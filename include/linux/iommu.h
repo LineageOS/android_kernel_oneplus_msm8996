@@ -21,6 +21,7 @@
 
 #include <linux/errno.h>
 #include <linux/err.h>
+#include <linux/of.h>
 #include <linux/types.h>
 #include <trace/events/iommu.h>
 
@@ -123,6 +124,7 @@ extern struct dentry *iommu_debugfs_top;
  * @remove_device: remove device from iommu grouping
  * @domain_get_attr: Query domain attributes
  * @domain_set_attr: Change domain attributes
+ * @of_xlate: add OF master IDs to iommu grouping
  * @pgsize_bitmap: bitmap of supported page sizes
  * @priv: per-instance data private to the iommu driver
  * @trigger_fault: trigger a fault on the device attached to an iommu domain
@@ -172,6 +174,10 @@ struct iommu_ops {
 				  unsigned long offset);
 	void (*reg_write)(struct iommu_domain *domain, unsigned long val,
 			  unsigned long offset);
+
+#ifdef CONFIG_OF_IOMMU
+	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
+#endif
 
 	unsigned long pgsize_bitmap;
 	void *priv;
