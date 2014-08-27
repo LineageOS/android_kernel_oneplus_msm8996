@@ -124,6 +124,7 @@ extern struct dentry *iommu_debugfs_top;
  * @domain_get_attr: Query domain attributes
  * @domain_set_attr: Change domain attributes
  * @pgsize_bitmap: bitmap of supported page sizes
+ * @priv: per-instance data private to the iommu driver
  * @trigger_fault: trigger a fault on the device attached to an iommu domain
  * @reg_read: read an IOMMU register
  * @reg_write: write an IOMMU register
@@ -173,6 +174,7 @@ struct iommu_ops {
 			  unsigned long offset);
 
 	unsigned long pgsize_bitmap;
+	void *priv;
 };
 
 #define IOMMU_GROUP_NOTIFY_ADD_DEVICE		1 /* Device added */
