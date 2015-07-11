@@ -55,6 +55,8 @@
 #include "mdss_smmu.h"
 #include "mdss_mdp.h"
 
+#include "mdss_livedisplay.h"
+
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
 #else
@@ -752,104 +754,6 @@ static ssize_t mdss_fb_get_dfps_mode(struct device *dev,
 	return ret;
 }
 
-static ssize_t mdss_fb_get_ACL(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct fb_info *fbi = dev_get_drvdata(dev);
-	struct msm_fb_data_type *mfd = fbi->par;
-	int ret,acl_mode;
-	acl_mode = mdss_fb_send_panel_event(mfd, MDSS_EVENT_PANEL_GET_ACL,
-			NULL);
-
-	ret = scnprintf(buf, PAGE_SIZE, "ACL current mode %d\n"
-											"0--ACL OFF\n"
-											"1--ACL 50\n"
-											"2--ALC 40\n"
-											"3--ACL 30\n",
-											acl_mode);
-
-	return ret;
-}
-
-static ssize_t mdss_fb_set_ACL(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct fb_info *fbi = dev_get_drvdata(dev);
-	struct msm_fb_data_type *mfd = fbi->par;
-	int rc = 0;
-	int state = 0;
-
-	rc = kstrtoint(buf, 10, &state);
-	if (rc) {
-		pr_err("kstrtoint failed. rc=%d\n", rc);
-		return rc;
-	}
-
-	pr_err("ACL = %d\n", state);
-
-	rc = mdss_fb_send_panel_event(mfd, MDSS_EVENT_PANEL_SET_ACL,
-		(void *)(unsigned long)state);
-	if (rc) {
-		pr_warn("unable to set ACL(%d)\n", state);
-	}
-
-	return count;
-}
-
-static DEVICE_ATTR(acl, S_IRUGO | S_IWUSR | S_IWGRP,
-	mdss_fb_get_ACL, mdss_fb_set_ACL);
-
-static ssize_t mdss_fb_get_max_brightness(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct fb_info *fbi = dev_get_drvdata(dev);
-	struct msm_fb_data_type *mfd = fbi->par;
-	int ret = 0;
-	int level = 0;
-
-	level = mdss_fb_send_panel_event(mfd, MDSS_EVENT_PANEL_GET_MAX_BRIGHTNESS,
-			NULL);
-
-	/*
-	 0-->max brightness level 380nit
-	 1-->max brightness level 430nit
-	 2-->HBM Enabled
-	 On CM we only use 0 and 2
-	*/
-	ret=scnprintf(buf, PAGE_SIZE, "%d\n", level & 0x000F);
-
-	return ret;
-}
-
-static ssize_t mdss_fb_set_max_brightness(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct fb_info *fbi = dev_get_drvdata(dev);
-	struct msm_fb_data_type *mfd = fbi->par;
-	int rc = 0;
-	int level = 0;
-
-	rc = kstrtoint(buf, 16, &level);
-	if (rc) {
-		pr_err("kstrtoint failed. rc=%d\n", rc);
-		return rc;
-	}
-
-	pr_err("Max Brightness Setting = 0x%02X\n", level);
-	rc = mdss_fb_send_panel_event(mfd, MDSS_EVENT_PANEL_SET_MAX_BRIGHTNESS,
-												(void *)(unsigned long)level);
-	if (rc)
-		pr_err("Fail to set max brihtness level 0x%02X\n", level);
-
-	return count;
-}
-
-static DEVICE_ATTR(hbm, S_IRUGO | S_IWUSR,
-	mdss_fb_get_max_brightness, mdss_fb_set_max_brightness);
-// Also export hbm as sre, as this is what user space expects
-static DEVICE_ATTR(sre, S_IRUGO | S_IWUSR,
-	mdss_fb_get_max_brightness, mdss_fb_set_max_brightness);
-
 static DEVICE_ATTR(msm_fb_type, S_IRUGO, mdss_fb_get_type, NULL);
 static DEVICE_ATTR(msm_fb_split, S_IRUGO | S_IWUSR, mdss_fb_show_split,
 					mdss_fb_store_split);
@@ -877,9 +781,6 @@ static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_msm_fb_thermal_level.attr,
 	&dev_attr_msm_fb_panel_status.attr,
 	&dev_attr_msm_fb_dfps_mode.attr,
-	&dev_attr_acl.attr,
-	&dev_attr_hbm.attr,
-	&dev_attr_sre.attr,
 	NULL,
 };
 
@@ -894,7 +795,8 @@ static int mdss_fb_create_sysfs(struct msm_fb_data_type *mfd)
 	rc = sysfs_create_group(&mfd->fbi->dev->kobj, &mdss_fb_attr_group);
 	if (rc)
 		pr_err("sysfs group creation failed, rc=%d\n", rc);
-	return rc;
+
+	return mdss_livedisplay_create_sysfs(mfd);
 }
 
 static void mdss_fb_remove_sysfs(struct msm_fb_data_type *mfd)

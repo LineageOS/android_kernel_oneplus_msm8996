@@ -25,6 +25,7 @@
 
 #include "mdss_dsi.h"
 #include "mdss_dba_utils.h"
+#include "mdss_livedisplay.h"
 
 #include <linux/project_info.h>
 
@@ -162,7 +163,7 @@ int mdss_dsi_panel_cmd_read(struct mdss_dsi_ctrl_pdata *ctrl, char cmd0,
 	return mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 }
 
-static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
+void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 			struct dsi_panel_cmds *pcmds, u32 flags)
 {
 	struct dcs_cmd_req cmdreq;
@@ -214,36 +215,6 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 
 	memset(&cmdreq, 0, sizeof(cmdreq));
 	cmdreq.cmds = &backlight_cmd;
-	cmdreq.cmds_cnt = 1;
-	cmdreq.flags = CMD_REQ_COMMIT | CMD_CLK_CTRL;
-	cmdreq.rlen = 0;
-	cmdreq.cb = NULL;
-
-	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
-}
-
-static char acl_mode[2] = {0x55, 0x0};	/* DTYPE_DCS_WRITE1 */
-static struct dsi_cmd_desc acl_cmd = {
-	{DTYPE_DCS_WRITE1, 1, 0, 0, 1, sizeof(acl_mode)},
-	acl_mode
-};
-
-void mdss_dsi_panel_set_acl(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
-{
-	struct dcs_cmd_req cmdreq;
-	struct mdss_panel_info *pinfo;
-
-	pinfo = &(ctrl->panel_data.panel_info);
-	if (pinfo->dcs_cmd_by_left) {
-		if (ctrl->ndx != DSI_CTRL_LEFT)
-			return;
-	}
-
-	pr_err("%s: level=%d\n", __func__, mode);
-
-	acl_mode[1] = (unsigned char)mode;
-	memset(&cmdreq, 0, sizeof(cmdreq));
-	cmdreq.cmds = &acl_cmd;
 	cmdreq.cmds_cnt = 1;
 	cmdreq.flags = CMD_REQ_COMMIT | CMD_CLK_CTRL;
 	cmdreq.rlen = 0;
@@ -723,62 +694,6 @@ static void mdss_dsi_panel_switch_mode(struct mdss_panel_data *pdata,
 	mdss_dsi_panel_cmds_send(ctrl_pdata, pcmds, flags);
 }
 
-static char hbm_status = 0;
-static char hbm_mode[2] = {0x53, 0x0};	/* DTYPE_DCS_WRITE1 */
-static struct dsi_cmd_desc hbm_cmd = {
-	{DTYPE_DCS_WRITE1, 1, 0, 0, 1, sizeof(hbm_mode)},
-	hbm_mode
-};
-void mdss_dsi_panel_set_hbm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
-{
-	struct dcs_cmd_req cmdreq;
-	struct mdss_panel_info *pinfo;
-
-	pinfo = &(ctrl->panel_data.panel_info);
-	if (pinfo->dcs_cmd_by_left) {
-		if (ctrl->ndx != DSI_CTRL_LEFT)
-			return;
-	}
-	if (level){
-	    hbm_mode[1] = 0xE8;
-	    pr_err("HBM Mode ON\n");
-	}
-	else{
-		hbm_mode[1] = 0x28;
-	    pr_err("HBM Mode OFF\n");
-	}
-
-	hbm_status = level;
-	memset(&cmdreq, 0, sizeof(cmdreq));
-	cmdreq.cmds = &hbm_cmd;
-	cmdreq.cmds_cnt = 1;
-	cmdreq.flags = CMD_REQ_COMMIT | CMD_CLK_CTRL;
-	cmdreq.rlen = 0;
-	cmdreq.cb = NULL;
-
-	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
-}
-
-#define BRIGHTNESS_LEVEL_MASK 0x000F
-
-enum brightness_setting_src_mask {
-	BRIGHTNESS_MASK_AUTO_BL = 0x0010,
-	BRIGHTNESS_MASK_CAMERA =  0x0020,
-	BRIGHTNESS_MASK_GALLERY = 0x0040,
-    //Add other setting here.
-};
-
-#define DEFAULT_BRIGHTNESS_LEVEL 230
-#define MAX_BRIGHTNESS_LEVEL 255
-static int max_brightness_setting = DEFAULT_BRIGHTNESS_LEVEL;
-static int pre_brightness_setting = 0;
-static int brightness_setting_src = 0;
-static int brightness_setting_level = 0;
-/**********************************************
-remapping backlight 0-->55 to 0-->55
-remapping backlight 55-->230 to 55-->200
-remapping backlight 230-->255 to 200-->255
-**********************************************/
 static u32 backlight_remap(u32 level)
 {
     u32 temp = 0;
@@ -794,112 +709,6 @@ static u32 backlight_remap(u32 level)
 	}
 #endif
 	return temp;
-}
-
-/*********************************************************************************
-int level;
-1. auto backlight setting
-   0x10 --Max 380 nit
-   0x11 --Max 430 nit
-   0x12 --HBM
-2. camera setting
-   0x20 --Max 380 nit
-   0x21 --Max 430 nit
-3. gallery setting
-   0x40 --Max 380 nit
-   0x41 --Max 430 nit
-4. 0, 1, 2 Can be also used for test.
-   0 --Max 380 nit
-   1 --Max 430 nit
-   2 --HBM
-**********************************************************************************/
-void mdss_dsi_panel_set_max_brightness(struct mdss_dsi_ctrl_pdata *ctrl, int level)
-{
-    struct mdss_dsi_ctrl_pdata *pctrl = ctrl;
-    int pre_level = 0;
-    int bl_level = BRIGHTNESS_LEVEL_MASK & level;
-
-    if (pctrl->high_brightness_panel){
-        if (!(pctrl->ctrl_state & CTRL_STATE_PANEL_INIT)){
-            pr_err("Can not set brightness in panel off status!!!\n" );
-            return;
-        }
-	    switch (bl_level){
-            case 0: //default brightness
-                if (!(level & (BRIGHTNESS_MASK_AUTO_BL | BRIGHTNESS_MASK_CAMERA | BRIGHTNESS_MASK_GALLERY))) { //for test
-                    if (hbm_status){
-                        mdss_dsi_panel_set_hbm(pctrl, 0);
-                        brightness_setting_level &= ~0x02;
-                    }
-                }else if ((level & BRIGHTNESS_MASK_AUTO_BL)){ //auto backlight setting
-                    if (hbm_status){
-                        mdss_dsi_panel_set_hbm(pctrl, 0);
-                        brightness_setting_level &= ~0x02;
-                    }
-                    if (brightness_setting_src & (BRIGHTNESS_MASK_CAMERA | BRIGHTNESS_MASK_GALLERY)){ //Camera or Gallery has set brightness
-                       break;
-                    }
-                }else if (level & BRIGHTNESS_MASK_CAMERA){
-                    if (brightness_setting_src & (BRIGHTNESS_MASK_AUTO_BL | BRIGHTNESS_MASK_GALLERY)){ //Auto BL or Gallery has set brightness
-                       break;
-                    }
-                }else if (level & BRIGHTNESS_MASK_GALLERY){
-                    if (brightness_setting_src & (BRIGHTNESS_MASK_AUTO_BL | BRIGHTNESS_MASK_CAMERA)){ //Auto BL or Camera has set brightness
-                       break;
-                    }
-                }
-
-                max_brightness_setting = DEFAULT_BRIGHTNESS_LEVEL;
-                pre_level = backlight_remap(pre_brightness_setting);
-                mdss_dsi_panel_bklt_dcs(pctrl, pre_level);
-                brightness_setting_level &= ~0x01;
-                break;
-
-            case 1: //max brightness
-                max_brightness_setting = MAX_BRIGHTNESS_LEVEL;
-                pre_level = backlight_remap(pre_brightness_setting);
-                mdss_dsi_panel_bklt_dcs(pctrl, pre_level);
-                brightness_setting_level |= 0x01;
-                //app can not disable hbm
-                if (level & (BRIGHTNESS_MASK_CAMERA | BRIGHTNESS_MASK_GALLERY)){
-                    break;
-                }
-                if (hbm_status){
-                    mdss_dsi_panel_set_hbm(pctrl, 0);
-                    brightness_setting_level &= ~0x02;
-                }
-                break;
-
-            case 2: //HBM
-                //app can not enable hbm
-                if (level & (BRIGHTNESS_MASK_CAMERA | BRIGHTNESS_MASK_GALLERY)){
-                    break;
-                }
-                mdss_dsi_panel_set_hbm(pctrl, 1);
-                brightness_setting_level |= 0x02;
-                break;
-            default:
-                break;
-        }
-
-        if (bl_level) {
-            brightness_setting_src |= (level & (BRIGHTNESS_MASK_AUTO_BL |
-                      BRIGHTNESS_MASK_CAMERA | BRIGHTNESS_MASK_GALLERY));
-        }else{
-            brightness_setting_src &= ~(level & (BRIGHTNESS_MASK_AUTO_BL |
-                 BRIGHTNESS_MASK_CAMERA | BRIGHTNESS_MASK_GALLERY));
-        }
-    }
-    return;
-}
-int mdss_dsi_panel_get_max_brightness(struct mdss_dsi_ctrl_pdata *ctrl)
-{
-    struct mdss_dsi_ctrl_pdata *pctrl = ctrl;
-
-    if (pctrl->high_brightness_panel){
-        return (brightness_setting_level > 0x02) ? 0x02 : brightness_setting_level;
-	}else
-        return 0;
 }
 
 static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
@@ -926,7 +735,6 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 				panel_data);
     if (ctrl_pdata->high_brightness_panel){
        pr_debug("%s goto backlight remap\n", __func__);
-       pre_brightness_setting = bl_level;
        bl_level = backlight_remap(bl_level);
     }
 	/*
@@ -1010,13 +818,17 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 
 	if (on_cmds->cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, on_cmds, CMD_REQ_COMMIT);
-	if(ctrl->acl_mode)
-		mdss_dsi_panel_set_acl(ctrl,ctrl->acl_mode);
+
 	if (pinfo->compression_mode == COMPRESSION_DSC)
 		mdss_dsi_panel_dsc_pps_send(ctrl, pinfo);
 
 	if (ctrl->ds_registered && pinfo->is_pluggable)
 		mdss_dba_utils_video_on(pinfo->dba_data, pinfo);
+
+	if (pdata->event_handler)
+		pdata->event_handler(pdata, MDSS_EVENT_UPDATE_LIVEDISPLAY,
+				(void *)(unsigned long) MODE_UPDATE_ALL);
+
 end:
 	pr_debug("%s:-\n", __func__);
 	return ret;
@@ -1139,7 +951,7 @@ static void mdss_dsi_parse_trigger(struct device_node *np, char *trigger,
 }
 
 
-static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
+int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 		struct dsi_panel_cmds *pcmds, char *cmd_key, char *link_key)
 {
 	const char *data;
@@ -2654,6 +2466,8 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	pinfo->is_dba_panel = of_property_read_bool(np,
 			"qcom,dba-panel");
+
+	mdss_livedisplay_parse_dt(np, pinfo);
 
 	return 0;
 
