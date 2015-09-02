@@ -3448,6 +3448,11 @@ static int __mdss_fb_perform_commit(struct msm_fb_data_type *mfd)
 	if (mfd->switch_state == MDSS_MDP_WAIT_FOR_COMMIT) {
 		dynamic_dsi_switch = 1;
 		new_dsi_mode = mfd->switch_new_mode;
+	} else if (mfd->switch_state != MDSS_MDP_NO_UPDATE_REQUESTED) {
+		pr_err("invalid commit on fb%d with state = %d\n",
+			mfd->index, mfd->switch_state);
+		mutex_unlock(&mfd->switch_lock);
+		goto skip_commit;
 	}
 	mutex_unlock(&mfd->switch_lock);
 
@@ -3481,11 +3486,13 @@ static int __mdss_fb_perform_commit(struct msm_fb_data_type *mfd)
 			pr_err("pan display failed %x on fb%d\n", ret,
 					mfd->index);
 	}
-	if(mfd->first_frame)
-		{
-			mfd->first_frame = 0;
-			mdss_fb_send_panel_event(mfd, MDSS_EVENT_POST_PANEL_ON, NULL);
-		}
+
+	if (mfd->first_frame) {
+        mfd->first_frame = 0;
+        mdss_fb_send_panel_event(mfd, MDSS_EVENT_POST_PANEL_ON, NULL);
+    }
+
+skip_commit:
 	if (!ret)
 		mdss_fb_update_backlight(mfd);
 
