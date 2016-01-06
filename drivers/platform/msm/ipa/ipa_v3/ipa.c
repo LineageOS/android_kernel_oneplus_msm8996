@@ -59,6 +59,8 @@
 
 #define IPA_TRANSPORT_PROD_TIMEOUT_MSEC 100
 
+#define IPA_IPC_LOG_PAGES 50
+
 #define IPA3_ACTIVE_CLIENTS_TABLE_BUF_SIZE 2048
 
 #define IPA3_ACTIVE_CLIENT_LOG_TYPE_EP 0
@@ -498,7 +500,7 @@ static int ipa3_open(struct inode *inode, struct file *filp)
 {
 	struct ipa3_context *ctx = NULL;
 
-	IPADBG("ENTER\n");
+	IPADBG_LOW("ENTER\n");
 	ctx = container_of(inode->i_cdev, struct ipa3_context, cdev);
 	filp->private_data = ctx;
 
@@ -2918,11 +2920,11 @@ static int ipa3_get_clks(struct device *dev)
  */
 void _ipa_enable_clks_v3_0(void)
 {
-	IPADBG("enabling gcc_ipa_clk\n");
+	IPADBG_LOW("enabling gcc_ipa_clk\n");
 	if (ipa3_clk) {
 		clk_prepare(ipa3_clk);
 		clk_enable(ipa3_clk);
-		IPADBG("curr_ipa_clk_rate=%d", ipa3_ctx->curr_ipa_clk_rate);
+		IPADBG_LOW("curr_ipa_clk_rate=%d", ipa3_ctx->curr_ipa_clk_rate);
 		clk_set_rate(ipa3_clk, ipa3_ctx->curr_ipa_clk_rate);
 		ipa3_uc_notify_clk_state(true);
 	} else {
@@ -2982,7 +2984,7 @@ void ipa3_enable_clks(void)
  */
 void _ipa_disable_clks_v3_0(void)
 {
-	IPADBG("disabling gcc_ipa_clk\n");
+	IPADBG_LOW("disabling gcc_ipa_clk\n");
 	ipa3_suspend_apps_pipes(true);
 	ipa3_uc_notify_clk_state(false);
 	if (ipa3_clk)
@@ -3142,7 +3144,7 @@ void ipa3_inc_client_enable_clks(struct ipa3_active_client_logging_info *id)
 	ipa3_ctx->ipa3_active_clients.cnt++;
 	if (ipa3_ctx->ipa3_active_clients.cnt == 1)
 		ipa3_enable_clks();
-	IPADBG("active clients = %d\n", ipa3_ctx->ipa3_active_clients.cnt);
+	IPADBG_LOW("active clients = %d\n", ipa3_ctx->ipa3_active_clients.cnt);
 	ipa3_active_clients_unlock();
 }
 
@@ -3169,7 +3171,7 @@ int ipa3_inc_client_enable_clks_no_block(struct ipa3_active_client_logging_info
 	}
 	ipa3_active_clients_log_inc(id, true);
 	ipa3_ctx->ipa3_active_clients.cnt++;
-	IPADBG("active clients = %d\n", ipa3_ctx->ipa3_active_clients.cnt);
+	IPADBG_LOW("active clients = %d\n", ipa3_ctx->ipa3_active_clients.cnt);
 bail:
 	ipa3_active_clients_trylock_unlock(&flags);
 
@@ -3194,7 +3196,7 @@ void ipa3_dec_client_disable_clks(struct ipa3_active_client_logging_info *id)
 	ipa3_active_clients_lock();
 	ipa3_active_clients_log_dec(id, false);
 	ipa3_ctx->ipa3_active_clients.cnt--;
-	IPADBG("active clients = %d\n", ipa3_ctx->ipa3_active_clients.cnt);
+	IPADBG_LOW("active clients = %d\n", ipa3_ctx->ipa3_active_clients.cnt);
 	if (ipa3_ctx->ipa3_active_clients.cnt == 0) {
 		if (ipa3_ctx->tag_process_before_gating) {
 			ipa3_ctx->tag_process_before_gating = false;
@@ -3229,7 +3231,7 @@ void ipa3_inc_acquire_wakelock(void)
 	ipa3_ctx->wakelock_ref_cnt.cnt++;
 	if (ipa3_ctx->wakelock_ref_cnt.cnt == 1)
 		__pm_stay_awake(&ipa3_ctx->w_lock);
-	IPADBG("active wakelock ref cnt = %d\n",
+	IPADBG_LOW("active wakelock ref cnt = %d\n",
 		ipa3_ctx->wakelock_ref_cnt.cnt);
 	spin_unlock_irqrestore(&ipa3_ctx->wakelock_ref_cnt.spinlock, flags);
 }
@@ -3248,7 +3250,7 @@ void ipa3_dec_release_wakelock(void)
 
 	spin_lock_irqsave(&ipa3_ctx->wakelock_ref_cnt.spinlock, flags);
 	ipa3_ctx->wakelock_ref_cnt.cnt--;
-	IPADBG("active wakelock ref cnt = %d\n",
+	IPADBG_LOW("active wakelock ref cnt = %d\n",
 		ipa3_ctx->wakelock_ref_cnt.cnt);
 	if (ipa3_ctx->wakelock_ref_cnt.cnt == 0)
 		__pm_relax(&ipa3_ctx->w_lock);
@@ -3261,7 +3263,7 @@ int ipa3_set_required_perf_profile(enum ipa_voltage_level floor_voltage,
 	enum ipa_voltage_level needed_voltage;
 	u32 clk_rate;
 
-	IPADBG("floor_voltage=%d, bandwidth_mbps=%u",
+	IPADBG_LOW("floor_voltage=%d, bandwidth_mbps=%u",
 					floor_voltage, bandwidth_mbps);
 
 	if (floor_voltage < IPA_VOLTAGE_UNSPECIFIED ||
@@ -3271,7 +3273,7 @@ int ipa3_set_required_perf_profile(enum ipa_voltage_level floor_voltage,
 	}
 
 	if (ipa3_ctx->enable_clock_scaling) {
-		IPADBG("Clock scaling is enabled\n");
+		IPADBG_LOW("Clock scaling is enabled\n");
 		if (bandwidth_mbps >=
 			ipa3_ctx->ctrl->clock_scaling_bw_threshold_turbo)
 			needed_voltage = IPA_VOLTAGE_TURBO;
@@ -3281,7 +3283,7 @@ int ipa3_set_required_perf_profile(enum ipa_voltage_level floor_voltage,
 		else
 			needed_voltage = IPA_VOLTAGE_SVS;
 	} else {
-		IPADBG("Clock scaling is disabled\n");
+		IPADBG_LOW("Clock scaling is disabled\n");
 		needed_voltage = IPA_VOLTAGE_NOMINAL;
 	}
 
@@ -3303,13 +3305,13 @@ int ipa3_set_required_perf_profile(enum ipa_voltage_level floor_voltage,
 	}
 
 	if (clk_rate == ipa3_ctx->curr_ipa_clk_rate) {
-		IPADBG("Same voltage\n");
+		IPADBG_LOW("Same voltage\n");
 		return 0;
 	}
 
 	ipa3_active_clients_lock();
 	ipa3_ctx->curr_ipa_clk_rate = clk_rate;
-	IPADBG("setting clock rate to %u\n", ipa3_ctx->curr_ipa_clk_rate);
+	IPADBG_LOW("setting clock rate to %u\n", ipa3_ctx->curr_ipa_clk_rate);
 	if (ipa3_ctx->ipa3_active_clients.cnt > 0) {
 		clk_set_rate(ipa3_clk, ipa3_ctx->curr_ipa_clk_rate);
 		if (ipa3_ctx->ipa3_hw_mode != IPA_HW_MODE_VIRTUAL)
@@ -3317,10 +3319,10 @@ int ipa3_set_required_perf_profile(enum ipa_voltage_level floor_voltage,
 			    ipa3_ctx->ipa_bus_hdl, ipa3_get_bus_vote()))
 				WARN_ON(1);
 	} else {
-		IPADBG("clocks are gated, not setting rate\n");
+		IPADBG_LOW("clocks are gated, not setting rate\n");
 	}
 	ipa3_active_clients_unlock();
-	IPADBG("Done\n");
+	IPADBG_LOW("Done\n");
 	return 0;
 }
 
@@ -3350,7 +3352,8 @@ void ipa3_suspend_handler(enum ipa_irq_type interrupt,
 	int res;
 	struct ipa_ep_cfg_holb holb_cfg;
 
-	IPADBG("interrupt=%d, interrupt_data=%u\n", interrupt, suspend_data);
+	IPADBG("interrupt=%d, interrupt_data=%u\n",
+		interrupt, suspend_data);
 	memset(&holb_cfg, 0, sizeof(holb_cfg));
 	holb_cfg.tmr_val = 0;
 
@@ -3366,8 +3369,8 @@ void ipa3_suspend_handler(enum ipa_irq_type interrupt,
 					) {
 					IPA_ACTIVE_CLIENTS_INC_EP(
 						ipa3_ctx->ep[i].client);
-					IPADBG("Pipes un-suspended.\n");
-					IPADBG("Enter poll mode.\n");
+					IPADBG_LOW("Pipes un-suspended.\n");
+					IPADBG_LOW("Enter poll mode.\n");
 					atomic_set(
 					&ipa3_ctx->transport_pm.dec_clients,
 					1);
@@ -3859,6 +3862,20 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 		goto fail_mem_ctx;
 	}
 
+	ipa3_ctx->logbuf = ipc_log_context_create(IPA_IPC_LOG_PAGES, "ipa", 0);
+	if (ipa3_ctx->logbuf == NULL) {
+		IPAERR("failed to get logbuf\n");
+		result = -ENOMEM;
+		goto fail_logbuf;
+	}
+	ipa3_ctx->logbuf_low =
+		ipc_log_context_create(IPA_IPC_LOG_PAGES, "ipa_low", 0);
+	if (ipa3_ctx->logbuf_low == NULL) {
+		IPAERR("failed to get logbuf_low\n");
+		result = -ENOMEM;
+		goto fail_logbuf_low;
+	}
+
 	ipa3_ctx->pdev = ipa_dev;
 	ipa3_ctx->uc_pdev = ipa_dev;
 	ipa3_ctx->smmu_present = smmu_present;
@@ -4333,6 +4350,10 @@ fail_bus_reg:
 fail_bind:
 	kfree(ipa3_ctx->ctrl);
 fail_mem_ctrl:
+	ipc_log_context_destroy(ipa3_ctx->logbuf_low);
+fail_logbuf_low:
+	ipc_log_context_destroy(ipa3_ctx->logbuf);
+fail_logbuf:
 	kfree(ipa3_ctx);
 	ipa3_ctx = NULL;
 fail_mem_ctx:
