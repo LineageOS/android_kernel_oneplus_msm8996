@@ -35,6 +35,7 @@
 #include <linux/cma.h>
 #include <linux/highmem.h>
 #include <linux/delay.h>
+#include <linux/kmemleak.h>
 #include <trace/events/cma.h>
 
 #include "cma.h"
@@ -314,6 +315,9 @@ int __init cma_declare_contiguous(phys_addr_t base,
 				goto err;
 			}
 		}
+
+		if (addr < highmem_start)
+			kmemleak_no_scan(__va(addr));
 
 		base = addr;
 	}
