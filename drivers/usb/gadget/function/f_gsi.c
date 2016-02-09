@@ -2331,7 +2331,7 @@ skip_string_id_alloc:
 		if (!ep)
 			goto fail;
 		gsi->d_port.in_ep = ep;
-		msm_ep_config(gsi->d_port.in_ep, NULL, GFP_ATOMIC);
+		msm_ep_config(gsi->d_port.in_ep, NULL, GFP_KERNEL);
 		ep->driver_data = cdev;	/* claim */
 	}
 
@@ -2341,7 +2341,7 @@ skip_string_id_alloc:
 		if (!ep)
 			goto fail;
 		gsi->d_port.out_ep = ep;
-		msm_ep_config(gsi->d_port.out_ep, NULL, GFP_ATOMIC);
+		msm_ep_config(gsi->d_port.out_ep, NULL, GFP_KERNEL);
 		ep->driver_data = cdev;	/* claim */
 	}
 
