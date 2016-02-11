@@ -809,9 +809,6 @@ void a5xx_snapshot(struct adreno_device *adreno_dev,
 	/* Try to run the crash dumper */
 	_a5xx_do_crashdump(device);
 
-	/* Try to run the crash dumper */
-	_a5xx_do_crashdump(device);
-
 	kgsl_snapshot_add_section(device, KGSL_SNAPSHOT_SECTION_REGS,
 		snapshot, a5xx_snapshot_registers, NULL);
 
