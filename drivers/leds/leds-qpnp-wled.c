@@ -1764,7 +1764,7 @@ static int qpnp_wled_probe(struct spmi_device *spmi)
 {
 	struct qpnp_wled *wled;
 	struct resource *wled_resource;
-	int rc, i;
+	int rc = 0, i;
 
 	wled = devm_kzalloc(&spmi->dev, sizeof(*wled), GFP_KERNEL);
 	if (!wled)
