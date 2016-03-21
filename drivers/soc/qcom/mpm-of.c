@@ -585,6 +585,9 @@ void msm_mpm_exit_sleep(bool from_idle)
 	uint32_t *enabled_intr;
 	int i;
 	int k;
+#ifdef CONFIG_HTC_POWER_DEBUG
+	const char *name;
+#endif
 
 	if (!msm_mpm_is_initialized()) {
 		pr_err("%s(): MPM not initialized\n", __func__);
@@ -612,6 +615,23 @@ void msm_mpm_exit_sleep(bool from_idle)
 
 			if (desc)
 				chip = desc->irq_data.chip;
+
+#ifdef CONFIG_HTC_POWER_DEBUG
+			name = "null";
+			if (desc == NULL)
+				name = "stray irq";
+			else if (desc->action && desc->action->name)
+				name = desc->action->name;
+
+			if(strcmp(desc->irq_data.chip->name,"msmgpio")==0)
+				pr_info("[WAKEUP] Resume caused by msmgpio-%lu\n", desc->irq_data.hwirq);
+
+			pr_info("%s: irq %d tirggered %s-%lu-%s", __func__,
+						apps_irq,
+						irq_desc_get_chip(desc)->name,
+						desc->irq_data.hwirq,
+						name);
+#endif
 
 			if (desc && !irqd_is_level_type(&desc->irq_data) &&
 				(!(chip && !strcmp(chip->name, "msmgpio")))) {
