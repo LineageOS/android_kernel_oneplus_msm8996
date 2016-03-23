@@ -115,7 +115,7 @@ u32 mdss_mdp_get_mixercfg(struct mdss_mdp_mixer *mixer, bool extn)
 	return mdss_mdp_ctl_read(mixer->ctl, mixer_off);
 }
 
-static inline u32 mdss_mdp_get_pclk_rate(struct mdss_mdp_ctl *ctl)
+static inline u64 mdss_mdp_get_pclk_rate(struct mdss_mdp_ctl *ctl)
 {
 	struct mdss_panel_info *pinfo = &ctl->panel_data->panel_info;
 
@@ -1321,9 +1321,9 @@ static void __mdss_mdp_perf_calc_ctl_helper(struct mdss_mdp_ctl *ctl,
 			perf->prefill_bytes += tmp.prefill_bytes;
 
 		if (ctl->intf_type) {
-			u32 clk_rate = mdss_mdp_get_pclk_rate(ctl);
+			u64 clk_rate = mdss_mdp_get_pclk_rate(ctl);
 			/* minimum clock rate due to inefficiency in 3dmux */
-			clk_rate = mult_frac(clk_rate >> 1, 9, 8);
+			clk_rate = DIV_ROUND_UP_ULL((clk_rate >> 1) * 9, 8);
 			if (clk_rate > perf->mdp_clk_rate)
 				perf->mdp_clk_rate = clk_rate;
 		}
