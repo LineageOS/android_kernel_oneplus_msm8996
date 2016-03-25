@@ -68,6 +68,7 @@ static int set_name(const char *str, struct kernel_param *kp)
 		count++;
 	} else {
 		pr_err("app_setting: set name failed. Max entries reached\n");
+		kfree(name);
 		mutex_unlock(&mutex);
 		return -EPERM;
 	}
