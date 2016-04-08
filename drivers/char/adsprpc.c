@@ -441,6 +441,7 @@ static void fastrpc_mmap_free(struct fastrpc_mmap *map)
 
 	if (!map)
 		return;
+	fl = map->fl;
 	if (map->flags == ADSP_MMAP_HEAP_ADDR) {
 		spin_lock(&me->hlock);
 		map->refs--;
@@ -448,18 +449,6 @@ static void fastrpc_mmap_free(struct fastrpc_mmap *map)
 			hlist_del_init(&map->hn);
 		spin_unlock(&me->hlock);
 	} else {
-		int destVM[1] = {VMID_HLOS};
-		int destVMperm[1] = {PERM_READ | PERM_WRITE | PERM_EXEC};
-
-		fl = map->fl;
-		vmid = fl->apps->channel[fl->cid].vmid;
-		if (vmid) {
-			int srcVM[2] = {VMID_HLOS, vmid};
-
-			hyp_assign_phys(map->phys, buf_page_size(map->size),
-				srcVM, 2, destVM, destVMperm, 1);
-		}
-
 		spin_lock(&fl->hlock);
 		map->refs--;
 		if (!map->refs)
@@ -482,6 +471,9 @@ static void fastrpc_mmap_free(struct fastrpc_mmap *map)
 					&(map->va), map->phys,	&attrs);
 		}
 	} else {
+		int destVM[1] = {VMID_HLOS};
+		int destVMperm[1] = {PERM_READ | PERM_WRITE | PERM_EXEC};
+
 		if (!IS_ERR_OR_NULL(map->handle))
 			ion_free(fl->apps->client, map->handle);
 		if (fl->sctx->smmu.enabled) {
@@ -491,6 +483,14 @@ static void fastrpc_mmap_free(struct fastrpc_mmap *map)
 					map->table->nents, DMA_BIDIRECTIONAL,
 					map->buf);
 		}
+		vmid = fl->apps->channel[fl->cid].vmid;
+		if (vmid && map->phys) {
+			int srcVM[2] = {VMID_HLOS, vmid};
+
+			hyp_assign_phys(map->phys, buf_page_size(map->size),
+				srcVM, 2, destVM, destVMperm, 1);
+		}
+
 		if (!IS_ERR_OR_NULL(map->table))
 			dma_buf_unmap_attachment(map->attach, map->table,
 					DMA_BIDIRECTIONAL);
@@ -569,9 +569,12 @@ static int fastrpc_mmap_create(struct fastrpc_file *fl, int fd, uintptr_t va,
 			goto bail;
 		map->uncached = !ION_IS_CACHED(flags);
 		map->phys = sg_dma_address(map->table->sgl);
-		map->size = sg_dma_len(map->table->sgl);
-		if (sess->smmu.cb)
+		if (sess->smmu.cb) {
 			map->phys += ((uint64_t)sess->smmu.cb << 32);
+			map->size = sg_dma_len(map->table->sgl);
+		} else {
+			map->size = buf_page_size(len);
+		}
 		vmid = fl->apps->channel[fl->cid].vmid;
 		if (vmid) {
 			int srcVM[1] = {VMID_HLOS};
