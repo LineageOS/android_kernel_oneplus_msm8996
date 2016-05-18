@@ -157,9 +157,9 @@ static int insert_str_to_int_lock(struct packagelist_data *pkgl_dat, char *key,
 	return 0;
 }
 
-static void fixup_perms(struct super_block *sb) {
+static void fixup_perms(struct super_block *sb, const char *key) {
 	if (sb && sb->s_magic == SDCARDFS_SUPER_MAGIC) {
-		get_derive_permissions_recursive(sb->s_root);
+		fixup_perms_recursive(sb->s_root, key, strlen(key));
 	}
 }
 
@@ -174,7 +174,7 @@ static int insert_str_to_int(struct packagelist_data *pkgl_dat, char *key,
 
 	list_for_each_entry(sbinfo, &sdcardfs_super_list, list) {
 		if (sbinfo) {
-			fixup_perms(sbinfo->sb);
+			fixup_perms(sbinfo->sb, key);
 		}
 	}
 	mutex_unlock(&sdcardfs_super_list_lock);
@@ -203,7 +203,7 @@ static void remove_str_to_int(struct packagelist_data *pkgl_dat, const char *key
 	spin_unlock(&pkgl_data_all->hashtable_lock);
 	list_for_each_entry(sbinfo, &sdcardfs_super_list, list) {
 		if (sbinfo) {
-			fixup_perms(sbinfo->sb);
+			fixup_perms(sbinfo->sb, key);
 		}
 	}
 	mutex_unlock(&sdcardfs_super_list_lock);

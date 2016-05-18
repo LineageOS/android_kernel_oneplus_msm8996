@@ -505,7 +505,7 @@ static int sdcardfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	 * we pass along new_dentry for the name.*/
 	get_derived_permission_new(new_dentry->d_parent, old_dentry, new_dentry);
 	fix_derived_permission(old_dentry->d_inode);
-	get_derive_permissions_recursive(old_dentry);
+	fixup_top_recursive(old_dentry);
 out:
 	unlock_rename(lower_old_dir_dentry, lower_new_dir_dentry);
 	dput(lower_old_dir_dentry);
@@ -579,6 +579,13 @@ out:
 static int sdcardfs_permission(struct inode *inode, int mask)
 {
 	int err;
+	struct inode *top = SDCARDFS_I(inode)->top;
+
+	/* Ensure owner is up to date */
+	if (from_kuid(&init_user_ns, inode->i_uid) != from_kuid(&init_user_ns, top->i_uid)) {
+		SDCARDFS_I(inode)->d_uid = SDCARDFS_I(top)->d_uid;
+		fix_derived_permission(inode);
+	}
 
 	/*
 	 * Permission check on sdcardfs inode.
@@ -767,9 +774,7 @@ const struct inode_operations sdcardfs_symlink_iops = {
 const struct inode_operations sdcardfs_dir_iops = {
 	.create		= sdcardfs_create,
 	.lookup		= sdcardfs_lookup,
-#if 0
 	.permission	= sdcardfs_permission,
-#endif
 	.unlink		= sdcardfs_unlink,
 	.mkdir		= sdcardfs_mkdir,
 	.rmdir		= sdcardfs_rmdir,
