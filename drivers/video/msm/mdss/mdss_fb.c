@@ -845,6 +845,9 @@ static ssize_t mdss_fb_set_max_brightness(struct device *dev,
 
 static DEVICE_ATTR(hbm, S_IRUGO | S_IWUSR,
 	mdss_fb_get_max_brightness, mdss_fb_set_max_brightness);
+// Also export hbm as sre, as this is what user space expects
+static DEVICE_ATTR(sre, S_IRUGO | S_IWUSR,
+	mdss_fb_get_max_brightness, mdss_fb_set_max_brightness);
 
 static DEVICE_ATTR(msm_fb_type, S_IRUGO, mdss_fb_get_type, NULL);
 static DEVICE_ATTR(msm_fb_split, S_IRUGO | S_IWUSR, mdss_fb_show_split,
@@ -875,6 +878,7 @@ static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_msm_fb_dfps_mode.attr,
 	&dev_attr_acl.attr,
 	&dev_attr_hbm.attr,
+	&dev_attr_sre.attr,
 	NULL,
 };
 
