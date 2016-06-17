@@ -567,6 +567,7 @@
 			reg = <0xd000 0x100>;
 			label = "rgb";
 			status = "okay";
+			qcom,rgb-sync;
 
 			red_led: qcom,rgb_0 {
 				label = "rgb";
@@ -577,8 +578,14 @@
 				qcom,max-current = <12>;
 				qcom,default-state = "off";
 				linux,name = "red";
-				linux,default-trigger =
-					"battery-charging";
+				linux,default-trigger = "none";
+				qcom,duty-pcts = [ 00 0E 1C 2A 38 46 54 64 ];
+				qcom,start-idx = <0>;
+				qcom,pause-lo = <500>;
+				qcom,pause-hi = <500>;
+				qcom,ramp-step-ms = <50>;
+				qcom,lut-flags = <31>; /* loop, ramp up, reverse, pause hi, pause lo */
+				qcom,use-blink;
 			};
 
 			green_led: qcom,rgb_1 {
@@ -590,7 +597,14 @@
 				qcom,max-current = <12>;
 				qcom,default-state = "off";
 				linux,name = "green";
-				linux,default-trigger = "battery-full";
+				linux,default-trigger = "none";
+				qcom,duty-pcts = [ 00 0E 1C 2A 38 46 54 64 ];
+				qcom,start-idx = <8>;
+				qcom,pause-lo = <500>;
+				qcom,pause-hi = <500>;
+				qcom,ramp-step-ms = <50>;
+				qcom,lut-flags = <31>; /* loop, ramp up, reverse, pause hi, pause lo */
+				qcom,use-blink;
 			};
 
 			blue_led: qcom,rgb_2 {
@@ -602,7 +616,14 @@
 				qcom,max-current = <12>;
 				qcom,default-state = "off";
 				linux,name = "blue";
-				linux,default-trigger = "boot-indication";
+				linux,default-trigger = "none";
+				qcom,duty-pcts = [ 00 0E 1C 2A 38 46 54 64 ];
+				qcom,start-idx = <16>;
+				qcom,pause-lo = <500>;
+				qcom,pause-hi = <500>;
+				qcom,ramp-step-ms = <50>;
+				qcom,lut-flags = <31>; /* loop, ramp up, reverse, pause hi, pause lo */
+				qcom,use-blink;
 			};
 		};
 
