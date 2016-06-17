@@ -376,7 +376,6 @@ struct mdss_mdp_ctl {
 	u64 last_input_time;
 	int pending_mode_switch;
 	u16 frame_rate;
-	int autorefresh_frame_cnt;
 };
 
 struct mdss_mdp_mixer {
