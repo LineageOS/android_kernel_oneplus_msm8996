@@ -561,6 +561,7 @@
 			qcom,lra-auto-res-mode = "qwd";
 			qcom,lra-res-cal-period = <4>;
 		};
+
 		qcom,leds@d000 {
 			compatible = "qcom,leds-qpnp";
 			reg = <0xd000 0x100>;
@@ -575,20 +576,9 @@
 				qcom,pwm-us = <1000>;
 				qcom,max-current = <12>;
 				qcom,default-state = "off";
-				qcom,duty-pcts = [00 05 0a 0f 14 1d 28 32 3c 4b 64];
-				qcom,duty-ms = <20>;
-				qcom,start-idx = <1>;
-				qcom,idx-len = <11>;
-
-				qcom,lut-flags = <0x1f>;
-				qcom,ramp-step-ms = <100>;
-				qcom,pause-lo = <2000>;
-				qcom,pause-hi = <1000>;
-
 				linux,name = "red";
-				/*linux,default-trigger =
-					"battery-charging";*/
-				qcom,use-blink;
+				linux,default-trigger =
+					"battery-charging";
 			};
 
 			green_led: qcom,rgb_1 {
@@ -599,19 +589,8 @@
 				qcom,pwm-us = <1000>;
 				qcom,max-current = <12>;
 				qcom,default-state = "off";
-				qcom,duty-pcts = [00 05 0a 0f 14 1d 28 32 3c 4b 64];
-				qcom,duty-ms = <20>;
-				qcom,start-idx = <13>;
-				qcom,idx-len = <11>;
-
-				qcom,lut-flags = <0x1f>;
-				qcom,ramp-step-ms = <100>;
-				qcom,pause-lo = <2000>;
-				qcom,pause-hi = <1000>;
-
 				linux,name = "green";
-				/*linux,default-trigger = "battery-full";*/
-				qcom,use-blink;
+				linux,default-trigger = "battery-full";
 			};
 
 			blue_led: qcom,rgb_2 {
@@ -621,19 +600,8 @@
 				pwms = <&pmi8994_pwm_1 0 0>;
 				qcom,pwm-us = <1000>;
 				qcom,max-current = <12>;
-				qcom,duty-pcts = [00 05 0a 0f 14 1d 28 32 3c 4b 64];
-				qcom,duty-ms = <20>;
-				qcom,start-idx = <13>;
-				qcom,idx-len = <11>;
-
-				qcom,lut-flags = <0x1f>;
-				qcom,ramp-step-ms = <100>;
-				qcom,pause-lo = <2000>;
-				qcom,pause-hi = <1000>;
-
 				qcom,default-state = "off";
 				linux,name = "blue";
-				qcom,use-blink;
 				linux,default-trigger = "boot-indication";
 			};
 		};
