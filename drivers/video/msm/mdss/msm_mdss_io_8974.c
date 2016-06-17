@@ -1851,21 +1851,13 @@ int mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, void *clk_handle,
 	void *m_clk_handle;
 	bool is_ecg = false;
 	int state = MDSS_DSI_CLK_OFF;
+
 	if (!ctrl) {
 		pr_err("%s: Invalid arg\n", __func__);
 		return -EINVAL;
 	}
 
 	mutex_lock(&dsi_clk_mutex);
-
-	if (mctrl && (clk_handle == ctrl->dsi_clk_handle)) {
-		m_clk_handle = mctrl->dsi_clk_handle;
-		vote_cnt = &mctrl->m_dsi_vote_cnt;
-	} else if (mctrl) {
-		m_clk_handle = mctrl->mdp_clk_handle;
-		vote_cnt = &mctrl->m_mdp_vote_cnt;
-	}
-
 	/*
 	 * In sync_wait_broadcast mode, we need to enable clocks
 	 * for the other controller as well when enabling clocks
@@ -1887,6 +1879,18 @@ int mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, void *clk_handle,
 		if (!mctrl)
 			pr_warn("%s: Unable to get clk master control\n",
 				__func__);
+	}
+
+	/*
+	 * it should add and remove extra votes based on voting clients to avoid
+	 * removal of legitimate vote from DSI client.
+	 */
+	if (mctrl && (clk_handle == ctrl->dsi_clk_handle)) {
+		m_clk_handle = mctrl->dsi_clk_handle;
+		vote_cnt = &mctrl->m_dsi_vote_cnt;
+	} else if (mctrl) {
+		m_clk_handle = mctrl->mdp_clk_handle;
+		vote_cnt = &mctrl->m_mdp_vote_cnt;
 	}
 
 	/*
@@ -1917,6 +1921,7 @@ int mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, void *clk_handle,
 		}
 		(*vote_cnt)++;
 	}
+
 	rc = mdss_dsi_clk_req_state(clk_handle, clk_type, clk_state, ctrl->ndx);
 	if (rc) {
 		pr_err("%s: failed set clk state, rc = %d\n", __func__, rc);

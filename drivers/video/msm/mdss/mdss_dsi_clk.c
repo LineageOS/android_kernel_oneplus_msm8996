@@ -727,7 +727,7 @@ bool is_dsi_clk_in_ecg_state(void *client)
 
 
 	if (!client) {
-		pr_err("Invalid client params\n");
+		pr_err("Invalid params, client = %p\n", client);
 		goto end;
 	}
 
@@ -742,7 +742,7 @@ end:
 }
 
 int mdss_dsi_clk_req_state(void *client, enum mdss_dsi_clk_type clk,
-			enum mdss_dsi_clk_state state, u32 index)
+	enum mdss_dsi_clk_state state, u32 index)
 {
 	int rc = 0;
 	struct mdss_dsi_clk_client_info *c = client;
@@ -762,6 +762,7 @@ int mdss_dsi_clk_req_state(void *client, enum mdss_dsi_clk_type clk,
 	pr_debug("[%s]%s: CLK=%d, new_state=%d, core=%d, linkl=%d\n",
 	       c->name, mngr->name, clk, state, c->core_clk_state,
 	       c->link_clk_state);
+
 	MDSS_XLOG(index, clk, state, c->core_clk_state, c->link_clk_state);
 	/*
 	 * Refcount handling rules:
@@ -829,6 +830,7 @@ int mdss_dsi_clk_req_state(void *client, enum mdss_dsi_clk_type clk,
 		 c->name, mngr->name, changed, c->core_refcount,
 		 c->core_clk_state, c->link_refcount, c->link_clk_state);
 	MDSS_XLOG(index, clk, state, c->core_clk_state, c->link_clk_state);
+
 	if (changed) {
 		rc = dsi_recheck_clk_state(mngr);
 		if (rc)

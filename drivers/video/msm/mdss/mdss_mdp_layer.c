@@ -331,29 +331,27 @@ static int __layer_param_check(struct msm_fb_data_type *mfd,
 	return 0;
 }
 
-
 /* compare all reconfiguration parameter validation in this API */
 static int __validate_layer_reconfig(struct mdp_input_layer *layer,
-             struct mdss_mdp_pipe *pipe)
+	struct mdss_mdp_pipe *pipe)
 {
-             int status = 0;
-             struct mdss_mdp_format_params *src_fmt;
+	int status = 0;
+	struct mdss_mdp_format_params *src_fmt;
 
-             /*
-             * csc registers are not double buffered. It is not permitted
-             * to change them on staged pipe with YUV layer.
-             */
-             if (pipe->csc_coeff_set != layer->color_space) {
-                             src_fmt = mdss_mdp_get_format_params(layer->buffer.format);
-                             if (pipe->src_fmt->is_yuv && src_fmt->is_yuv) {
-                                             status = -EPERM;
-                                             pr_err("csc change is not permitted on used pipe\n");
-                             }
-             }
+	/*
+	 * csc registers are not double buffered. It is not permitted
+	 * to change them on staged pipe with YUV layer.
+	 */
+	if (pipe->csc_coeff_set != layer->color_space) {
+		src_fmt = mdss_mdp_get_format_params(layer->buffer.format);
+		if (pipe->src_fmt->is_yuv && src_fmt->is_yuv) {
+			status = -EPERM;
+			pr_err("csc change is not permitted on used pipe\n");
+		}
+	}
 
-             return status;
+	return status;
 }
-
 
 static int __validate_single_layer(struct msm_fb_data_type *mfd,
 	struct mdp_input_layer *layer, u32 mixer_mux)
@@ -523,8 +521,8 @@ static int __configure_pipe_params(struct msm_fb_data_type *mfd,
 	pipe->blend_op = layer->blend_op;
 	pipe->is_handed_off = false;
 	pipe->async_update = (layer->flags & MDP_LAYER_ASYNC) ? true : false;
-    pipe->csc_coeff_set = layer->color_space;
-    
+	pipe->csc_coeff_set = layer->color_space;
+
 	if (mixer->ctl) {
 		pipe->dst.x += mixer->ctl->border_x_off;
 		pipe->dst.y += mixer->ctl->border_y_off;
@@ -1316,19 +1314,20 @@ static int __validate_layers(struct msm_fb_data_type *mfd,
 			goto validate_exit;
 		}
 
-        if (pipe_q_type == LAYER_USES_USED_PIPE_Q) {
-        /*
-        * reconfig is allowed on new/destroy pipes. Only used
-        * pipe needs this extra validation.
-        */
-        ret = __validate_layer_reconfig(layer, pipe);
-            if (ret) {
-               pr_err("layer reconfig validation failed=%d\n", ret);
-               mdss_mdp_pipe_unmap(pipe);
-               layer->error_code = ret;
-               goto validate_exit;
-                     }
-        }
+		if (pipe_q_type == LAYER_USES_USED_PIPE_Q) {
+			/*
+			 * reconfig is allowed on new/destroy pipes. Only used
+			 * pipe needs this extra validation.
+			 */
+			ret = __validate_layer_reconfig(layer, pipe);
+			if (ret) {
+				pr_err("layer reconfig validation failed=%d\n",
+					ret);
+				mdss_mdp_pipe_unmap(pipe);
+				layer->error_code = ret;
+				goto validate_exit;
+			}
+		}
 
 		ret = __configure_pipe_params(mfd, layer, pipe,
 			left_blend_pipe, is_single_layer, mixer_mux);

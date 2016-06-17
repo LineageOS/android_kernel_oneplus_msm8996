@@ -56,6 +56,7 @@
 
 #define MDP_PP_AD_BL_LINEAR	0x0
 #define MDP_PP_AD_BL_LINEAR_INV	0x1
+
 /**
  * enum mdp_notify_event - Different frame events to indicate frame update state
  *

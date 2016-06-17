@@ -719,6 +719,10 @@ int mdss_mdp_resource_control(struct mdss_mdp_ctl *ctl, u32 sw_event)
 		break;
 	case MDP_RSRC_CTL_EVENT_STOP:
 
+		/* Cancel early wakeup Work Item */
+		if (cancel_work_sync(&ctx->early_wakeup_clk_work))
+			pr_debug("early wakeup work canceled\n");
+
 		/* If we are already OFF, just return */
 		/* yankelong delete ,qcom's patch I64aba71bb4c5602df9a524b77bd8bf3296dda012
 		if (mdp5_data->resources_state ==
@@ -738,11 +742,6 @@ int mdss_mdp_resource_control(struct mdss_mdp_ctl *ctl, u32 sw_event)
 			mdss_mdp_disable_autorefresh(ctl, sctl);
 		}
 		mutex_unlock(&ctx->autorefresh_lock);
-		/*yankelong add ,qcom's patch I64aba71bb4c5602df9a524b77bd8bf3296dda012 */
-		/* Cancel early wakeup Work Item */
-		if (cancel_work_sync(&ctx->early_wakeup_clk_work))
-			pr_debug("early wakeup work canceled\n");
-		/*end*/
 
 		/*
 		 * If a pp_done happened just before the stop,
@@ -771,11 +770,6 @@ int mdss_mdp_resource_control(struct mdss_mdp_ctl *ctl, u32 sw_event)
 					__func__);
 		}
 
-		/* Cancel early wakeup Work Item */
-		/* yankelong delete ,qcom's patch I64aba71bb4c5602df9a524b77bd8bf3296dda012
-		if (cancel_work_sync(&ctx->early_wakeup_clk_work))
-			pr_debug("early wakeup work canceled\n");
-		*/
 		mutex_lock(&ctl->rsrc_lock);
 		MDSS_XLOG(ctl->num, mdp5_data->resources_state, sw_event, 0x33);
 		if ((mdp5_data->resources_state == MDP_RSRC_CTL_STATE_ON) ||

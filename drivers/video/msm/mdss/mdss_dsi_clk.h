@@ -204,7 +204,7 @@ int mdss_dsi_clk_deregister(void *client);
  * @return: error code.
  */
 int mdss_dsi_clk_req_state(void *client, enum mdss_dsi_clk_type clk,
-				enum mdss_dsi_clk_state state, u32 index);
+	enum mdss_dsi_clk_state state, u32 index);
 
 /**
  * mdss_dsi_clk_set_link_rate() - set clock rate for link clocks
@@ -237,7 +237,6 @@ int mdss_dsi_clk_set_link_rate(void *client, enum mdss_dsi_link_clk_type clk,
  */
 int mdss_dsi_clk_force_toggle(void *client, u32 clk);
 
-
 /**
  * is_dsi_clk_in_ecg_state() - Checks the current state of clocks
  * @client: client handle.
@@ -249,5 +248,4 @@ int mdss_dsi_clk_force_toggle(void *client, u32 clk);
  *         false: for all other cases
  */
 bool is_dsi_clk_in_ecg_state(void *client);
-
 #endif /* _MDSS_DSI_CLK_H_ */

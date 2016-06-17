@@ -2156,11 +2156,13 @@ static int mdss_rotator_handle_request(struct mdss_rot_mgr *mgr,
 		pr_err("fail to copy rotation request\n");
 		return ret;
 	}
+
 	req_count = user_req.count;
 	if ((!req_count) || (req_count > MAX_LAYER_COUNT)) {
 		pr_err("invalid rotator req count :%d\n", req_count);
 		return -EINVAL;
 	}
+
 	/*
 	 * here, we make a copy of the items so that we can copy
 	 * all the output fences to the client in one call.   Otherwise,
@@ -2306,6 +2308,7 @@ static int mdss_rotator_handle_request32(struct mdss_rot_mgr *mgr,
 	struct mdss_rot_entry_container *req = NULL;
 	int size, ret;
 	uint32_t req_count;
+
 	if (mdss_get_sd_client_cnt()) {
 		pr_err("rot request not permitted during secure display session\n");
 		return -EPERM;
@@ -2317,6 +2320,7 @@ static int mdss_rotator_handle_request32(struct mdss_rot_mgr *mgr,
 		pr_err("fail to copy rotation request\n");
 		return ret;
 	}
+
 	req_count = user_req32.count;
 	if ((!req_count) || (req_count > MAX_LAYER_COUNT)) {
 		pr_err("invalid rotator req count :%d\n", req_count);
