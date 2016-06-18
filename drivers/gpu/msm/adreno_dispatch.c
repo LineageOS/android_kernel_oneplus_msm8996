@@ -569,10 +569,11 @@ static int sendcmd(struct adreno_device *adreno_dev,
 
 			/* Stop fault timer before reading fault registers */
 			del_timer_sync(&dispatcher->fault_timer);
+
 			fault_detect_read(adreno_dev);
+
 			/* Start the fault timer on first submission */
 			start_fault_timer(adreno_dev);
-
 
 			if (!test_and_set_bit(ADRENO_DISPATCHER_ACTIVE,
 				&dispatcher->priv))
@@ -633,9 +634,6 @@ static int sendcmd(struct adreno_device *adreno_dev,
 		mod_timer(&dispatcher->timer, cmdbatch->expires);
 	}
 
-//	/* Start the fault detection timer on the first submission */
-//	if (dispatcher->inflight == 1)
-//		start_fault_timer(adreno_dev);
 
 	/*
 	 * we just submitted something, readjust ringbuffer
