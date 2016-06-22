@@ -15,10 +15,30 @@
 
 #include "msm8996-v3.dtsi"
 #include "msm-pmi8996.dtsi"
-#include "msm8996-mtp.dtsi"
+#include "15801/msm8996-15801.dtsi"
 
 / {
 	model = "Qualcomm Technologies, Inc. MSM 8996 v3 + PMI8996 MTP";
 	compatible = "qcom,msm8996-mtp", "qcom,msm8996", "qcom,mtp";
-	qcom,board-id = <8 0 15801 13>;
+	qcom,board-id = <8 0 15801 15>, <8 0 15801 16>;
+};
+
+&soc {
+	oneplus_rf_cable {
+		compatible = "oneplus,rf_cable";
+		interrupt-parent = <&tlmm>;
+		rf,cable-gpio    = <&tlmm 131 0>;
+
+		#pinctrl-names = "pmx_tri_state_key_active", "pmx_tri_state_key_suspend";
+		#pinctrl-0 = <&tri_state_key_active>;
+		#pinctrl-1 = <&tri_state_key_suspend>;
+	};
+};
+
+&dsi_samsung_s6e3fa3_1080p_video {
+	qcom,mdss-dsi-high-brightness-panel;
+};
+
+&dsi_samsung_s6e3fa3_1080p_cmd {
+	qcom,mdss-dsi-high-brightness-panel;
 };
