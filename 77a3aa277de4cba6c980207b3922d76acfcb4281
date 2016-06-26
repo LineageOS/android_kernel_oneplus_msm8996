@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5faad753_1a61d205",
+        "filename": "arch/arm64/configs/cyanogenmod_oneplus3_defconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 10151
+      },
+      "writtenOn": "2016-06-26T09:01:37Z",
+      "side": 1,
+      "message": "you need to enable cfq at least.",
+      "revId": "77a3aa277de4cba6c980207b3922d76acfcb4281",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_3a5e0e44",
+        "filename": "arch/arm64/configs/cyanogenmod_oneplus3_defconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 63,
+      "author": {
+        "id": 10151
+      },
+      "writtenOn": "2016-06-26T09:01:37Z",
+      "side": 1,
+      "message": "what\u0027s this?\nuseless I think.",
+      "revId": "77a3aa277de4cba6c980207b3922d76acfcb4281",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_da56da2a",
+        "filename": "arch/arm64/configs/cyanogenmod_oneplus3_defconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 635,
+      "author": {
+        "id": 10151
+      },
+      "writtenOn": "2016-06-26T09:01:37Z",
+      "side": 1,
+      "message": "Why enable this?\nFor some file manager to access Linux?",
+      "revId": "77a3aa277de4cba6c980207b3922d76acfcb4281",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
