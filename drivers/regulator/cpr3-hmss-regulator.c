@@ -1409,9 +1409,9 @@ static int cpr3_hmss_init_regulator(struct cpr3_regulator *vreg)
 static int cpr3_hmss_init_aging(struct cpr3_controller *ctrl)
 {
 	struct cpr3_msm8996_hmss_fuses *fuse = NULL;
-	struct cpr3_regulator *vreg;
-	u32 aging_ro_scale;
-	int i, j, rc;
+	struct cpr3_regulator *vreg = NULL;
+	u32 aging_ro_scale = 0;
+	int i, j, rc = 0;
 
 	for (i = 0; i < ctrl->thread_count; i++) {
 		for (j = 0; j < ctrl->thread[i].vreg_count; j++) {
@@ -1611,9 +1611,9 @@ static int cpr3_hmss_regulator_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	const struct of_device_id *match;
-	struct cpr3_controller *ctrl;
-	struct cpr3_regulator *vreg;
-	int i, j, rc;
+	struct cpr3_controller *ctrl = NULL;
+	struct cpr3_regulator *vreg = NULL;
+	int i = 0, j = 0, rc = 0;
 
 	if (!dev->of_node) {
 		dev_err(dev, "Device tree node is missing\n");

@@ -765,18 +765,18 @@ EXPORT_SYMBOL(glink_ssr_wait_cleanup_done);
  */
 static int glink_ssr_probe(struct platform_device *pdev)
 {
-	struct device_node *node;
-	struct device_node *phandle_node;
-	struct restart_notifier_block *nb;
-	struct subsys_info *ss_info;
-	struct subsys_info_leaf *ss_info_leaf;
-	struct glink_link_info *link_info;
-	char *key;
+	struct device_node *node = NULL;
+	struct device_node *phandle_node = NULL;
+	struct restart_notifier_block *nb = NULL;
+	struct subsys_info *ss_info = NULL;
+	struct subsys_info_leaf *ss_info_leaf = NULL;
+	struct glink_link_info *link_info = NULL;
+	char *key = NULL;
 	const char *edge;
 	const char *subsys_name;
 	const char *xprt;
-	void *handle;
-	void *link_state_handle;
+	void *handle = NULL;
+	void *link_state_handle = NULL;
 	int phandle_index = 0;
 	int ret = 0;
 

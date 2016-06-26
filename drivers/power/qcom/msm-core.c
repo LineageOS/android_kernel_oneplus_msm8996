@@ -371,12 +371,12 @@ int register_cpu_pwr_stats_ready_notifier(struct notifier_block *nb)
 
 static int update_userspace_power(struct sched_params __user *argp)
 {
-	int i;
-	int ret;
-	int cpu;
-	struct cpu_activity_info *node;
+	int i = 0;
+	int ret = 0;
+	int cpu = 0;
+	struct cpu_activity_info *node = NULL;
 	struct cpu_static_info *sp, *clear_sp;
-	int cpumask, cluster, mpidr;
+	int cpumask = 0, cluster = 0, mpidr = 0;
 
 	get_user(cpumask, &argp->cpumask);
 	get_user(cluster, &argp->cluster);

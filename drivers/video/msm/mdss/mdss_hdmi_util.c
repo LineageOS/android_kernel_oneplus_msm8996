@@ -731,10 +731,10 @@ static void hdmi_ddc_clear_status(struct hdmi_tx_ddc_ctrl *ddc_ctrl)
 
 static int hdmi_ddc_read_retry(struct hdmi_tx_ddc_ctrl *ddc_ctrl)
 {
-	u32 reg_val, ndx, time_out_count, wait_time;
-	struct hdmi_tx_ddc_data *ddc_data;
-	int status;
-	int busy_wait_us;
+	u32 reg_val = 0, ndx = 0, time_out_count = 0, wait_time = 0;
+	struct hdmi_tx_ddc_data *ddc_data = NULL;
+	int status = 0;
+	int busy_wait_us = 0;
 
 	if (!ddc_ctrl || !ddc_ctrl->io) {
 		pr_err("invalid input\n");
@@ -1208,11 +1208,11 @@ error:
 
 int hdmi_ddc_write(struct hdmi_tx_ddc_ctrl *ddc_ctrl)
 {
-	int status;
-	u32 time_out_count;
-	struct hdmi_tx_ddc_data *ddc_data;
-	u32 wait_time;
-	int busy_wait_us;
+	int status = 0;
+	u32 time_out_count = 0;
+	struct hdmi_tx_ddc_data *ddc_data = NULL;
+	u32 wait_time = 0;
+	int busy_wait_us = 0;
 
 	if (!ddc_ctrl || !ddc_ctrl->io) {
 		pr_err("invalid input\n");

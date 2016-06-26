@@ -1876,9 +1876,9 @@ static int __mdss_dsi_dfps_update_clks(struct mdss_panel_data *pdata,
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct mdss_dsi_ctrl_pdata *sctrl_pdata = NULL;
-	struct mdss_panel_info *pinfo, *spinfo;
+	struct mdss_panel_info *pinfo = NULL, *spinfo = NULL;
 	int rc = 0;
-	u32 data;
+	u32 data = 0;
 
 	if (pdata == NULL) {
 		pr_err("%s Invalid pdata\n", __func__);

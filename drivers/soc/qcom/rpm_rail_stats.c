@@ -219,13 +219,13 @@ static const struct file_operations msm_rpm_rail_stats_fops = {
 
 static int msm_rpm_rail_stats_probe(struct platform_device *pdev)
 {
-	struct dentry *dent;
-	struct msm_rpm_rail_stats_platform_data *pdata;
-	struct resource *res;
-	struct resource *offset;
-	struct device_node *node;
-	uint32_t offset_addr;
-	void __iomem *phys_ptr;
+	struct dentry *dent = NULL;
+	struct msm_rpm_rail_stats_platform_data *pdata = NULL;
+	struct resource *res = NULL;
+	struct resource *offset = NULL;
+	struct device_node *node = NULL;
+	uint32_t offset_addr = 0;
+	void __iomem *phys_ptr = NULL;
 
 	if (!pdev)
 		return -EINVAL;

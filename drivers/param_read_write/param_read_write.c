@@ -324,7 +324,7 @@ static ssize_t param_dump_show(struct device *dev,
 {
     int count = 0;
     char *tmp_buf;
-    int ret;
+    int ret = 0;
 
     tmp_buf = kzalloc(PAGE_SIZE,GFP_KERNEL);
     if(!tmp_buf){

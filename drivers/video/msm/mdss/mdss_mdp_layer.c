@@ -459,7 +459,7 @@ static int __configure_pipe_params(struct msm_fb_data_type *mfd,
 {
 	int ret = 0;
 	u32 left_lm_w = left_lm_w_from_mfd(mfd);
-	u32 flags;
+	u32 flags = 0;
 
 	struct mdss_mdp_mixer *mixer = NULL;
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
@@ -1167,22 +1167,22 @@ static void __handle_free_list(struct mdss_overlay_private *mdp5_data,
 static int __validate_layers(struct msm_fb_data_type *mfd,
 	struct file *file, struct mdp_layer_commit_v1 *commit)
 {
-	int ret, i, release_ndx = 0, inputndx = 0, destroy_ndx = 0;
+	int ret = 0, i = 0, release_ndx = 0, inputndx = 0, destroy_ndx = 0;
 	u32 left_lm_layers = 0, right_lm_layers = 0;
 	u32 left_cnt = 0, right_cnt = 0;
 	u32 left_lm_w = left_lm_w_from_mfd(mfd);
-	u32 mixer_mux, dst_x;
+	u32 mixer_mux = 0, dst_x = 0;
 	int layer_count = commit->input_layer_cnt;
 
-	struct mdss_mdp_pipe *pipe, *tmp, *left_blend_pipe;
+	struct mdss_mdp_pipe *pipe = NULL, *tmp = NULL, *left_blend_pipe = NULL;
 	struct mdss_mdp_pipe *right_plist[MAX_PIPES_PER_LM] = {0};
 	struct mdss_mdp_pipe *left_plist[MAX_PIPES_PER_LM] = {0};
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 
 	struct mdss_mdp_mixer *mixer = NULL;
-	struct mdp_input_layer *layer, *prev_layer, *layer_list;
+	struct mdp_input_layer *layer = NULL, *prev_layer = NULL, *layer_list = NULL;
 	bool is_single_layer = false;
-	enum layer_pipe_q pipe_q_type;
+	enum layer_pipe_q pipe_q_type = 0;
 
 	ret = mutex_lock_interruptible(&mdp5_data->ov_lock);
 	if (ret)

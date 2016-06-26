@@ -1787,8 +1787,8 @@ static void smb1351_chg_ctrl_in_jeita(struct smb1351_charger *chip)
 static void smb1351_chg_adc_notification(enum qpnp_tm_state state, void *ctx)
 {
 	struct smb1351_charger *chip = ctx;
-	struct battery_status *cur;
-	int temp;
+	struct battery_status *cur = NULL;
+	int temp = 0;
 
 	if (state >= ADC_TM_STATE_NUM) {
 		pr_err("invalid state parameter %d\n", state);

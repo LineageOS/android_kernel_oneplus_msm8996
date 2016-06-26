@@ -1830,19 +1830,19 @@ static void pp_dspp_opmode_config(struct mdss_mdp_ctl *ctl, u32 num,
 
 static int pp_dspp_setup(u32 disp_num, struct mdss_mdp_mixer *mixer)
 {
-	u32 ad_flags, flags, dspp_num, opmode = 0, ad_bypass;
-	struct mdp_pgc_lut_data *pgc_config;
-	struct pp_sts_type *pp_sts;
-	char __iomem *base, *addr;
+	u32 ad_flags = 0, flags = 0, dspp_num = 0, opmode = 0, ad_bypass = 0;
+	struct mdp_pgc_lut_data *pgc_config = NULL;
+	struct pp_sts_type *pp_sts = NULL;
+	char __iomem *base = NULL, *addr = NULL;
 	int ret = 0;
-	struct mdss_data_type *mdata;
+	struct mdss_data_type *mdata = NULL;
 	struct mdss_ad_info *ad = NULL;
 	struct mdss_mdp_ad *ad_hw = NULL;
 	struct mdp_pa_v2_cfg_data *pa_v2_cfg_data = NULL;
-	struct mdss_mdp_ctl *ctl;
-	u32 mixer_cnt;
+	struct mdss_mdp_ctl *ctl = NULL;
+	u32 mixer_cnt = 0;
 	u32 mixer_id[MDSS_MDP_INTF_MAX_LAYERMIXER];
-	int side;
+	int side = 0;
 
 	if (!mixer || !mixer->ctl || !mixer->ctl->mdata)
 		return -EINVAL;
@@ -2442,8 +2442,8 @@ int mdss_mdp_pp_init(struct device *dev)
 {
 	int i, ret = 0;
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
-	struct mdss_mdp_pipe *vig;
-	struct pp_hist_col_info *hist;
+	struct mdss_mdp_pipe *vig = NULL;
+	struct pp_hist_col_info *hist = NULL;
 	void *ret_ptr = NULL;
 	u32 ctl_off = 0;
 

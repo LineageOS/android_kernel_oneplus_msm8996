@@ -435,14 +435,14 @@ int get_prop_pre_shutdown_soc(void)
 static int fg_soc_calibrate(struct  bq27541_device_info *di, int soc)
 {
 	union power_supply_propval ret = {0,};
-	unsigned int soc_calib;
+	unsigned int soc_calib = 0;
 	int counter_temp = 0;
 	static int charging_status = 0;
 	static int charging_status_pre = 0;
 	static bool first_enter=false;
-	int soc_load;
-	int soc_temp;
-	unsigned long	  soc_current_time,time_last;
+	int soc_load = 0;
+	int soc_temp = 0;
+	unsigned long	  soc_current_time,time_last = 0;
 	if(false == first_enter)
 	{
 		di->batt_psy = power_supply_get_by_name("battery");

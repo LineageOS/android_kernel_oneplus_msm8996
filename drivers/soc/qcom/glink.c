@@ -1888,9 +1888,9 @@ static struct glink_core_xprt_ctx *find_open_transport(const char *edge,
 						       bool initial_xprt,
 						       uint16_t *best_id)
 {
-	struct glink_core_xprt_ctx *xprt;
-	struct glink_core_xprt_ctx *best_xprt;
-	struct glink_core_xprt_ctx *ret;
+	struct glink_core_xprt_ctx *xprt = NULL;
+	struct glink_core_xprt_ctx *best_xprt = NULL;
+	struct glink_core_xprt_ctx *ret = NULL;
 	bool first = true;
 
 	ret = (struct glink_core_xprt_ctx *)ERR_PTR(-ENODEV);
@@ -2566,8 +2566,8 @@ int glink_close(void *handle)
 {
 	struct glink_core_xprt_ctx *xprt_ctx = NULL;
 	struct channel_ctx *ctx = (struct channel_ctx *)handle;
-	int ret;
-	unsigned long flags;
+	int ret = 0;
+	unsigned long flags = 0;
 	bool is_empty = false;
 
 	if (!ctx)
@@ -5104,12 +5104,12 @@ static void glink_scheduler_eval_prio(struct channel_ctx *ctx,
 static int glink_scheduler_tx(struct channel_ctx *ctx,
 			struct glink_core_xprt_ctx *xprt_ctx)
 {
-	unsigned long flags;
-	struct glink_core_tx_pkt *tx_info;
+	unsigned long flags = 0;
+	struct glink_core_tx_pkt *tx_info = NULL;
 	size_t txd_len = 0;
 	size_t tx_len = 0;
 	uint32_t num_pkts = 0;
-	int ret;
+	int ret = 0;
 
 	spin_lock_irqsave(&ctx->tx_lists_lock_lhc3, flags);
 	while (txd_len < xprt_ctx->mtu &&
@@ -5200,13 +5200,13 @@ static void tx_work_func(struct work_struct *work)
 {
 	struct glink_core_xprt_ctx *xprt_ptr =
 			container_of(work, struct glink_core_xprt_ctx, tx_work);
-	struct channel_ctx *ch_ptr;
-	uint32_t prio;
-	uint32_t tx_ready_head_prio;
-	int ret;
+	struct channel_ctx *ch_ptr = NULL;
+	uint32_t prio = 0;
+	uint32_t tx_ready_head_prio = 0;
+	int ret = 0;
 	struct channel_ctx *tx_ready_head = NULL;
 	bool transmitted_successfully = true;
-	unsigned long flags;
+	unsigned long flags = 0;
 
 	GLINK_PERF("%s: worker starting\n", __func__);
 

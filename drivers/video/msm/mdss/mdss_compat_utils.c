@@ -298,8 +298,8 @@ static int __compat_atomic_commit(struct fb_info *info, unsigned int cmd,
 	int ret, i;
 	struct mdp_layer_commit  commit;
 	struct mdp_layer_commit32 commit32;
-	u32 layer_count;
-	struct mdp_input_layer *layer_list = NULL, *layer;
+	u32 layer_count = 0;
+	struct mdp_input_layer *layer_list = NULL, *layer = NULL;
 	struct mdp_input_layer32 *layer_list32 = NULL;
 	struct mdp_output_layer *output_layer = NULL;
 

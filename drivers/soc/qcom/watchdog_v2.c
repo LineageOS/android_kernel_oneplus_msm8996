@@ -314,7 +314,7 @@ static __ref int watchdog_kthread(void *arg)
 {
 	struct msm_watchdog_data *wdog_dd =
 		(struct msm_watchdog_data *)arg;
-	unsigned long delay_time;
+	unsigned long delay_time = 0;
 	struct sched_param param = {.sched_priority = MAX_RT_PRIO-1};
 
 	sched_setscheduler(current, SCHED_FIFO, &param);

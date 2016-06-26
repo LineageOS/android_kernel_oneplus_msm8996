@@ -9539,10 +9539,10 @@ static struct notify_usb_enumeration_status usb_enumeration  = {
 };
 static int smbchg_probe(struct spmi_device *spmi)
 {
-	int rc;
-	struct smbchg_chip *chip;
-	struct power_supply *usb_psy, *typec_psy = NULL;
-	struct qpnp_vadc_chip *vadc_dev, *vchg_vadc_dev;
+	int rc = 0;
+	struct smbchg_chip *chip = NULL;
+	struct power_supply *usb_psy = NULL, *typec_psy = NULL;
+	struct qpnp_vadc_chip *vadc_dev = NULL, *vchg_vadc_dev = NULL;
 	const char *typec_psy_name;
 
 	usb_psy = power_supply_get_by_name("usb");

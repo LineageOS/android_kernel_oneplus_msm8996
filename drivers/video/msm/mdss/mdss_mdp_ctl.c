@@ -932,7 +932,7 @@ static void mdss_mdp_perf_calc_mixer(struct mdss_mdp_mixer *mixer,
 		struct mdss_mdp_pipe **pipe_list, int num_pipes,
 		u32 flags)
 {
-	struct mdss_mdp_pipe *pipe;
+	struct mdss_mdp_pipe *pipe = NULL;
 	struct mdss_panel_info *pinfo = NULL;
 	int fps = DEFAULT_FRAME_RATE;
 	u32 v_total = 0, bpp = MDSS_MDP_WB_OUTPUT_BPP;
@@ -945,7 +945,7 @@ static void mdss_mdp_perf_calc_mixer(struct mdss_mdp_mixer *mixer,
 	u32 prefill_val = 0;
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 	bool apply_fudge = true;
-	struct mdss_mdp_format_params *fmt;
+	struct mdss_mdp_format_params *fmt = NULL;
 
 	BUG_ON(num_pipes > MAX_PIPES_PER_LM);
 
@@ -4648,7 +4648,7 @@ struct mdss_mdp_pipe *mdss_mdp_get_staged_pipe(struct mdss_mdp_ctl *ctl,
 
 int mdss_mdp_get_pipe_flush_bits(struct mdss_mdp_pipe *pipe)
 {
-	u32 flush_bits;
+	u32 flush_bits = 0;
 
 	if (pipe->type == MDSS_MDP_PIPE_TYPE_DMA)
 		flush_bits |= BIT(pipe->num) << 5;

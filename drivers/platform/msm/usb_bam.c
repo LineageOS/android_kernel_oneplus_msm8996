@@ -2714,11 +2714,11 @@ EXPORT_SYMBOL(usb_bam_disconnect_ipa);
 
 static void usb_bam_sps_events(enum sps_callback_case sps_cb_case, void *user)
 {
-	int i;
-	int bam;
-	struct usb_bam_ctx_type *ctx;
-	struct usb_bam_pipe_connect *pipe_connect;
-	struct usb_bam_event_info *event_info;
+	int i = 0;
+	int bam = 0;
+	struct usb_bam_ctx_type *ctx = NULL;
+	struct usb_bam_pipe_connect *pipe_connect = NULL;
+	struct usb_bam_event_info *event_info = NULL;
 
 	switch (sps_cb_case) {
 	case SPS_CALLBACK_BAM_TIMER_IRQ:

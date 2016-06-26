@@ -749,7 +749,7 @@ static long qbt1000_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 {
 	int rc = 0;
 	void __user *priv_arg = (void __user *)arg;
-	struct qbt1000_drvdata *drvdata;
+	struct qbt1000_drvdata *drvdata = NULL;
 
 	if (IS_ERR(priv_arg)) {
 		dev_err(drvdata->dev, "%s: invalid user space pointer %lu\n",

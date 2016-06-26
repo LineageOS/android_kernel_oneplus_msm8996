@@ -2872,9 +2872,9 @@ static int mdss_mdp_cmd_intfs_stop(struct mdss_mdp_ctl *ctl, int session,
 static int mdss_mdp_cmd_stop_sub(struct mdss_mdp_ctl *ctl,
 		int panel_power_state)
 {
-	struct mdss_mdp_cmd_ctx *ctx;
-	struct mdss_mdp_vsync_handler *tmp, *handle;
-	int session;
+	struct mdss_mdp_cmd_ctx *ctx = NULL;
+	struct mdss_mdp_vsync_handler *tmp = NULL, *handle = NULL;
+	int session = 0;
 
 	ctx = (struct mdss_mdp_cmd_ctx *) ctl->intf_ctx[MASTER_CTX];
 	if (!ctx) {
@@ -2896,7 +2896,7 @@ static int mdss_mdp_cmd_stop_sub(struct mdss_mdp_ctl *ctl,
 int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl, int panel_power_state)
 {
 	struct mdss_mdp_cmd_ctx *ctx = ctl->intf_ctx[MASTER_CTX];
-	struct mdss_mdp_cmd_ctx *sctx;
+	struct mdss_mdp_cmd_ctx *sctx = NULL;
 	struct mdss_mdp_ctl *sctl = mdss_mdp_get_split_ctl(ctl);
 	bool panel_off = false;
 	bool turn_off_clocks = false;

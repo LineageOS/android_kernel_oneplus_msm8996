@@ -283,12 +283,12 @@ static void power_supply_callback(struct power_supply *psy)
 	static struct power_supply *bms_psy;
 	//taokai@bsp add for detecting usb status 2016.03.11
 	static struct power_supply *usb_psy;
-	int usb_state;
-	bool is_usb_present;
+	int usb_state = 0;
+	bool is_usb_present = 0;
 	//taokai@bsp add end 2016.03.11
 	union power_supply_propval ret = {0,};
-	int battery_percentage;
-	enum bcl_threshold_state prev_soc_state;
+	int battery_percentage = 0;
+	enum bcl_threshold_state prev_soc_state = 0;
 	if (gbcl->bcl_mode != BCL_DEVICE_ENABLED) {
 		pr_debug("BCL is not enabled\n");
 		return;
