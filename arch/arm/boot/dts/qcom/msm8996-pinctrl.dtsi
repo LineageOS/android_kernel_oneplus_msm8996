@@ -1319,7 +1319,7 @@
 				config {
 					pins = "gpio64";
 					drive-strength = <16>;
-					bias-disable;
+					bias-pull-down;
 					output-high;
 				};
 			};
