@@ -765,7 +765,7 @@ static ssize_t mdss_fb_get_ACL(struct device *dev,
 											"0--ACL OFF\n"
 											"1--ACL 50\n"
 											"2--ALC 40\n"
-											"3--ACL 30\n", 
+											"3--ACL 30\n",
 											acl_mode);
 
 	return ret;
@@ -799,8 +799,6 @@ static ssize_t mdss_fb_set_ACL(struct device *dev,
 static DEVICE_ATTR(acl, S_IRUGO | S_IWUSR | S_IWGRP,
 	mdss_fb_get_ACL, mdss_fb_set_ACL);
 
-
-
 static ssize_t mdss_fb_get_max_brightness(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -812,11 +810,14 @@ static ssize_t mdss_fb_get_max_brightness(struct device *dev,
 	level = mdss_fb_send_panel_event(mfd, MDSS_EVENT_PANEL_GET_MAX_BRIGHTNESS,
 			NULL);
 
-	ret=scnprintf(buf, PAGE_SIZE, "max brightness level = %d\n"
-					                        "0-->max brightness level 380nit\n"
-											"1-->max brightness level 430nit\n"
-											"2-->HBM Enabled\n",
-											level&0x000F);
+	/*
+	 0-->max brightness level 380nit
+	 1-->max brightness level 430nit
+	 2-->HBM Enabled
+	 On CM we only use 0 and 2
+	*/
+	ret=scnprintf(buf, PAGE_SIZE, "%d\n", level & 0x000F);
+
 	return ret;
 }
 
@@ -835,8 +836,8 @@ static ssize_t mdss_fb_set_max_brightness(struct device *dev,
 	}
 
 	pr_err("Max Brightness Setting = 0x%02X\n", level);
-    rc = mdss_fb_send_panel_event(mfd, MDSS_EVENT_PANEL_SET_MAX_BRIGHTNESS,
-	    (void *)(unsigned long)level);
+	rc = mdss_fb_send_panel_event(mfd, MDSS_EVENT_PANEL_SET_MAX_BRIGHTNESS,
+												(void *)(unsigned long)level);
 	if (rc)
 		pr_err("Fail to set max brihtness level 0x%02X\n", level);
 
