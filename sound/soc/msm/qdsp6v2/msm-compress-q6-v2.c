@@ -932,10 +932,11 @@ static int msm_compr_configure_dsp(struct snd_compr_stream *cstream)
 
 	pr_debug("%s: stream_id %d\n", __func__, ac->stream_id);
 
-    if (prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S24_LE)
-        bits_per_sample = 24;
-    else if (prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S32_LE)
-        bits_per_sample = 32;
+	if ((prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S24_LE) ||
+		(prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S24_3LE))
+		bits_per_sample = 24;
+	else if (prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S32_LE)
+		bits_per_sample = 32;
 
     //use 24bits to get rid of 16bits innate noise
     //mark by globale value to open adm 24bits
