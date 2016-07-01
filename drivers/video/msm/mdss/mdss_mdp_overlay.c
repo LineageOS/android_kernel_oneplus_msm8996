@@ -2508,6 +2508,11 @@ static int mdss_mdp_overlay_update_frc(struct msm_fb_data_type *mfd)
 		}
 	}
 
+	mdss_debug_frc_add_kickoff_sample_pre(ctl, frc_info, remaining_repeat);
+
+	if (mdss_debug_frc_frame_repeat_disabled())
+		remaining_repeat = 0;
+
 	ret = __repeat_current_frame(ctl, remaining_repeat);
 
 	/* save last data */
@@ -2515,6 +2520,8 @@ static int mdss_mdp_overlay_update_frc(struct msm_fb_data_type *mfd)
 	frc_info->last_vsync_cnt = ctl->vsync_cnt;
 
 FRC_UPDATE_EXIT:
+	mdss_debug_frc_add_kickoff_sample_post(ctl, frc_info, remaining_repeat);
+
 	*last_frc = *cur_frc;
 
 	return ret;
