@@ -138,8 +138,8 @@ struct test_header {
 #define KEY_GESTURE_CIRCLE      250 // draw circle to lunch camera
 #define KEY_GESTURE_TWO_SWIPE	251 // swipe two finger vertically to play/pause
 #define KEY_GESTURE_V           252 // draw v to toggle flashlight
-#define KEY_GESTURE_LEFT_V      253 // draw left arrow for previous track
-#define KEY_GESTURE_RIGHT_V     254 // draw right arrow for next track
+#define KEY_GESTURE_LEFT        253 // draw left arrow for previous track
+#define KEY_GESTURE_RIGHT       254 // draw right arrow for next track
 
 #define BIT0 (0x1 << 0)
 #define BIT1 (0x1 << 1)
@@ -1174,11 +1174,11 @@ static void gesture_judge(struct synaptics_ts_data *ts)
 		case DownVee:
 			keyCode = KEY_GESTURE_V;
 			break;
-		case LeftVee:
-			keyCode = KEY_GESTURE_RIGHT_V;
+		case Left2RightSwip:
+			keyCode = KEY_GESTURE_RIGHT;
 			break;
-		case RightVee:
-			keyCode = KEY_GESTURE_LEFT_V;
+		case Right2LeftSwip:
+			keyCode = KEY_GESTURE_LEFT;
 			break;
 		case Circle:
 			keyCode = KEY_GESTURE_CIRCLE;
@@ -1205,10 +1205,13 @@ static void gesture_judge(struct synaptics_ts_data *ts)
 			gesture == Wgestrue ? "(W)" : "[unknown]");
 	synaptics_get_coordinate_point(ts);
 
-    TPD_DEBUG("gesture suport LeftVee:%d RightVee:%d DouSwip:%d Circle:%d UpVee:%d DouTap:%d\n",\
-        LeftVee_gesture,RightVee_gesture,DouSwip_gesture,Circle_gesture,UpVee_gesture,DouTap_gesture);
-	if((gesture == DouTap && DouTap_gesture)||(gesture == RightVee && RightVee_gesture)\
-        ||(gesture == LeftVee && LeftVee_gesture)||(gesture == UpVee && UpVee_gesture)\
+    TPD_DEBUG("gesture suport LeftVee:%d RightVee:%d DouSwip:%d Circle:%d UpVee:%d DouTap:%d Left2RightSwip:%d Right2LeftSwip:%d\n",
+        LeftVee_gesture,RightVee_gesture,DouSwip_gesture,Circle_gesture,UpVee_gesture,
+        DouTap_gesture,Left2RightSwip_gesture,Right2LeftSwip_gesture);
+	if((gesture == DouTap && DouTap_gesture)||(gesture == RightVee && RightVee_gesture)
+        ||(gesture == LeftVee && LeftVee_gesture)||(gesture == UpVee && UpVee_gesture)
+        ||(gesture == Left2RightSwip && Left2RightSwip_gesture)
+        ||(gesture == Right2LeftSwip && Right2LeftSwip_gesture)
         ||(gesture == Circle && Circle_gesture)||(gesture == DouSwip && DouSwip_gesture)){
 		gesture_upload = gesture;
 		input_report_key(ts->input_dev, keyCode, 1);
@@ -1505,9 +1508,11 @@ static ssize_t tp_gesture_write_func(struct file *file, const char __user *buffe
     RightVee_gesture = (buf[0] & BIT4)?1:0;//"<"
     Circle_gesture = (buf[0] & BIT6)?1:0; //"O"
     DouTap_gesture = (buf[0] & BIT7)?1:0; //double tap
+    Left2RightSwip_gesture = (buf[0] & BIT2)?1:0; //"(-->)"
+    Right2LeftSwip_gesture = (buf[0] & BIT5)?1:0; //"(<--)"
 
 	if(DouTap_gesture||Circle_gesture||UpVee_gesture||LeftVee_gesture\
-        ||RightVee_gesture||DouSwip_gesture)
+        ||RightVee_gesture||DouSwip_gesture||Left2RightSwip_gesture||Right2LeftSwip_gesture)
 	{
 		ts->gesture_enable = 1;
 	}
@@ -1535,7 +1540,7 @@ static ssize_t coordinate_proc_read_func(struct file *file, char __user *user_bu
 static void gesture_enable(struct synaptics_ts_data *ts)
 {
 	ts->gesture_enable = DouTap_gesture || Circle_gesture || UpVee_gesture ||
-                (LeftVee_gesture && RightVee_gesture && DouSwip_gesture) ? 1 : 0;
+                (Left2RightSwip_gesture && Right2LeftSwip_gesture && DouSwip_gesture) ? 1 : 0;
 }
 
 static ssize_t double_tap_enable_read_func(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
@@ -1591,7 +1596,7 @@ static ssize_t music_enable_read_func(struct file *file, char __user *user_buf, 
 	int ret = 0;
 	char page[PAGESIZE];
 
-	ret = sprintf(page, "%d\n", LeftVee_gesture && RightVee_gesture && DouSwip_gesture);
+	ret = sprintf(page, "%d\n", Left2RightSwip_gesture && Right2LeftSwip_gesture && DouSwip_gesture);
 	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
 
 	return ret;
@@ -1605,8 +1610,8 @@ static ssize_t music_enable_write_func(struct file *file, const char __user *buf
 	sscanf(buf, "%d", &ret);
 
 	DouSwip_gesture = ret;
-	LeftVee_gesture = ret;
-	RightVee_gesture = ret;
+	Left2RightSwip_gesture = ret;
+	Right2LeftSwip_gesture = ret;
 	gesture_enable(ts);
 
 	return count;
@@ -2412,8 +2417,8 @@ static int	synaptics_input_init(struct synaptics_ts_data *ts)
 	set_bit(KEY_GESTURE_CIRCLE, ts->input_dev->keybit);
 	set_bit(KEY_GESTURE_V, ts->input_dev->keybit);
 	set_bit(KEY_GESTURE_TWO_SWIPE, ts->input_dev->keybit);
-	set_bit(KEY_GESTURE_LEFT_V, ts->input_dev->keybit);
-	set_bit(KEY_GESTURE_RIGHT_V, ts->input_dev->keybit);
+	set_bit(KEY_GESTURE_LEFT, ts->input_dev->keybit);
+	set_bit(KEY_GESTURE_RIGHT, ts->input_dev->keybit);
 #endif
 	/* For multi touch */
 	input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
