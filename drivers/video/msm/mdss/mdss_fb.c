@@ -835,6 +835,7 @@ static ssize_t mdss_fb_set_max_brightness(struct device *dev,
 		return rc;
 	}
 
+	level = (level & 0x000F) | 0x0010;
 	pr_err("Max Brightness Setting = 0x%02X\n", level);
 	rc = mdss_fb_send_panel_event(mfd, MDSS_EVENT_PANEL_SET_MAX_BRIGHTNESS,
 												(void *)(unsigned long)level);

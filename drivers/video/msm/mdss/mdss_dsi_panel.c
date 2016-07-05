@@ -734,6 +734,9 @@ void mdss_dsi_panel_set_hbm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 	struct dcs_cmd_req cmdreq;
 	struct mdss_panel_info *pinfo;
 
+	if (!mdss_dsi_is_panel_on_interactive(&ctrl->panel_data))
+		return;
+
 	pinfo = &(ctrl->panel_data.panel_info);
 	if (pinfo->dcs_cmd_by_left) {
 		if (ctrl->ndx != DSI_CTRL_LEFT)
@@ -820,10 +823,6 @@ void mdss_dsi_panel_set_max_brightness(struct mdss_dsi_ctrl_pdata *ctrl, int lev
     int bl_level = BRIGHTNESS_LEVEL_MASK & level;
 
     if (pctrl->high_brightness_panel){
-        if (!(pctrl->ctrl_state & CTRL_STATE_PANEL_INIT)){
-            pr_err("Can not set brightness in panel off status!!!\n" );
-            return;
-        }
 	    switch (bl_level){
             case 0: //default brightness
                 if (!(level & (BRIGHTNESS_MASK_AUTO_BL | BRIGHTNESS_MASK_CAMERA | BRIGHTNESS_MASK_GALLERY))) { //for test
@@ -851,14 +850,16 @@ void mdss_dsi_panel_set_max_brightness(struct mdss_dsi_ctrl_pdata *ctrl, int lev
 
                 max_brightness_setting = DEFAULT_BRIGHTNESS_LEVEL;
                 pre_level = backlight_remap(pre_brightness_setting);
-                mdss_dsi_panel_bklt_dcs(pctrl, pre_level);
+				if (mdss_dsi_is_panel_on_interactive(&pctrl->panel_data))
+					mdss_dsi_panel_bklt_dcs(pctrl, pre_level);
                 brightness_setting_level &= ~0x01;
                 break;
 
             case 1: //max brightness
                 max_brightness_setting = MAX_BRIGHTNESS_LEVEL;
                 pre_level = backlight_remap(pre_brightness_setting);
-                mdss_dsi_panel_bklt_dcs(pctrl, pre_level);
+				if (mdss_dsi_is_panel_on_interactive(&pctrl->panel_data))
+					mdss_dsi_panel_bklt_dcs(pctrl, pre_level);
                 brightness_setting_level |= 0x01;
                 //app can not disable hbm
                 if (level & (BRIGHTNESS_MASK_CAMERA | BRIGHTNESS_MASK_GALLERY)){
