@@ -1613,6 +1613,13 @@
 		enable-active-high;
 		gpio = <&pm8994_gpios 9 0>;
 	};
+
+	wlan_en_vreg: wlan_en_vreg {
+		compatible = "regulator-fixed";
+		regulator-name = "wlan_en_vreg";
+		enable-active-high;
+		gpio = <&pm8994_gpios 8 0>;
+	};
 };
 
 &pmi8994_charger {
