@@ -215,7 +215,6 @@ static int sleep_enable;
 
 static struct synaptics_ts_data *ts_g = NULL;
 static struct workqueue_struct *synaptics_wq = NULL;
-static struct workqueue_struct *synaptics_report = NULL;
 static struct workqueue_struct *get_base_report = NULL;
 static struct proc_dir_entry *prEntry_tp = NULL;
 
@@ -453,7 +452,6 @@ struct synaptics_ts_data {
 	uint32_t pre_finger_state;
 	uint32_t pre_btn_state;
 	struct delayed_work  base_work;
-	struct work_struct  report_work;
 	struct delayed_work speed_up_work;
 	struct input_dev *input_dev;
 	struct hrtimer timer;
@@ -1438,6 +1436,7 @@ void int_touch(void)
 	mutex_unlock(&ts->mutexreport);
 }
 
+#ifndef TPD_USE_EINT
 static void synaptics_ts_work_func(struct work_struct *work)
 {
 	int ret,status_check;
@@ -1493,7 +1492,6 @@ END:
 	return;
 }
 
-#ifndef TPD_USE_EINT
 static enum hrtimer_restart synaptics_ts_timer_func(struct hrtimer *timer)
 {
 	struct synaptics_ts_data *ts = container_of(timer, struct synaptics_ts_data, timer);
@@ -1507,9 +1505,52 @@ static enum hrtimer_restart synaptics_ts_timer_func(struct hrtimer *timer)
 static irqreturn_t synaptics_irq_thread_fn(int irq, void *dev_id)
 {
 	struct synaptics_ts_data *ts = (struct synaptics_ts_data *)dev_id;
+	int ret,status_check;
+	uint8_t status = 0;
+	uint8_t inte = 0;
+
+	if (atomic_read(&ts->is_stop) == 1)
+	{
+		return IRQ_HANDLED;
+	}
+
+	if( ts->enable_remote) {
+		return IRQ_HANDLED;
+	}
+
 	ts->timestamp = ktime_get();
-	touch_disable(ts);
-	synaptics_ts_work_func(&ts->report_work);
+
+	ret = synaptics_rmi4_i2c_write_byte(ts->client, 0xff, 0x00 );
+	ret = synaptics_rmi4_i2c_read_word(ts->client, F01_RMI_DATA_BASE);
+
+	if( ret < 0 ) {
+		TPDTM_DMESG("Synaptic:ret = %d\n", ret);
+        synaptics_hard_reset(ts);
+		return IRQ_HANDLED;
+	}
+	status = ret & 0xff;
+	inte = (ret & 0x7f00)>>8;
+	//TPD_ERR("%s status[0x%x],inte[0x%x]\n",__func__,status,inte);
+        if(status & 0x80){
+		TPD_DEBUG("enter reset tp status,and ts->in_gesture_mode is:%d\n",ts->in_gesture_mode);
+		status_check = synaptics_init_panel(ts);
+		if (status_check < 0) {
+			TPD_ERR("synaptics_init_panel failed\n");
+		}
+		if ((ts->is_suspended == 1) && (ts->gesture_enable == 1)){
+			synaptics_enable_interrupt_for_gesture(ts, 1);
+		}
+	}
+/*
+	if(0 != status && 1 != status) {//0:no error;1: after hard reset;the two state don't need soft reset
+        TPD_ERR("%s status[0x%x],inte[0x%x]\n",__func__,status,inte);
+		int_state(ts);
+		goto END;
+	}
+*/
+	if ( inte & 0x04 )
+		int_touch();
+
 	return IRQ_HANDLED;
 }
 #endif
@@ -4229,8 +4270,6 @@ exit_init_failed:
 exit_createworkqueue_failed:
 	destroy_workqueue(synaptics_wq);
 	synaptics_wq = NULL;
-	destroy_workqueue(synaptics_report);
-	synaptics_report = NULL;
 	destroy_workqueue(get_base_report);
 	get_base_report = NULL;
 
