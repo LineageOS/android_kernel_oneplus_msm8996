@@ -109,6 +109,10 @@ Parent node optional properties:
 					this. If this property is not specified,
 					low battery voltage threshold will be
 					configured to 4200 mV.
+- qcom,fg-rconn-mohm:			Battery connector resistance (Rconn) in
+					milliohms. If Rconn is specified, then
+					Rslow values will be updated to account
+					it for an accurate ESR.
 - qcom,cycle-counter-en:		Boolean property which enables the cycle
 					counter feature. If this property is
 					present, then the following properties
@@ -254,6 +258,24 @@ Parent node optional properties:
 - qcom,fg-skip-first-estimate		A boolean property to specify if the
 					first estimate done by FG should be
 					skipped.
+- qcom,fg-batt-temp-low-limit:		Battery temperature (in decidegC) low
+					limit  which will be used to validate
+					the battery temperature reading from FG.
+					If the battery temperature goes below
+					this limit, last read good temperature
+					will be notified to userspace. If this
+					limit is not specified, then the
+					default limit would be -60C.
+- qcom,fg-batt-temp-high-limit:		Battery temperature (in decidegC) high
+					limit  which will be used to validate
+					the battery temperature reading from FG.
+					If the battery temperature goes above
+					this limit, last read good temperature
+					will be notified to userspace. If this
+					limit is not specified, then the
+					default limit would be 150C.
+- qcom,fg-cc-soc-limit-pct:		Percentage of CC_SOC before resetting
+					FG and restore the full CC_SOC value.
 
 qcom,fg-soc node required properties:
 - reg : offset and length of the PMIC peripheral register map.

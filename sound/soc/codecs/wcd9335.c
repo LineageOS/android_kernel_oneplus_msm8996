@@ -3757,13 +3757,13 @@ static int tasha_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 	dev_dbg(codec->dev, "%s %s %d\n", __func__, w->name, event);
 
 	switch (event) {
-    case SND_SOC_DAPM_PRE_PMU:
+	case SND_SOC_DAPM_PRE_PMU:
 		if ((!(strcmp(w->name, "ANC HPHR PA"))) &&
 		    (test_bit(HPH_PA_DELAY, &tasha->status_mask))) {
 			snd_soc_update_bits(codec, WCD9335_ANA_HPH, 0xC0, 0xC0);
 		}
     	set_bit(HPH_PA_DELAY, &tasha->status_mask);
-	break;
+		break;
 	case SND_SOC_DAPM_POST_PMU:
 		if (!(strcmp(w->name, "ANC HPHR PA"))) {
 			if ((snd_soc_read(codec, WCD9335_ANA_HPH) & 0xC0)
@@ -3871,13 +3871,13 @@ static int tasha_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 		 * 7ms sleep is required after PA is enabled as per
 		 * HW requirement
 		 */
-	if (test_bit(HPH_PA_DELAY, &tasha->status_mask)) {
-		usleep_range(7000, 7100);
-		clear_bit(HPH_PA_DELAY, &tasha->status_mask);
-	}
+		if (test_bit(HPH_PA_DELAY, &tasha->status_mask)) {
+			usleep_range(7000, 7100);
+			clear_bit(HPH_PA_DELAY, &tasha->status_mask);
+		}
 
-	tasha_codec_hph_post_pa_config(tasha, hph_mode, event);
-		snd_soc_update_bits(codec, WCD9335_CDC_RX1_RX_PATH_CTL,
+		tasha_codec_hph_post_pa_config(tasha, hph_mode, event);
+			snd_soc_update_bits(codec, WCD9335_CDC_RX1_RX_PATH_CTL,
 				    0x10, 0x00);
 		/* Remove mix path mute if it is enabled */
 		if ((snd_soc_read(codec, WCD9335_CDC_RX1_RX_PATH_MIX_CTL)) &
