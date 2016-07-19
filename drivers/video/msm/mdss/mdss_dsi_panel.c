@@ -696,6 +696,7 @@ static void mdss_dsi_panel_switch_mode(struct mdss_panel_data *pdata,
 
 static u32 backlight_remap(u32 level)
 {
+#ifdef BACKLIGHT_REMAP
     u32 temp = 0;
 #if 0
     temp = (level > max_brightness_setting)? max_brightness_setting: level;
@@ -709,6 +710,9 @@ static u32 backlight_remap(u32 level)
 	}
 #endif
 	return temp;
+#else
+    return level;
+#endif
 }
 
 static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
