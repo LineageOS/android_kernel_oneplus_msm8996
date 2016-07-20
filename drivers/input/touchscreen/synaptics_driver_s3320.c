@@ -487,6 +487,8 @@ struct synaptics_ts_data {
 #ifdef SUPPORT_VIRTUAL_KEY
         struct kobject *properties_kobj;
 #endif
+
+	ktime_t timestamp;
 };
 
 static struct device_attribute attrs_oem[] = {
@@ -1331,6 +1333,12 @@ void int_touch(void)
 		TPD_ERR("synaptics_int_touch F12_2D_DATA_BASE: i2c_transfer failed\n");
 		goto INT_TOUCH_END;
 	}
+
+	input_event(ts->input_dev, EV_SYN, SYN_TIME_SEC,
+			ktime_to_timespec(ts->timestamp).tv_sec);
+	input_event(ts->input_dev, EV_SYN, SYN_TIME_NSEC,
+			ktime_to_timespec(ts->timestamp).tv_nsec);
+
 	for( i = 0; i < count_data; i++ ) {
 		points.status = buf[i*8];
 		points.x = ((buf[i*8+2]&0x0f)<<8) | (buf[i*8+1] & 0xff);
@@ -1478,7 +1486,8 @@ static enum hrtimer_restart synaptics_ts_timer_func(struct hrtimer *timer)
 static irqreturn_t synaptics_irq_thread_fn(int irq, void *dev_id)
 {
 	struct synaptics_ts_data *ts = (struct synaptics_ts_data *)dev_id;
-    touch_disable(ts);
+	ts->timestamp = ktime_get();
+	touch_disable(ts);
 	synaptics_ts_work_func(&ts->report_work);
 	return IRQ_HANDLED;
 }
