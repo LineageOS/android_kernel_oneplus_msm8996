@@ -326,6 +326,7 @@ struct synaptics_rmi4_data {
 			bool rebuild);
 	int (*irq_enable)(struct synaptics_rmi4_data *rmi4_data, bool enable,
 			bool attn_only);
+	ktime_t timestamp;
 };
 
 struct synaptics_dsx_bus_access {
