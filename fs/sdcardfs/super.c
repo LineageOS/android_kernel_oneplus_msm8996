@@ -196,12 +196,21 @@ static int sdcardfs_show_options(struct seq_file *m, struct dentry *root)
 	struct sdcardfs_mount_options *opts = &sbi->options;
 
 	if (opts->fs_low_uid != 0)
-		seq_printf(m, ",uid=%u", opts->fs_low_uid);
+		seq_printf(m, ",fsuid=%u", opts->fs_low_uid);
 	if (opts->fs_low_gid != 0)
-		seq_printf(m, ",gid=%u", opts->fs_low_gid);
+		seq_printf(m, ",fsgid=%u", opts->fs_low_gid);
 
 	if (opts->multiuser)
 		seq_printf(m, ",multiuser");
+
+	if (opts->mask)
+		seq_printf(m, ",mask=%u", opts->mask);
+
+	if (opts->gid)
+		seq_printf(m, ",gid=%u", opts->gid);
+
+	if (opts->fs_user_id)
+		seq_printf(m, ",userid=%d", opts->fs_user_id);
 
 	if (opts->reserved_mb != 0)
 		seq_printf(m, ",reserved=%uMB", opts->reserved_mb);
