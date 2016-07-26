@@ -2595,6 +2595,13 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	case MDSS_EVENT_UPDATE_LIVEDISPLAY:
 		rc = mdss_livedisplay_update(ctrl_pdata, (int)(unsigned long) arg);
 		break;
+	case MDSS_EVENT_PANEL_SET_SRGB_MODE:
+		ctrl_pdata->SRGB_mode= (int)(unsigned long) arg;
+		mdss_dsi_panel_set_srgb_mode(ctrl_pdata,(int)(unsigned long) ctrl_pdata->SRGB_mode);
+		break;
+	case MDSS_EVENT_PANEL_GET_SRGB_MODE:
+		rc = mdss_dsi_panel_get_srgb_mode(ctrl_pdata);
+		break;
 	default:
 		pr_debug("%s: unhandled event=%d\n", __func__, event);
 		break;

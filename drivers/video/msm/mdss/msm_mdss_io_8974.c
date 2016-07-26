@@ -1956,6 +1956,7 @@ int mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, void *clk_handle,
 	}
 
 	mutex_lock(&dsi_clk_mutex);
+
 	/*
 	 * In sync_wait_broadcast mode, we need to enable clocks
 	 * for the other controller as well when enabling clocks
@@ -1978,6 +1979,15 @@ int mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, void *clk_handle,
 			pr_warn("%s: Unable to get clk master control\n",
 				__func__);
 	}
+
+	if (mctrl && (clk_handle == ctrl->dsi_clk_handle)) {
+                m_clk_handle = mctrl->dsi_clk_handle;
+                vote_cnt = &mctrl->m_dsi_vote_cnt;
+        } else if (mctrl) {
+                m_clk_handle = mctrl->mdp_clk_handle;
+                vote_cnt = &mctrl->m_mdp_vote_cnt;
+        }
+
 
 	/*
 	 * it should add and remove extra votes based on voting clients to avoid
