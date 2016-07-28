@@ -242,7 +242,6 @@ int mdss_livedisplay_update(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		}
 	}
 
-
 	// CABC/SRE/ACO features
 	if (is_cabc_cmd(types) && mlc->cabc_cmds_len) {
 		memcpy(cmd_buf + dlen, mlc->cabc_cmds, mlc->cabc_cmds_len);
