@@ -142,6 +142,10 @@
 			15 01 00 00 00 00 02 53 E0];
 		cm,mdss-livedisplay-hbm-off-cmd = [
 			15 01 00 00 00 00 02 53 20];
+		cm,mdss-livedisplay-srgb-on-cmd = [
+			39 01 00 00 00 00 02 57 4C];
+		cm,mdss-livedisplay-srgb-off-cmd = [
+			39 01 00 00 00 00 02 57 40];
 
 		qcom,partial-update-enabled;
 		qcom,panel-roi-alignment = <360 64 360 64 360 64>;
