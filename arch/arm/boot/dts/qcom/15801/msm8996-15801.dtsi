@@ -1028,9 +1028,10 @@
 };
 
 &red_led {
-	linux,default-trigger = "none";
+	/delete-property/ linux,default-trigger;
 	qcom,duty-pcts = [ 00 0E 1C 2A 38 46 54 64 ];
 	qcom,start-idx = <0>;
+	qcom,idx-len = <8>;
 	qcom,pause-lo = <500>;
 	qcom,pause-hi = <500>;
 	qcom,ramp-step-ms = <50>;
@@ -1039,9 +1040,10 @@
 };
 
 &green_led {
-	linux,default-trigger = "none";
+	/delete-property/ linux,default-trigger;
 	qcom,duty-pcts = [ 00 0E 1C 2A 38 46 54 64 ];
 	qcom,start-idx = <8>;
+	qcom,idx-len = <8>;
 	qcom,pause-lo = <500>;
 	qcom,pause-hi = <500>;
 	qcom,ramp-step-ms = <50>;
@@ -1050,9 +1052,10 @@
 };
 
 &blue_led {
-	linux,default-trigger = "none";
+	/delete-property/ linux,default-trigger;
 	qcom,duty-pcts = [ 00 0E 1C 2A 38 46 54 64 ];
 	qcom,start-idx = <16>;
+	qcom,idx-len = <8>;
 	qcom,pause-lo = <500>;
 	qcom,pause-hi = <500>;
 	qcom,ramp-step-ms = <50>;
