@@ -25,8 +25,6 @@
 #define	FW_CHECK_FAIL		0
 #define	FW_CHECK_SUCCESS	1
 
-#define SHOW_FW_VERSION_DELAY_MS 7000
-
 struct fastchg_device_info {
 	struct i2c_client		*client;
 	struct miscdevice   dash_device;
@@ -60,9 +58,6 @@ struct fastchg_device_info {
 	struct wake_lock fastchg_update_fireware_lock;
 
 	struct delayed_work		update_firmware;
-	struct delayed_work update_fireware_version_work;
-	char fw_id[12];
-	char manu_name[12];
 };
 
 struct fastchg_device_info *fastchg_di;
@@ -566,19 +561,6 @@ static void fastcg_work_func(struct work_struct *work)
 	}
 }
 
-static void update_fireware_version_func(struct work_struct *work)
-{
-	struct fastchg_device_info *di = container_of(work,
-			struct fastchg_device_info,
-			update_fireware_version_work.work);
-
-	if (!dashchg_firmware_data || di->dashchg_fw_ver_count == 0)
-		return;
-
-	sprintf(di->fw_id,"0x%x",dashchg_firmware_data[di->dashchg_fw_ver_count - 4]);
-	sprintf(di->manu_name,"%s","ONEPLUS");
-}
-
 void di_watchdog(unsigned long data)
 {
 	struct fastchg_device_info *di = (struct fastchg_device_info *)data;
@@ -1011,7 +993,6 @@ static int dash_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	INIT_WORK(&di->fastcg_work,fastcg_work_func);
 	INIT_WORK(&di->charger_present_status_work,update_charger_present_status);
-	INIT_DELAYED_WORK(&di->update_fireware_version_work,update_fireware_version_func);
 	INIT_DELAYED_WORK(&di->update_firmware,dashchg_fw_update);
 
 	init_timer(&di->watchdog);
@@ -1030,8 +1011,6 @@ static int dash_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	mcu_init(di);
 
 	fastcharge_information_register(&fastcharge_information);
-	schedule_delayed_work(&di->update_fireware_version_work,
-			msecs_to_jiffies(SHOW_FW_VERSION_DELAY_MS));
 	pr_info("dash_probe success\n");
 
 	return 0;
