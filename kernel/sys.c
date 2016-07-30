@@ -2496,29 +2496,32 @@ struct compat_sysinfo {
 COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 {
 	struct sysinfo s;
-
+	int bitcount = 0;
 	do_sysinfo(&s);
 
 	/* Check to see if any memory value is too large for 32-bit and scale
-	 *  down if needed
+	 * down if needed
+	 *
+	 * cyanogen: changed this to use a smaller multiple since various 32-bit
+	 * proprietary vendor code ignored the mem_unit field for the longest time
+	 * until we started getting devices with 6GB of RAM. unfortunately this is
+	 * code we cannot easily change and thus this is a hack.
 	 */
-	if (upper_32_bits(s.totalram) || upper_32_bits(s.totalswap)) {
-		int bitcount = 0;
-
-		while (s.mem_unit < PAGE_SIZE) {
-			s.mem_unit <<= 1;
-			bitcount++;
-		}
-
-		s.totalram >>= bitcount;
-		s.freeram >>= bitcount;
-		s.sharedram >>= bitcount;
-		s.bufferram >>= bitcount;
-		s.totalswap >>= bitcount;
-		s.freeswap >>= bitcount;
-		s.totalhigh >>= bitcount;
-		s.freehigh >>= bitcount;
+	while (s.mem_unit < PAGE_SIZE &&
+			(upper_32_bits(s.totalram) ||
+			 upper_32_bits(s.totalswap))) {
+		s.mem_unit <<= 1;
+		s.totalram >>= 1;
+		s.freeram >>= 1;
+		bitcount++;
 	}
+
+	s.sharedram >>= bitcount;
+	s.bufferram >>= bitcount;
+	s.totalswap >>= bitcount;
+	s.freeswap >>= bitcount;
+	s.totalhigh >>= bitcount;
+	s.freehigh >>= bitcount;
 
 	if (!access_ok(VERIFY_WRITE, info, sizeof(struct compat_sysinfo)) ||
 	    __put_user(s.uptime, &info->uptime) ||
