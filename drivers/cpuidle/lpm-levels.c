@@ -532,6 +532,9 @@ static int cluster_configure(struct lpm_cluster *cluster, int idx,
 		us = us + 1;
 		do_div(us, USEC_PER_SEC/SCLK_HZ);
 		msm_mpm_enter_sleep(us, from_idle, cpumask);
+
+		if (cluster->no_saw_devices && !use_psci)
+			msm_spm_set_rpm_hs(true);
 	}
 
 	/* Notify cluster enter event after successfully config completion */
@@ -656,6 +659,9 @@ static void cluster_unprepare(struct lpm_cluster *cluster,
 
 		lpm_wa_cx_unvote_send();
 		msm_mpm_exit_sleep(from_idle);
+
+		if (cluster->no_saw_devices && !use_psci)
+			msm_spm_set_rpm_hs(false);
 	}
 
 	update_debug_pc_event(CLUSTER_EXIT, cluster->last_level,
