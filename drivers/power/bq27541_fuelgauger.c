@@ -687,7 +687,7 @@ static int bq27541_battery_soc(struct bq27541_device_info *di, int suspend_time_
 	bool fg_soc_changed=false;
 	/* Add for get right soc when sleep long time */
 	if(atomic_read(&di->suspended) == 1) {
-		dev_warn(di->dev, "di->suspended di->soc_pre=%d\n", di->soc_pre);
+		dev_dbg(di->dev, "di->suspended di->soc_pre=%d\n", di->soc_pre);
 		return di->soc_pre;
 	}
 	if(di->alow_reading) {
@@ -1169,12 +1169,12 @@ static struct platform_device this_device = {
 
 static void update_pre_capacity_func(struct work_struct *w)
 {
-	pr_info("enter\n");
+	pr_debug("enter\n");
 	bq27541_set_alow_reading(true);
 	bq27541_battery_soc(bq27541_di, update_pre_capacity_data.suspend_time);
 	bq27541_set_alow_reading(false);
 	wake_unlock(&bq27541_di->update_soc_wake_lock);
-	pr_info("exit\n");
+	pr_debug("exit\n");
 }
 
 #define MAX_RETRY_COUNT	5
@@ -1354,11 +1354,11 @@ static int bq27541_battery_resume(struct i2c_client *client)
 		return 0;
 	}
 	suspend_time =  di->rtc_resume_time - di->rtc_suspend_time;
-	pr_info("suspend_time=%d\n", suspend_time);
+	pr_debug("suspend_time=%d\n", suspend_time);
 	update_pre_capacity_data.suspend_time = suspend_time;
 
 	if (di->rtc_resume_time - di->lcd_off_time >= TWO_POINT_FIVE_MINUTES) {
-		pr_err("di->rtc_resume_time - di->lcd_off_time=%ld\n",
+		pr_debug("di->rtc_resume_time - di->lcd_off_time=%ld\n",
 				di->rtc_resume_time - di->lcd_off_time);
 		wake_lock(&di->update_soc_wake_lock);
 		get_current_time(&di->lcd_off_time);
