@@ -245,6 +245,7 @@ struct qpnp_flash_led {
 	struct mutex			flash_led_lock;
 	struct qpnp_flash_led_buffer	*log;
 	struct dentry			*dbgfs_root;
+	spinlock_t			led_spin_lock;
 	int				num_leds;
 	u32				buffer_cnt;
 	u16				base;
@@ -257,6 +258,7 @@ struct qpnp_flash_led {
 	bool				strobe_debug;
 	bool				dbg_feature_en;
 	bool				open_fault;
+	bool				switch_in_progress;
 };
 
 static u8 qpnp_flash_led_ctrl_dbg_regs[] = {
@@ -1657,6 +1659,15 @@ static void qpnp_flash_led_work(struct work_struct *work)
 	}
 
 	flash_node->flash_on = true;
+
+	spin_lock(&led->led_spin_lock);
+	if (flash_node->id == FLASH_LED_SWITCH) {
+		led->switch_in_progress = false;
+		for (i = 0 ; i < led->num_leds; i++)
+			led_sysfs_enable(&led->flash_node[i].cdev);
+	}
+	spin_unlock(&led->led_spin_lock);
+
 unlock_mutex:
 	mutex_unlock(&flash_node->cdev.led_access);
 	mutex_unlock(&led->flash_led_lock);
@@ -1725,6 +1736,15 @@ exit_flash_hdrm_sns:
 			}
 		}
 	}
+
+	spin_lock(&led->led_spin_lock);
+	if (flash_node->id == FLASH_LED_SWITCH) {
+		led->switch_in_progress = false;
+		for (i = 0 ; i < led->num_leds; i++)
+			led_sysfs_enable(&led->flash_node[i].cdev);
+	}
+	spin_unlock(&led->led_spin_lock);
+
 exit_flash_led_work:
 	rc = qpnp_flash_led_module_disable(led, flash_node);
 	if (rc)
@@ -1746,12 +1766,23 @@ static void qpnp_flash_led_brightness_set(struct led_classdev *led_cdev,
 {
 	struct flash_node_data *flash_node;
 	struct qpnp_flash_led *led;
+	int i;
 	flash_node = container_of(led_cdev, struct flash_node_data, cdev);
 	led = dev_get_drvdata(&flash_node->spmi_dev->dev);
 
 	if (value < LED_OFF) {
 		pr_err("Invalid brightness value\n");
 		return;
+	}
+
+	spin_lock(&led->led_spin_lock);
+
+	if (led->switch_in_progress)
+		goto release_lock;
+	else if (flash_node->id == FLASH_LED_SWITCH) {
+		for (i = 0 ; i < led->num_leds; i++)
+			led_sysfs_disable(&led->flash_node[i].cdev);
+		led->switch_in_progress = true;
 	}
 
 	if (value > flash_node->cdev.max_brightness)
@@ -1790,7 +1821,7 @@ static void qpnp_flash_led_brightness_set(struct led_classdev *led_cdev,
 				prgm_current2 =
 				flash_node->prgm_current;
 
-			return;
+			goto release_lock;
 		} else if (flash_node->id == FLASH_LED_SWITCH) {
 			if (!value) {
 				flash_node->prgm_current = 0;
@@ -1805,7 +1836,8 @@ static void qpnp_flash_led_brightness_set(struct led_classdev *led_cdev,
 
 	queue_work(led->ordered_workq, &flash_node->work);
 
-	return;
+release_lock:
+	spin_unlock(&led->led_spin_lock);
 }
 
 static int qpnp_flash_led_init_settings(struct qpnp_flash_led *led)
@@ -2397,6 +2429,8 @@ static int qpnp_flash_led_probe(struct spmi_device *spmi)
 	led->spmi_dev = spmi;
 	led->current_addr = FLASH_LED0_CURRENT(led->base);
 	led->current2_addr = FLASH_LED1_CURRENT(led->base);
+
+	spin_lock_init(&led->led_spin_lock);
 
 	led->pdata = devm_kzalloc(&spmi->dev,
 			sizeof(struct flash_led_platform_data), GFP_KERNEL);
