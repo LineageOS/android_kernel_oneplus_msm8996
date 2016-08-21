@@ -1264,10 +1264,6 @@
 };
 
 // msm8996-mdss.dtsi
-&mdss_mdp {
-	/delete-property/ qcom,mdss-idle-power-collapse-enabled;
-};
-
 &mdss_dsi0 {
 	//guozhiming modify for lcd 2015-10-15
 	oled-vdda-supply = <&pm8994_s5>;
