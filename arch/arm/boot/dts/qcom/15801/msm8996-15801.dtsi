@@ -2027,9 +2027,6 @@
 //msm8996-mdss-pll.dtsi end
 
 //msm8996-mdss.dtsi start
-&mdss_mdp {
-	/delete-property/ qcom,mdss-idle-power-collapse-enabled;
-};
 &mdss_dsi0 {
 	oled-vdda-supply = <&pm8994_s5>;
 	/delete-property/ vddio-supply;
