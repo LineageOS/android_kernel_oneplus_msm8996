@@ -89,8 +89,6 @@
 		qcom,mdss-dsi-dma-trigger = "trigger_sw";
 		qcom,mdss-dsi-mdp-trigger = "trigger_sw";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
-		qcom,mdss-dsi-lp11-init;
-		qcom,mdss-dsi-init-delay-us = <10000>;
 		qcom,mdss-dsi-reset-sequence = <1 2>,<0 2>, <1 10>;
 		/*qcom,mdss-dsi-panel-inverted;*/
 		qcom,mdss-pan-physical-width-dimension = <68>;
@@ -102,6 +100,9 @@
 	       // qcom,mdss-tear-check-sync-threshold-continue = <4>;
 	       // qcom,mdss-tear-check-start-pos= <1920>; /* Height */
 	       // qcom,mdss-tear-check-rd-ptr-trigger-intr= <1921>; /* Height + 1 */
+
+		qcom,ulps-enabled;
+		qcom,panel-allow-phy-poweroff;
 
 		cm,mdss-livedisplay-cabc-cmd = [
 			15 01 00 00 00 00 02 55 00];
