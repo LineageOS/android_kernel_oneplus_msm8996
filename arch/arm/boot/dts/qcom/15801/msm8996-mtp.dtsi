@@ -1057,10 +1057,6 @@
 };
 
 // msm8996-mdss.dtsi
-&mdss_mdp {
-	/delete-property/ qcom,mdss-idle-power-collapse-enabled;
-};
-
 &mdss_dsi0 {
 	oled-vdda-supply = <&pm8994_s5>;
 	vddio-supply = <&pm8994_l18>;//power provide 3.3V
