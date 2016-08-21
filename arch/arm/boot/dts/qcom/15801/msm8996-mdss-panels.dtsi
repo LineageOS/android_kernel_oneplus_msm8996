@@ -133,8 +133,8 @@
 	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
 	qcom,esd-check-enabled;
 	qcom,mdss-dsi-panel-status-check-mode = "te_signal_check";
-	qcom,mdss-dsi-lp11-init;
-	qcom,mdss-dsi-init-delay-us = <10000>;
+	qcom,ulps-enabled;
+	qcom,panel-allow-phy-poweroff;
 };
 
 &dsi_samsung_s6e3fa5_1080p_cmd {
@@ -148,6 +148,6 @@
 	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
 	qcom,esd-check-enabled;
 	qcom,mdss-dsi-panel-status-check-mode = "te_signal_check";
-	qcom,mdss-dsi-lp11-init;
-	qcom,mdss-dsi-init-delay-us = <10000>;
+	qcom,ulps-enabled;
+	qcom,panel-allow-phy-poweroff;
 };
