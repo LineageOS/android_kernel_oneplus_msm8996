@@ -1073,7 +1073,6 @@
 
 // msm8996-mdss.dtsi
 &mdss_mdp {
-	/delete-property/ qcom,mdss-idle-power-collapse-enabled;
 	/delete-property/ qcom,regs-dump-xin-id-mdp;
 };
 &smmu_mdp_unsec {
