@@ -15,7 +15,7 @@ config SDCARD_FS_FADV_NOACTIVE
 config CONFIG_SDCARD_FS_ANDROID_PKGLIST
 	bool "Read Android packages.list from filesystem"
 	depends on SDCARD_FS
-	default y
+	default n
 	help
 	  Support for reading Android's package list directly from
 	  the filesystem. Disable this if you have support for the
