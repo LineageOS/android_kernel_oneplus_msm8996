@@ -91,6 +91,7 @@ struct fpc1020_data {
 	struct notifier_block fb_notif;
     #endif
 	struct work_struct pm_work;
+	int proximity_state; /* 0:far 1:near */
 };
 
 static int fpc1020_request_named_gpio(struct fpc1020_data *fpc1020,
@@ -356,12 +357,39 @@ static ssize_t screen_state_get(struct device* device,
 
 static DEVICE_ATTR(screen_state, S_IRUSR , screen_state_get, NULL);
 
+static ssize_t proximity_state_set(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+	int rc, val;
+
+	rc = kstrtoint(buf, 10, &val);
+	if (rc)
+		return -EINVAL;
+
+	fpc1020->proximity_state = !!val;
+
+	if (!fpc1020->screen_state && !fpc1020->proximity_state) {
+		gpio_set_value(fpc1020->rst_gpio, 1);
+		udelay(FPC1020_RESET_HIGH1_US);
+		gpio_set_value(fpc1020->rst_gpio, 0);
+		udelay(FPC1020_RESET_LOW_US);
+		gpio_set_value(fpc1020->rst_gpio, 1);
+		udelay(FPC1020_RESET_HIGH2_US);
+	}
+
+	return count;
+}
+
+static DEVICE_ATTR(proximity_state, S_IWUSR, NULL, proximity_state_set);
+
 static struct attribute *attributes[] = {
 	&dev_attr_hw_reset.attr,
 	&dev_attr_irq.attr,
 	&dev_attr_report_home.attr,
 	&dev_attr_update_info.attr,
 	&dev_attr_screen_state.attr,
+	&dev_attr_proximity_state.attr,
 	NULL
 };
 
@@ -471,6 +499,9 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
 static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 {
 	struct fpc1020_data *fpc1020 = handle;
+
+	if (!fpc1020->screen_state && fpc1020->proximity_state)
+		return IRQ_NONE;
 
 	sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_irq.attr.name);
 
