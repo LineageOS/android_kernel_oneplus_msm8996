@@ -39,6 +39,7 @@
 #include <linux/platform_device.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/spinlock.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/regulator/consumer.h>
@@ -91,6 +92,8 @@ struct fpc1020_data {
 	struct notifier_block fb_notif;
     #endif
 	struct work_struct pm_work;
+	int proximity_state; /* 0:far 1:near */
+	spinlock_t irq_lock;
 };
 
 static int fpc1020_request_named_gpio(struct fpc1020_data *fpc1020,
@@ -356,12 +359,42 @@ static ssize_t screen_state_get(struct device* device,
 
 static DEVICE_ATTR(screen_state, S_IRUSR , screen_state_get, NULL);
 
+static ssize_t proximity_state_set(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+	int rc, val;
+	unsigned long flags;
+
+	rc = kstrtoint(buf, 10, &val);
+	if (rc)
+		return -EINVAL;
+
+	fpc1020->proximity_state = !!val;
+
+	spin_lock_irqsave(&fpc1020->irq_lock, flags);
+	if (!fpc1020->screen_state && !fpc1020->proximity_state) {
+		gpio_set_value(fpc1020->rst_gpio, 1);
+		udelay(FPC1020_RESET_HIGH1_US);
+		gpio_set_value(fpc1020->rst_gpio, 0);
+		udelay(FPC1020_RESET_LOW_US);
+		gpio_set_value(fpc1020->rst_gpio, 1);
+		udelay(FPC1020_RESET_HIGH2_US);
+	}
+	spin_unlock_irqrestore(&fpc1020->irq_lock, flags);
+
+	return count;
+}
+
+static DEVICE_ATTR(proximity_state, S_IWUSR, NULL, proximity_state_set);
+
 static struct attribute *attributes[] = {
 	&dev_attr_hw_reset.attr,
 	&dev_attr_irq.attr,
 	&dev_attr_report_home.attr,
 	&dev_attr_update_info.attr,
 	&dev_attr_screen_state.attr,
+	&dev_attr_proximity_state.attr,
 	NULL
 };
 
@@ -471,6 +504,15 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
 static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 {
 	struct fpc1020_data *fpc1020 = handle;
+	unsigned long flags;
+	bool status;
+
+	spin_lock_irqsave(&fpc1020->irq_lock, flags);
+	status = !fpc1020->screen_state && fpc1020->proximity_state;
+	spin_unlock_irqrestore(&fpc1020->irq_lock, flags);
+
+	if (status)
+		return IRQ_NONE;
 
 	sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_irq.attr.name);
 
@@ -598,6 +640,7 @@ static int fpc1020_probe(struct platform_device *pdev)
 	enable_irq_wake( gpio_to_irq( fpc1020->irq_gpio ) );
 	wake_lock_init(&fpc1020->ttw_wl, WAKE_LOCK_SUSPEND, "fpc_ttw_wl");
 	device_init_wakeup(fpc1020->dev, 1);
+	spin_lock_init(&fpc1020->irq_lock);
 
 	rc = sysfs_create_group(&dev->kobj, &attribute_group);
 	if (rc) {
