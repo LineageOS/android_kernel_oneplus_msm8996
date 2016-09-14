@@ -679,8 +679,6 @@ static bool is_report_key = true;
 #ifdef SUPPORT_VIRTUAL_KEY //WayneChang, 2015/12/29, add flag to enable virtual key
 bool virtual_key_enable;
 EXPORT_SYMBOL(virtual_key_enable);
-struct completion key_cm;
-EXPORT_SYMBOL(key_cm);
 #endif
 static void int_key(struct synaptics_ts_data *ts )
 {
@@ -2028,9 +2026,6 @@ static int synaptics_ts_probe(struct i2c_client *client, const struct i2c_device
 	ts->dev = &client->dev;
 	ts->loading_fw = false;
     tc_g = ts;
-#if (defined SUPPORT_VIRTUAL_KEY)
-    init_completion(&key_cm);
-#endif
     ret = synaptics_dsx_pinctrl_init(ts);
     if (!ret && ts->pinctrl) {
         ret = pinctrl_select_state(ts->pinctrl,
