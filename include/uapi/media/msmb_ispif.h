@@ -1,5 +1,9 @@
-#ifndef MSM_CAM_ISPIF_H
-#define MSM_CAM_ISPIF_H
+#ifndef UAPI_MSMB_ISPIF_H
+#define UAPI_MSMB_ISPIF_H
+
+#include <linux/types.h>
+#include <linux/ioctl.h>
+#include <linux/videodev2.h>
 
 #define CSID_VERSION_V20                      0x02000011
 #define CSID_VERSION_V22                      0x02001000
