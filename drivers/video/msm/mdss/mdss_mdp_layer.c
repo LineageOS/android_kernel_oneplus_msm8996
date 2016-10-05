@@ -542,7 +542,7 @@ static int __configure_pipe_params(struct msm_fb_data_type *mfd,
 
 	if (layer->flags & SCALER_ENABLED)
 		memcpy(&pipe->scaler, layer->scale,
-			sizeof(struct mdp_scale_data));
+			sizeof(struct mdp_scale_data_v2));
 
 	pipe->scaler.enable = (layer->flags & SCALER_ENABLED);
 
