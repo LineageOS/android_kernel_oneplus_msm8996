@@ -1065,6 +1065,7 @@ irqreturn_t mdss_mdp_isr(int irq, void *ptr)
 		if (hist_isr != 0)
 			mdss_mdp_hist_intr_done(hist_isr);
 	}
+	mdss_mdp_video_isr(mdata->video_intf, mdata->nintf);
 	return IRQ_HANDLED;
 }
 
@@ -1878,7 +1879,6 @@ static void mdss_hw_rev_init(struct mdss_data_type *mdata)
  */
 void mdss_hw_init(struct mdss_data_type *mdata)
 {
-	int i;
 	struct mdss_mdp_pipe *vig;
 
 	mdss_hw_rev_init(mdata);

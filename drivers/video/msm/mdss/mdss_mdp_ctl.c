@@ -826,7 +826,7 @@ static u32 mdss_mdp_get_vbp_factor(struct mdss_mdp_ctl *ctl)
 		return 0;
 
 	pinfo = &ctl->panel_data->panel_info;
-	fps = mdss_panel_get_framerate(pinfo);
+	fps = mdss_panel_get_framerate(pinfo, FPS_RESOLUTION_HZ);
 	v_total = mdss_panel_get_vtotal(pinfo);
 	vbp = pinfo->lcdc.v_back_porch + pinfo->lcdc.v_pulse_width;
 	vbp += pinfo->prg_fet;
@@ -874,7 +874,7 @@ static u32 __calc_prefill_line_time_us(struct mdss_mdp_ctl *ctl)
 		return 0;
 
 	pinfo = &ctl->panel_data->panel_info;
-	fps = mdss_panel_get_framerate(pinfo);
+	fps = mdss_panel_get_framerate(pinfo, FPS_RESOLUTION_HZ);
 	v_total = mdss_panel_get_vtotal(pinfo);
 	vbp = pinfo->lcdc.v_back_porch + pinfo->lcdc.v_pulse_width;
 	vbp += pinfo->prg_fet;
@@ -931,7 +931,7 @@ static u32 mdss_mdp_calc_prefill_line_time(struct mdss_mdp_ctl *ctl,
 		return -EINVAL;
 
 	pinfo = &ctl->panel_data->panel_info;
-	fps = mdss_panel_get_framerate(pinfo);
+	fps = mdss_panel_get_framerate(pinfo, FPS_RESOLUTION_HZ);
 	v_total = mdss_panel_get_vtotal(pinfo);
 
 	/* calculate the minimum prefill */
