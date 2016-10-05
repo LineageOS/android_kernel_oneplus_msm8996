@@ -3207,7 +3207,7 @@ static int mdss_mdp_cmd_ctx_setup(struct mdss_mdp_ctl *ctl,
 		ctx->default_pp_num, mdss_mdp_cmd_readptr_done, ctl);
 
 	mdss_mdp_set_intr_callback(MDSS_MDP_IRQ_TYPE_PING_PONG_WR_PTR,
-		ctx->default_pp_num, mdss_mdp_cmd_writeptr_done, ctl);
+		ctx->default_pp_num, mdss_mdp_cmd_lineptr_done, ctl);
 
 	ret = mdss_mdp_cmd_tearcheck_setup(ctx, false);
 	if (ret)
