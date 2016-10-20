@@ -42,6 +42,7 @@ struct project_info{
        uint32  ddr_raw;
        uint32  ddr_column;
        uint32  ddr_reserve_info;
+       uint32  platform_id;
 };
 
 static struct project_info * project_info_desc;

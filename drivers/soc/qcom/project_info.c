@@ -13,6 +13,7 @@
 #include <linux/types.h>
 #include <linux/project_info.h>
 
+#include <soc/qcom/socinfo.h>
 #include <soc/qcom/smem.h>
 
 #include <linux/gpio.h>
@@ -31,6 +32,7 @@ struct project_info{
        uint32  ddr_raw;
        uint32  ddr_column;
        uint32  ddr_reserve_info;
+       uint32  platform_id;
 };
 
 struct component_info{
@@ -60,6 +62,7 @@ static DEVICE_ATTR(ddr_raw, S_IRUGO, project_info_get, NULL);
 static DEVICE_ATTR(ddr_column, S_IRUGO, project_info_get, NULL);
 static DEVICE_ATTR(ddr_reserve_info, S_IRUGO, project_info_get, NULL);
 static DEVICE_ATTR(secboot_status, S_IRUGO, project_info_get, NULL);
+static DEVICE_ATTR(platform_id, S_IRUGO, project_info_get, NULL);
 
 uint32 get_secureboot_fuse_status(void)
 {
@@ -104,6 +107,8 @@ static ssize_t project_info_get(struct device *dev,
 		//return sprintf(buf, "%d\n", project_info_desc->ddr_reserve_info);
 		return sprintf(buf, "%d\n",get_secureboot_fuse_status());
 	}
+	if (attr == &dev_attr_platform_id)
+		return sprintf(buf, "%d\n", socinfo_get_id());
 
 	return -EINVAL;
 
@@ -122,6 +127,7 @@ static struct attribute *project_info_sysfs_entries[] = {
 	&dev_attr_ddr_column.attr,
 	&dev_attr_ddr_reserve_info.attr,
 	&dev_attr_secboot_status.attr,
+	&dev_attr_platform_id.attr,
 	NULL,
 };
 
