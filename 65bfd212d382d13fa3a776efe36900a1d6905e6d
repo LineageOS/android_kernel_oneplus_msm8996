@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ff2e2bb8_e1f08ecc",
+        "filename": "drivers/soc/qcom/op_rf_cable_monitor.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 105,
+      "author": {
+        "id": 11124
+      },
+      "writtenOn": "2016-10-24T17:49:51Z",
+      "side": 1,
+      "message": "Marc: I tested this patch with firmware 3.2.6 and 3.5.4 and both boot fine with cm14, I had to pick the patch from your github which doesn\u0027t have the brace otherwise I had this build error:\n\nop_rf_cable_monitor.c:122:1: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]",
+      "revId": "65bfd212d382d13fa3a776efe36900a1d6905e6d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
