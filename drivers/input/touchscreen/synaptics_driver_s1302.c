@@ -72,7 +72,7 @@ enum oem_boot_mode{
 /*------------------------------------------------Global Define--------------------------------------------*/
 #define TP_TEST_ENABLE 1
 #define TPD_NAME "synaptics"
-#define TPD_DEVICE "synaptics,s1302"
+#define TPD_DEVICE "HWK,synaptics,s1302"
 #define LOG_TAG		"touchkey,s1302"
 
 #define SUPPORT_TP_SLEEP_MODE
@@ -753,7 +753,7 @@ static void int_key_cover(struct synaptics_ts_data *ts )
         ts->key_back = false;
         ts->key_app_select = false;
         ret = hrtimer_cancel(&ts->timer);
-        TPD_DEBUG("timer cancel ret[%s]\n",ret?"active":"no active");  
+        TPD_DEBUG("timer cancel ret[%s]\n",ret?"active":"no active");
     }
     if (button_key == 0x00){
         is_in_cover = false;
@@ -1797,7 +1797,7 @@ static int synaptics_parse_dts(struct device *dev, struct synaptics_ts_data *ts)
 	}
 
 	/***********power regulator_get****************/
-	
+
 	ts->vdd_2v8 = regulator_get(&ts->client->dev, "vdd_2v8");
 	if( IS_ERR(ts->vdd_2v8) ){
 		rc = PTR_ERR(ts->vdd_2v8);
@@ -1855,7 +1855,7 @@ static int synaptics_dsx_pinctrl_init(struct synaptics_ts_data *ts)
         printk("%s %d error!\n",__func__,__LINE__);
 		goto err_pinctrl_lookup;
 	}
-    
+
 	ts->pinctrl_state_suspend
 		= pinctrl_lookup_state(ts->pinctrl, "pmx_tk_suspend");
 	if (IS_ERR_OR_NULL(ts->pinctrl_state_suspend)) {
