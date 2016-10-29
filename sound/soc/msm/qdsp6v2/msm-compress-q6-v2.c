@@ -90,8 +90,6 @@ const DECLARE_TLV_DB_LINEAR(msm_compr_vol_gain, 0,
  * 40 = size of dts_eagle_param_desc + module_id cast to 64 bits
  */
 #define DTS_EAGLE_MAX_PARAM_SIZE_FOR_ALSA ((64 * 4) - 40)
-//use 24bits to get rid of 16bits innate noise
-int gis_24bits = 0;
 struct msm_compr_gapless_state {
 	bool set_next_stream_id;
 	int32_t stream_opened[MAX_NUMBER_OF_STREAMS];
@@ -978,13 +976,6 @@ static int msm_compr_configure_dsp(struct snd_compr_stream *cstream)
 	else if (prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S32_LE)
 		bits_per_sample = 32;
 
-    //use 24bits to get rid of 16bits innate noise
-    //mark by globale value to open adm 24bits
-    if (prtd->codec_param.codec.bit_rate == 24) {
-        bits_per_sample = 24;
-        gis_24bits = 1;
-    }
-
 	if (prtd->compr_passthr != LEGACY_PCM) {
 		ret = q6asm_open_write_compressed(ac, prtd->codec,
 						  prtd->compr_passthr);
@@ -1545,8 +1536,6 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 	unsigned long flags;
 	int stream_id;
 	uint32_t stream_index;
-    //use 24bits to get rid of 16bits innate noise
-    //mark by globale value to open adm 24bits
     uint16_t bits_per_sample = 16;
     if (prtd->codec_param.codec.bit_rate == 24) {
         bits_per_sample = 24;
