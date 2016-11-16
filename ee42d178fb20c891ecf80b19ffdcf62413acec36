@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ff2e2bb8_55728e4a",
+        "filename": "arch/arm/boot/dts/qcom/15801/dsi-panel-samsung_s6e3fa5_1080p_cmd.dtsi",
+        "patchSetId": 1
+      },
+      "lineNbr": 112,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2016-11-16T01:45:08Z",
+      "side": 1,
+      "message": "works in theory",
+      "range": {
+        "startLine": 102,
+        "startChar": 0,
+        "endLine": 112,
+        "endChar": 31
+      },
+      "revId": "ee42d178fb20c891ecf80b19ffdcf62413acec36",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
