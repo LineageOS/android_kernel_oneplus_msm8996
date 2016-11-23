@@ -9,10 +9,6 @@ config QCA_CLD_WLAN
 
 if QCA_CLD_WLAN != n
 
-config CONFIG_QCACLD_SPAMMY_DEBUG
-	bool "Verbose debug logging"
-	default n
-
 config QCACLD_WLAN_LFR3
 	bool "Enable the WLAN Legacy Fast Roaming feature Version 3"
 	default n
@@ -39,6 +35,11 @@ config QCOM_VOWIFI_11R
 
 config WLAN_FEATURE_NAN
 	bool "Enable NAN feature"
+	default n
+
+config WLAN_FEATURE_NAN_DATAPATH
+	bool "Enable NaN Data Path feature"
+	depends on WLAN_FEATURE_NAN
 	default n
 
 config QCOM_TDLS
@@ -71,6 +72,14 @@ config WLAN_UDP_RESPONSE_OFFLOAD
 
 config WLAN_FEATURE_RX_WAKELOCK
 	bool "Enable RX wake lock feature"
+	default n
+
+config WLAN_WOW_PULSE
+	bool "Enable WOW Pulse feature"
+	default n
+
+config DPTRACE_ENABLE
+	bool "Enable DPTRACE feature for non performance builds"
 	default n
 
 endif # QCA_CLD_WLAN
