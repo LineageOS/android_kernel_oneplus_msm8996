@@ -169,8 +169,6 @@ struct sdcardfs_inode_info {
 	userid_t userid;
 	uid_t d_uid;
 	bool under_android;
-	/* top folder for ownership */
-	struct inode *top;
 
 	struct inode vfs_inode;
 };
@@ -405,12 +403,11 @@ extern int packagelist_init(void);
 extern void packagelist_exit(void);
 
 /* for derived_perm.c */
-extern void setup_derived_state(struct inode *inode, perm_t perm, userid_t userid,
-			uid_t uid, bool under_android, struct inode *top);
+extern void setup_derived_state(struct inode *inode, perm_t perm,
+			userid_t userid, uid_t uid, bool under_android);
 extern void get_derived_permission(struct dentry *parent, struct dentry *dentry);
 extern void get_derived_permission_new(struct dentry *parent, struct dentry *dentry, struct dentry *newdentry);
-extern void fixup_top_recursive(struct dentry *parent);
-extern void fixup_perms_recursive(struct dentry *dentry, const char *name, size_t len);
+extern void get_derive_permissions_recursive(struct dentry *parent);
 
 extern void update_derived_permission_lock(struct dentry *dentry);
 extern int need_graft_path(struct dentry *dentry);
