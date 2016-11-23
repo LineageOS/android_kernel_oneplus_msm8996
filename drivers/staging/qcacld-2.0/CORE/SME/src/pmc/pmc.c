@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -654,7 +654,7 @@ tANI_BOOLEAN pmcPowerSaveCheck (tHalHandle hHal)
         {
             if (!checkRoutine(pPowerSaveCheckEntry->checkContext))
             {
-                pmcLog(pMac, LOGE, FL("pmcPowerSaveCheck fail!"));
+                pmcLog(pMac, LOG1, FL("pmcPowerSaveCheck fail!"));
                 bResult = FALSE;
                 break;
             }
@@ -1029,8 +1029,12 @@ void pmcTrafficTimerExpired (tHalHandle hHal)
     }
     else
     {
-        /*Some module voted against Power Save. So timer should be restarted again to retry BMPS */
-        pmcLog(pMac, LOGE, FL("Power Save check failed. Retry BMPS again later"));
+        /*
+         * Some module voted against Power Save.
+         * So timer should be restarted again to retry BMPS
+         */
+        pmcLog(pMac, LOGW,
+              FL("Power Save check failed. Retry BMPS again later"));
         //Since hTrafficTimer is a vos_timer now, we need to restart the timer here
         vosStatus = vos_timer_start(&pMac->pmc.hTrafficTimer, pMac->pmc.bmpsConfig.trafficMeasurePeriod);
         if ( !VOS_IS_STATUS_SUCCESS(vosStatus) && (VOS_STATUS_E_ALREADY != vosStatus) )
@@ -2512,7 +2516,8 @@ eHalStatus pmcEnterBmpsCheck( tpAniSirGlobal pMac )
    /* Check that we are associated with a single active session. */
    if (!pmcValidateConnectState( pMac ))
    {
-      pmcLog(pMac, LOGE, "PMC: STA not associated with an AP with single active session. BMPS cannot be entered");
+      pmcLog(pMac, VOS_TRACE_LEVEL_INFO,
+                 "PMC: STA not associated with an AP with single active session. BMPS cannot be entered");
       return eHAL_STATUS_FAILURE;
    }
 
@@ -2584,7 +2589,7 @@ tANI_BOOLEAN pmcShouldBmpsTimerRun( tpAniSirGlobal pMac )
      * an Infra session */
     if (!csrIsInfraConnected(pMac))
     {
-        pmcLog(pMac, LOG1, FL("No Infra Session or multiple sessions. BMPS should not be started"));
+        pmcLog(pMac, LOG1, FL("No Infra Session. BMPS can't be started"));
         return eANI_BOOLEAN_FALSE;
     }
     return eANI_BOOLEAN_TRUE;

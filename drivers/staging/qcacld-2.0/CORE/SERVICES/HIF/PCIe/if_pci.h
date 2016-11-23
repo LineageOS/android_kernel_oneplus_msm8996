@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -131,8 +131,11 @@ struct hif_pci_softc {
     unsigned long runtime_timer_expires;
 #ifdef WLAN_OPEN_SOURCE
     struct dentry *pm_dentry;
-#endif
-#endif
+#ifndef FEATURE_RUNTIME_PM_UNIT_TEST
+    struct hif_pm_runtime_context *dynamic_ctx;
+#endif /*FEATURE_RUNTIME_PM_UNIT_TEST*/
+#endif /*WLAN_OPEN_SOURCE*/
+#endif /*FEATURE_RUNTIME_PM*/
 };
 #define TARGID(sc) ((A_target_id_t)(&(sc)->mem))
 #define TARGID_TO_HIF(targid) (((struct hif_pci_softc *)((char *)(targid) - (char *)&(((struct hif_pci_softc *)0)->mem)))->hif_device)
@@ -165,8 +168,6 @@ int hif_pci_check_soc_status(struct hif_pci_softc *sc);
 void dump_CE_debug_register(struct hif_pci_softc *sc);
 
 /*These functions are exposed to HDD*/
-int hif_register_driver(void);
-void hif_unregister_driver(void);
 int hif_init_adf_ctx(void *ol_sc);
 void hif_init_pdev_txrx_handle(void *ol_sc, void *txrx_handle);
 void hif_disable_isr(void *ol_sc);
