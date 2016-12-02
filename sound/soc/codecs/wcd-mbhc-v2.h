@@ -429,6 +429,7 @@ struct wcd_mbhc {
 	struct mutex hphl_pa_lock;
 	struct mutex hphr_pa_lock;
 	struct switch_dev wcd9xxx_sdev;
+    bool jackAlreadReport;
 	unsigned long intr_status;
 };
 #define WCD_MBHC_CAL_SIZE(buttons, rload) ( \

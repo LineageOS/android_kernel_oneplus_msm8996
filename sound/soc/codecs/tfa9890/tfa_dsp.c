@@ -90,6 +90,13 @@ int recoverMtp0 = false;
 
 EXPORT_SYMBOL_GPL(recoverMtp0);
 
+#define TO_FIXED(e)	e
+#define CalibraMin  6000
+#define CalibraMax  9000
+int tfa98xx_dsp_get_param(struct tfa98xx *tfa98xx, u8 module_id,
+			  u8 param_id, int len, u8 *data);
+
+
 /*
  * write a bit field
  */
@@ -212,6 +219,7 @@ int tfa98xx_restore_i2cmtp(struct tfa98xx *tfa98xx)
 
     return 0;
 }
+
 
 /*
  * tfa98xx_dsp_system_stable will compensate for the wrong behavior of CLKS
@@ -646,6 +654,9 @@ static int tfa98xx_wait_calibration(struct tfa98xx *tfa98xx, int *done)
 	int ret = 0;
 	int tries = 0;
 	u16 mtp;
+	u8 bytes[3];
+	int data[1];
+    u32 calibraValue = 0;
 
 	*done = 0;
 
@@ -678,6 +689,22 @@ static int tfa98xx_wait_calibration(struct tfa98xx *tfa98xx, int *done)
 		pr_err("Calibrate Done timedout\n");
 		return -ETIMEDOUT;
 	}
+
+//su, print the calibration value.
+	tfa98xx_dsp_get_param(tfa98xx, MODULE_SPEAKERBOOST,
+				      SB_PARAM_GET_RE0, 3, bytes);
+
+	tfa98xx_convert_bytes2data(3, bytes, data);
+
+	/* /2^23*2^(def.SPKRBST_TEMPERATURE_EXP) */
+	calibraValue = (TO_FIXED(data[0]) *1000) / (1 << (23 - SPKRBST_TEMPERATURE_EXP));
+    pr_err("%s calibration value is:%d\n",__func__,calibraValue);
+    if(calibraValue < CalibraMin || calibraValue > CalibraMax )
+    {
+        pr_err("error:calibration value is a bad value\n");
+    }
+//su end
+
 
 	return ret;
 }
@@ -1053,6 +1080,8 @@ struct snd_soc_codec *codec = tfa98xx->codec;
 		pr_debug("OK (tries=%d)\n", tries);
 	}
 
+
+
 	return ret;
 }
 
@@ -1203,7 +1232,6 @@ int tfa98xx_set_configured(struct tfa98xx *tfa98xx)
 
 #define TO_LONG_LONG(x)	((s64)(x)<<32)
 #define TO_INT(x)	((x)>>32)
-#define TO_FIXED(e)	e
 
 int float_to_int(u32 x)
 {
@@ -2100,13 +2128,13 @@ int tfaRunColdStartup(struct tfa98xx *tfa98xx)
 	pr_debug("\n");
 
 	ret = tfa98xx_startup(tfa98xx);
-	pr_debug("tfa98xx_startup %d\n", ret);
+	pr_err("tfa98xx_startup %d\n", ret);
 	if (ret)
 		return ret;
 
 	/* force cold boot */
 	ret = tfa98xx_coldboot(tfa98xx, 1); /* set ACS */
-	pr_debug("tfa98xx_coldboot %d\n", ret);
+	pr_err("tfa98xx_coldboot %d\n", ret);
 	if (ret)
 		return ret;
 
@@ -2270,6 +2298,8 @@ int tfaRunSpeakerQuickBoost(struct tfa98xx *tfa98xx, int force)
 	pr_debug("force: %d\n", force);
 
 	if (force) {
+		pr_err("%s cold boot force =%d\n",__func__,force);
+
 		ret = tfaRunColdStartup(tfa98xx);
 		if (ret)
 			return ret;
@@ -2279,7 +2309,7 @@ int tfaRunSpeakerQuickBoost(struct tfa98xx *tfa98xx, int force)
 	if (force || tfa98xx_is_coldboot(tfa98xx)) {
 		int done;
 
-		pr_debug("coldstart%s\n", force ? " (forced)" : "");
+		pr_err("coldstart%s\n", force ? " (forced)" : "");
 
 		/* in case of force CF already runnning */
 		if (!force) {
@@ -2363,6 +2393,7 @@ int tfaRunSpeakerQuickBoost(struct tfa98xx *tfa98xx, int force)
 		ret = tfa98xx_dsp_power_up(tfa98xx);
 	}
 
+
 	return ret;
 }
 
@@ -2378,7 +2409,7 @@ int tfa98xx_dsp_quickstart(struct tfa98xx *tfa98xx, int next_profile, int vstep)
 
 
 	if (tfa98xx->dsp_init == TFA98XX_DSP_INIT_RECOVER) {
-		pr_warn("Restart for recovery\n");
+		pr_err("%s Restart for recovery\n",__func__);
 		forcecoldboot = 1;
 	}
 
@@ -2395,6 +2426,9 @@ int tfa98xx_dsp_quickstart(struct tfa98xx *tfa98xx, int next_profile, int vstep)
 
 	pr_debug("Starting device\n");
 	if (forcecoldboot || tfa98xx_is_coldboot(tfa98xx)) {
+
+		pr_err("%s cold boot forcecoldboot =%d\n",__func__,forcecoldboot);
+
 		/* enable I2S output */
 		ret = tfa98xx_aec_output(tfa98xx, 1);
 		if (ret)
