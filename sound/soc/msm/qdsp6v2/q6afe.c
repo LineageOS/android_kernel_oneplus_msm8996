@@ -27,8 +27,6 @@
 #include <sound/audio_cal_utils.h>
 #include <sound/adsp_err.h>
 #include <sound/sounddebug.h>
-#include <linux/qdsp6v2/apr_tal.h>
-
 #define WAKELOCK_TIMEOUT	5000
 enum {
 	AFE_COMMON_RX_CAL = 0,
@@ -261,7 +259,7 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 		return -EINVAL;
 	}
 	if (data->opcode == RESET_EVENTS) {
-		pr_debug("%s: reset event = %d %d apr[%pK]\n",
+		pr_debug("%s: reset event = %d %d apr[%p]\n",
 			__func__,
 			data->reset_event, data->reset_proc, this_afe.apr);
 
@@ -285,21 +283,6 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 		pr_debug("%s: task_name = %s pid = %d\n",
 			__func__,
 			this_afe.task->comm, this_afe.task->pid);
-
-		/*
-		 * Pass reset events to proxy driver, if cb is registered
-		 */
-		if (this_afe.tx_cb) {
-			this_afe.tx_cb(data->opcode, data->token,
-					data->payload,
-					this_afe.tx_private_data);
-		}
-		if (this_afe.rx_cb) {
-			this_afe.rx_cb(data->opcode, data->token,
-					data->payload,
-					this_afe.rx_private_data);
-		}
-
 		return 0;
 	}
 	afe_callback_debug_print(data);
@@ -310,7 +293,7 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 			return 0;
 
 		if (!payload || (data->token >= AFE_MAX_PORTS)) {
-			pr_err("%s: Error: size %d payload %pK token %d\n",
+			pr_err("%s: Error: size %d payload %p token %d\n",
 				__func__, data->payload_size,
 				payload, data->token);
 			return -EINVAL;
@@ -706,7 +689,7 @@ static int afe_send_cal_block(u16 port_id, struct cal_block_data *cal_block)
 		msm_audio_populate_upper_32_bits(cal_block->cal_data.paddr);
 	afe_cal.param.mem_map_handle = cal_block->map_data.q6map_handle;
 
-	pr_debug("%s: AFE cal sent for device port = 0x%x, cal size = %zd, cal addr = 0x%pK\n",
+	pr_debug("%s: AFE cal sent for device port = 0x%x, cal size = %zd, cal addr = 0x%pa\n",
 		__func__, port_id,
 		cal_block->cal_data.size, &cal_block->cal_data.paddr);
 
@@ -751,7 +734,7 @@ static int afe_send_custom_topology_block(struct cal_block_data *cal_block)
 		msm_audio_populate_upper_32_bits(cal_block->cal_data.paddr);
 	afe_cal.mem_map_handle = cal_block->map_data.q6map_handle;
 
-	pr_debug("%s:cmd_id:0x%x calsize:%zd memmap_hdl:0x%x caladdr:0x%pK",
+	pr_debug("%s:cmd_id:0x%x calsize:%zd memmap_hdl:0x%x caladdr:0x%pa",
 		__func__, AFE_CMD_ADD_TOPOLOGIES, cal_block->cal_data.size,
 		afe_cal.mem_map_handle, &cal_block->cal_data.paddr);
 
@@ -1344,7 +1327,7 @@ static int remap_cal_data(struct cal_block_data *cal_block, int cal_index)
 			pr_err("%s: mmap did not work! size = %zd ret %d\n",
 				__func__,
 				cal_block->map_data.map_size, ret);
-			pr_debug("%s: mmap did not work! addr = 0x%pK, size = %zd\n",
+			pr_debug("%s: mmap did not work! addr = 0x%pa, size = %zd\n",
 				__func__,
 				&cal_block->cal_data.paddr,
 				cal_block->map_data.map_size);
@@ -1514,75 +1497,53 @@ static int afe_send_codec_reg_page_config(
 static int afe_send_codec_reg_config(
 	struct afe_param_cdc_reg_cfg_data *cdc_reg_cfg)
 {
-	int i, j, ret = 0;
-	int pkt_size, payload_size, reg_per_pkt, num_pkts, num_regs;
+	int i, ret;
+	int pkt_size, payload_size;
 	struct afe_svc_cmd_cdc_reg_cfg *config;
 	struct afe_svc_cmd_set_param *param;
 
-	reg_per_pkt = (APR_MAX_BUF - sizeof(*config)) /
-			sizeof(struct afe_param_cdc_reg_cfg_payload);
-	if (reg_per_pkt > 0) {
-		num_pkts = (cdc_reg_cfg->num_registers / reg_per_pkt) +
-			(cdc_reg_cfg->num_registers % reg_per_pkt == 0 ? 0 : 1);
-	} else {
-		pr_err("%s: Failed to build codec reg config APR packet\n",
-			__func__);
-		return -EINVAL;
+	payload_size = sizeof(struct afe_param_cdc_reg_cfg_payload) *
+		       cdc_reg_cfg->num_registers;
+	pkt_size = sizeof(*config) + payload_size;
+
+	pr_debug("%s: pkt_size %d, payload_size %d\n", __func__, pkt_size,
+		 payload_size);
+	config = kzalloc(pkt_size, GFP_KERNEL);
+	if (!config) {
+		pr_warn("%s: Not enought memory, pkt_size %d\n", __func__,
+			pkt_size);
+		return -ENOMEM;
 	}
 
-	for (j = 0; j < num_pkts; ++j) {
-		/*
-		 * num_regs is set to reg_per_pkt on each pass through the loop
-		 * except the last, when it is set to the number of registers
-		 * remaining from the total
-		 */
-		num_regs = (j < (num_pkts - 1) ? reg_per_pkt :
-				cdc_reg_cfg->num_registers - (reg_per_pkt * j));
-		payload_size = sizeof(struct afe_param_cdc_reg_cfg_payload) *
-				num_regs;
-		pkt_size = sizeof(*config) + payload_size;
-		pr_debug("%s: pkt_size %d, payload_size %d\n", __func__,
-			 pkt_size, payload_size);
-		config = kzalloc(pkt_size, GFP_KERNEL);
-		if (!config)
-			return -ENOMEM;
+	config->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+					      APR_HDR_LEN(APR_HDR_SIZE),
+					      APR_PKT_VER);
+	config->hdr.pkt_size = pkt_size;
+	config->hdr.src_port = 0;
+	config->hdr.dest_port = 0;
+	config->hdr.token = IDX_GLOBAL_CFG;
+	config->hdr.opcode = AFE_SVC_CMD_SET_PARAM;
 
-		config->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-						      APR_HDR_LEN(APR_HDR_SIZE),
-						      APR_PKT_VER);
-		config->hdr.pkt_size = pkt_size;
-		config->hdr.src_port = 0;
-		config->hdr.dest_port = 0;
-		config->hdr.token = IDX_GLOBAL_CFG;
-		config->hdr.opcode = AFE_SVC_CMD_SET_PARAM;
+	param = &config->param;
+	param->payload_size = payload_size;
+	param->payload_address_lsw = 0x00;
+	param->payload_address_msw = 0x00;
+	param->mem_map_handle = 0x00;
 
-		param = &config->param;
-		param->payload_size = payload_size;
-		param->payload_address_lsw = 0x00;
-		param->payload_address_msw = 0x00;
-		param->mem_map_handle = 0x00;
-
-		for (i = 0; i < num_regs; i++) {
-			config->reg_data[i].common.module_id =
-						AFE_MODULE_CDC_DEV_CFG;
-			config->reg_data[i].common.param_id =
-						AFE_PARAM_ID_CDC_REG_CFG;
-			config->reg_data[i].common.param_size =
-			    sizeof(config->reg_data[i].reg_cfg);
-			config->reg_data[i].reg_cfg =
-				cdc_reg_cfg->reg_data[i + (j * reg_per_pkt)];
-		}
-
-		ret = afe_apr_send_pkt(config, &this_afe.wait[IDX_GLOBAL_CFG]);
-		if (ret) {
-			pr_err("%s: AFE_PARAM_ID_CDC_REG_CFG failed %d\n",
-				__func__, ret);
-			kfree(config);
-			break;
-		}
-		kfree(config);
+	for (i = 0; i < cdc_reg_cfg->num_registers; i++) {
+		config->reg_data[i].common.module_id = AFE_MODULE_CDC_DEV_CFG;
+		config->reg_data[i].common.param_id = AFE_PARAM_ID_CDC_REG_CFG;
+		config->reg_data[i].common.param_size =
+		    sizeof(config->reg_data[i].reg_cfg);
+		config->reg_data[i].reg_cfg = cdc_reg_cfg->reg_data[i];
 	}
 
+	ret = afe_apr_send_pkt(config, &this_afe.wait[IDX_GLOBAL_CFG]);
+	if (ret)
+		pr_err("%s: AFE_PARAM_ID_CDC_REG_CFG failed %d\n", __func__,
+		       ret);
+
+	kfree(config);
 	return ret;
 }
 
@@ -3624,7 +3585,7 @@ int q6afe_audio_client_buf_alloc_contiguous(unsigned int dir,
 	size_t len;
 
 	if (!(ac) || ((dir != IN) && (dir != OUT))) {
-		pr_err("%s: ac %pK dir %d\n", __func__, ac, dir);
+		pr_err("%s: ac %p dir %d\n", __func__, ac, dir);
 		return -EINVAL;
 	}
 
@@ -3676,7 +3637,7 @@ int q6afe_audio_client_buf_alloc_contiguous(unsigned int dir,
 			buf[cnt].used = dir ^ 1;
 			buf[cnt].size = bufsz;
 			buf[cnt].actual_size = bufsz;
-			pr_debug("%s:  data[%pK]phys[%pK][%pK]\n", __func__,
+			pr_debug("%s:  data[%p]phys[%pa][%p]\n", __func__,
 				   buf[cnt].data,
 				   &buf[cnt].phys,
 				   &buf[cnt].phys);
@@ -3770,7 +3731,7 @@ int afe_cmd_memory_map(phys_addr_t dma_addr_p, u32 dma_buf_sz)
 	mregion_pl->shm_addr_msw = msm_audio_populate_upper_32_bits(dma_addr_p);
 	mregion_pl->mem_size_bytes = dma_buf_sz;
 
-	pr_debug("%s: dma_addr_p 0x%pK , size %d\n", __func__,
+	pr_debug("%s: dma_addr_p 0x%pa , size %d\n", __func__,
 					&dma_addr_p, dma_buf_sz);
 	atomic_set(&this_afe.state, 1);
 	atomic_set(&this_afe.status, 0);
@@ -3896,7 +3857,7 @@ int q6afe_audio_client_buf_free_contiguous(unsigned int dir,
 	cnt = port->max_buf_cnt - 1;
 
 	if (port->buf[0].data) {
-		pr_debug("%s: data[%pK]phys[%pK][%pK] , client[%pK] handle[%pK]\n",
+		pr_debug("%s: data[%p]phys[%pa][%p] , client[%p] handle[%p]\n",
 			__func__,
 			port->buf[0].data,
 			&port->buf[0].phys,
@@ -4146,7 +4107,7 @@ int afe_rt_proxy_port_write(phys_addr_t buf_addr_p,
 		ret = -ENODEV;
 		return ret;
 	}
-	pr_debug("%s: buf_addr_p = 0x%pK bytes = %d\n", __func__,
+	pr_debug("%s: buf_addr_p = 0x%pa bytes = %d\n", __func__,
 						&buf_addr_p, bytes);
 
 	afecmd_wr.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
@@ -4183,7 +4144,7 @@ int afe_rt_proxy_port_read(phys_addr_t buf_addr_p,
 		ret = -ENODEV;
 		return ret;
 	}
-	pr_debug("%s: buf_addr_p = 0x%pK bytes = %d\n", __func__,
+	pr_debug("%s: buf_addr_p = 0x%pa bytes = %d\n", __func__,
 						&buf_addr_p, bytes);
 
 	afecmd_rd.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
@@ -6015,7 +5976,7 @@ static int afe_map_cal_data(int32_t cal_type,
 		pr_err("%s: mmap did not work! size = %zd ret %d\n",
 			__func__,
 			cal_block->map_data.map_size, ret);
-		pr_debug("%s: mmap did not work! addr = 0x%pK, size = %zd\n",
+		pr_debug("%s: mmap did not work! addr = 0x%pa, size = %zd\n",
 			__func__,
 			&cal_block->cal_data.paddr,
 			cal_block->map_data.map_size);
@@ -6042,17 +6003,6 @@ static int afe_unmap_cal_data(int32_t cal_type,
 		goto done;
 	}
 
-	if (cal_block == NULL) {
-		pr_err("%s: Cal block is NULL!\n",
-						__func__);
-		goto done;
-	}
-
-	if (cal_block->map_data.q6map_handle == 0) {
-		pr_err("%s: Map handle is NULL, nothing to unmap\n",
-				__func__);
-		goto done;
-	}
 
 	atomic_set(&this_afe.mem_map_cal_handles[cal_index],
 		cal_block->map_data.q6map_handle);
@@ -6183,7 +6133,7 @@ int afe_map_rtac_block(struct rtac_cal_block_data *cal_block)
 	result = afe_cmd_memory_map(cal_block->cal_data.paddr,
 		cal_block->map_data.map_size);
 	if (result < 0) {
-		pr_err("%s: afe_cmd_memory_map failed for addr = 0x%pK, size = %d, err %d\n",
+		pr_err("%s: afe_cmd_memory_map failed for addr = 0x%pa, size = %d, err %d\n",
 			__func__, &cal_block->cal_data.paddr,
 			cal_block->map_data.map_size, result);
 		return result;

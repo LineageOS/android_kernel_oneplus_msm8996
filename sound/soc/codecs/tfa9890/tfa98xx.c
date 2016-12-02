@@ -188,6 +188,7 @@ err:
 static struct device_attribute tfa98xx_state_attr =
      __ATTR(calibra, 0444, tfa98xx_state_show, tfa98xx_state_store);
 
+/*zhiguang.su@MultiMedia.AudioDrv, 2015-11-05, add for debug*/
 static ssize_t tfa98xx_Log_state_store(struct device *dev, struct device_attribute *attr,
 		const char *buf, size_t count)
 {
@@ -279,6 +280,7 @@ int tfa98xx_bulk_write_raw(struct snd_soc_codec *codec, const u8 *data,
 		return -EIO;
 	}
 }
+
 
 
 static void tfa98xx_dsp_init(struct work_struct *work)
@@ -887,13 +889,13 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 	struct tfa98xx *tfa98xx;
 	int ret;
 	struct device_node *np = i2c->dev.of_node;
-    int error = 0;
+	int error = 0;
 
-    pr_err("%s\n",__func__);
+	pr_err("%s\n",__func__);
 
 
-    if(np!=NULL)
-        tfa_codec_np =np;
+	if(np!=NULL)
+		tfa_codec_np =np;
 
 	if (!i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C)) {
 		dev_err(&i2c->dev, "check_functionality failed\n");
