@@ -1423,9 +1423,10 @@ static int ipa3_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					rmnet_mux_val.mux_id);
 				return rc;
 			}
-			if (mux_index >= MAX_NUM_OF_MUX_CHANNEL) {
+			if (rmnet_ipa3_ctx->rmnet_index
+				>= MAX_NUM_OF_MUX_CHANNEL) {
 				IPAWANERR("Exceed mux_channel limit(%d)\n",
-				mux_index);
+				rmnet_ipa3_ctx->rmnet_index);
 				return -EFAULT;
 			}
 			IPAWANDBG("ADD_MUX_CHANNEL(%d, name: %s)\n",

@@ -521,11 +521,6 @@ static int ipa_create_uc_smmu_mapping_sgt(struct sg_table *sgt,
 		return -EINVAL;
 	}
 
-	if (!sgt) {
-		IPAERR("Bad parameters, scatter / gather list is NULL\n");
-		return -EINVAL;
-	}
-
 	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
 		phys = page_to_phys(sg_page(sg));
 		len = PAGE_ALIGN(sg->offset + sg->length);
