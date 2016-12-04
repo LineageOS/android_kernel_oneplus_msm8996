@@ -1985,9 +1985,7 @@ int ipa_q6_pre_shutdown_cleanup(void)
 		BUG();
 	}
 
-	/* set proxy vote before decrement */
-	ipa2_proxy_clk_vote();
-	IPA2_ACTIVE_CLIENTS_DEC_SPECIAL("Q6");
+	ipa_ctx->q6_proxy_clk_vote_valid = true;
 	return 0;
 }
 
