@@ -465,7 +465,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 		ppol->policy->governor_data;
 	struct sched_load *sl = ppol->sl;
 	struct cpufreq_interactive_cpuinfo *pcpu;
-	unsigned int new_freq;
+	unsigned int new_freq = 0;
 	unsigned int prev_laf = 0, t_prevlaf;
 	unsigned int pred_laf = 0, t_predlaf = 0;
 	unsigned int prev_chfreq, pred_chfreq, chosen_freq;
