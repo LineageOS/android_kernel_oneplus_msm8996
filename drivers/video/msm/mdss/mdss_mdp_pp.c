@@ -2035,7 +2035,7 @@ static int pp_mixer_setup(struct mdss_mdp_mixer *mixer)
 	if (disp_num < MDSS_BLOCK_DISP_NUM)
 		flags = mdss_pp_res->pp_disp_flags[disp_num];
 	else
-		flags = 0;
+		return -EINVAL;
 
 	if (mixer->num == MDSS_MDP_INTF_LAYERMIXER3)
 		lm_bitmask = BIT(20);
@@ -2345,7 +2345,7 @@ static int pp_dspp_setup(u32 disp_num, struct mdss_mdp_mixer *mixer)
 
 		flags = mdss_pp_res->pp_disp_flags[disp_num];
 	} else {
-		flags = 0;
+		return -EINVAL;
 	}
 
 	mixer_cnt = mdss_mdp_get_ctl_mixers(disp_num, mixer_id);
@@ -2651,7 +2651,7 @@ int mdss_mdp_pp_setup_locked(struct mdss_mdp_ctl *ctl)
 		if (ret)
 			pr_err("Updated reg_bus_scale failed, ret = %d", ret);
 	}
-	if (IS_PP_RESUME_COMMIT(flags))
+	if (disp_num < MDSS_BLOCK_DISP_NUM && IS_PP_RESUME_COMMIT(flags))
 		mdss_pp_res->pp_disp_flags[disp_num] &=
 			~PP_FLAGS_RESUME_COMMIT;
 	mutex_unlock(&mdss_pp_mutex);
