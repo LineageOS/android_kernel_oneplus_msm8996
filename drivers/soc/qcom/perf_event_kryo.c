@@ -418,4 +418,3 @@ int kryo_pmu_init(struct arm_pmu *armv8_pmu)
 
 	return 0;
 }
-
