@@ -1839,6 +1839,10 @@ int mdss_mode_switch(struct msm_fb_data_type *mfd, u32 mode)
 	} else if (mode == MIPI_VIDEO_PANEL) {
 		if (ctl->ops.wait_pingpong)
 			rc = ctl->ops.wait_pingpong(ctl, NULL);
+		if (rc) {
+			pr_err("wait for pp failed\n");
+			return rc;
+                }
 		mdss_mdp_update_panel_info(mfd, 0, 0);
 		mdss_mdp_switch_to_vid_mode(ctl, 1);
 		mdss_mdp_ctl_stop(ctl, MDSS_PANEL_POWER_OFF);

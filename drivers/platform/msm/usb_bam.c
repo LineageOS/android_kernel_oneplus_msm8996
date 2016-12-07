@@ -2764,14 +2764,17 @@ static void usb_bam_sps_events(enum sps_callback_case sps_cb_case, void *user)
 
 		log_event_dbg("%s: received SPS_CALLBACK_BAM_TIMER_IRQ\n",
 				__func__);
-
 		bam = get_bam_type_from_core_name((char *)user);
+
 		if (bam < 0 || bam >= MAX_BAMS) {
 			log_event_err("%s: Invalid bam, type=%d ,name=%s\n",
 				__func__, bam, (char *)user);
 			return;
 		}
+
 		ctx = &msm_usb_bam[bam];
+		spin_lock(&ctx->usb_bam_lock);
+
 		spin_lock(&ctx->usb_bam_lock);
 
 		ctx->is_bam_inactivity = true;

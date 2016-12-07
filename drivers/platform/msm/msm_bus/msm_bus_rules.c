@@ -697,7 +697,7 @@ static void free_rule_params(struct rules_def *node_rule)
 static bool __rule_unregister(int num_rules, struct bus_rule_type *rule,
 					struct notifier_block *nb)
 {
-	int i;
+	int i = 0;
 	struct rule_node_info *node = NULL;
 	struct rule_node_info *node_tmp = NULL;
 	struct rules_def *node_rule;
@@ -713,7 +713,6 @@ static bool __rule_unregister(int num_rules, struct bus_rule_type *rule,
 			pr_err("%s: Can't find node", __func__);
 			goto exit_unregister_rule;
 		}
-
 		for (i = 0; i < num_rules; i++) {
 			list_for_each_entry_safe(node_rule, node_rule_tmp,
 					&node->node_rules, link) {
@@ -882,4 +881,3 @@ bool msm_rule_are_rules_registered(void)
 	mutex_unlock(&msm_bus_rules_lock);
 	return ret;
 }
-
