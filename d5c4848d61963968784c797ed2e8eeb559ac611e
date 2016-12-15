@@ -22,6 +22,23 @@
       "revId": "d5c4848d61963968784c797ed2e8eeb559ac611e",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f681702_00559ac6",
+        "filename": "arch/arm/boot/dts/qcom/15811/dsi-panel-samsung_s6e3fa5r9s_1080p_cmd.dtsi",
+        "patchSetId": 5
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 8328
+      },
+      "writtenOn": "2016-12-15T15:07:07Z",
+      "side": 1,
+      "message": "as far as i have seen you have included all panel files from 15808",
+      "revId": "d5c4848d61963968784c797ed2e8eeb559ac611e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
