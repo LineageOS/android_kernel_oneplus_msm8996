@@ -28,23 +28,6 @@
 #include <linux/module.h>
 #include <linux/of_gpio.h>
 
-typedef		__u32		uint32;
-
-struct project_info{
-       char project_name[8];  //eg, 14049
-       uint32  hw_version;  //PCB number, T0, EVT
-       uint32  rf_v1;   //v1 for mainboard_rf_version
-       uint32  rf_v2;   //v2 for aboard_rf_version
-       uint32  rf_v3;
-       uint32  modem;
-       uint32  operator;
-       uint32  ddr_manufacture_info;
-       uint32  ddr_raw;
-       uint32  ddr_column;
-       uint32  ddr_reserve_info;
-       uint32  platform_id;
-};
-
 static struct project_info * project_info_desc;
 
 struct cable_data {
@@ -91,30 +74,6 @@ int modify_rf_cable_smem_info(uint32 status)
 	{
 	    project_info_desc->rf_v3 = status;
 		pr_err("%s: rf_cable: %d\n",__func__, project_info_desc->rf_v3);
-	}
-	return 0;
-}
-
-uint32 get_hw_version(void)
-{
-	project_info_desc = smem_find(SMEM_PROJECT_INFO,
-				sizeof(struct project_info),
-				0,
-				SMEM_ANY_HOST_FLAG);
-
-	if (IS_ERR_OR_NULL(project_info_desc))
-		/* Retry for old fw version */
-		project_info_desc = smem_find(SMEM_PROJECT_INFO,
-					sizeof(struct project_info) -
-					sizeof(uint32), 0,
-					SMEM_ANY_HOST_FLAG);
-
-	if (IS_ERR_OR_NULL(project_info_desc))
-		pr_err("%s: get project_info failure\n",__func__);
-	else
-	{
-		pr_info("%s: hw version: %d\n",__func__, project_info_desc->hw_version);
-		return project_info_desc->hw_version;
 	}
 	return 0;
 }
