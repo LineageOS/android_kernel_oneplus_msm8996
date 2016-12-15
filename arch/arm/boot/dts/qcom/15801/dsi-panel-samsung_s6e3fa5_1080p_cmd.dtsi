@@ -112,8 +112,6 @@
 			39 01 00 00 00 00 02 57 40];
 
 
-		qcom,partial-update-enabled;
-		qcom,panel-roi-alignment = <360 64 360 64 360 64>;
 		qcom,ulps-enabled;
 		qcom,panel-allow-phy-poweroff;
 	};
