@@ -1,5 +1,6 @@
 dtb-$(CONFIG_ARCH_MSM8996) += msm8996-v3-pmi8996-15801_DTV_PVT.dtb \
-	msm8996-v3-pmi8996-15801_EVT.dtb
+	msm8996-v3-pmi8996-15801_EVT.dtb \
+	msm8996pro-pmi8996-mtp_15811_PVT.dtb
 
 dtb-$(CONFIG_ARCH_MSMCOBALT) += msmcobalt-sim.dtb \
 	msmcobalt-rumi.dtb
