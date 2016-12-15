@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5f681702_80cc0abd",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 5
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 3671
+      },
+      "writtenOn": "2016-12-15T14:56:09Z",
+      "side": 1,
+      "message": "wouldn\u0027t it make sense to have this in a separate commit?",
+      "range": {
+        "startLine": 10,
+        "startChar": 1,
+        "endLine": 10,
+        "endChar": 76
+      },
+      "revId": "d5c4848d61963968784c797ed2e8eeb559ac611e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
