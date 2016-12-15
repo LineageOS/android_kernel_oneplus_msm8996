@@ -13,32 +13,11 @@
 #include <linux/types.h>
 #include <linux/project_info.h>
 
-#include <soc/qcom/socinfo.h>
 #include <soc/qcom/smem.h>
 
 #include <linux/gpio.h>
 
-typedef		__u32		uint32;
 
-struct project_info{
-       char project_name[8];  //eg, 14049
-       uint32  hw_version;  //PCB number, T0, EVT
-       uint32  rf_v1;   //v1 for mainboard_rf_version
-       uint32  rf_v2;   //v2 for aboard_rf_version
-       uint32  rf_v3;
-       uint32  modem;
-       uint32  operator;
-       uint32  ddr_manufacture_info;
-       uint32  ddr_raw;
-       uint32  ddr_column;
-       uint32  ddr_reserve_info;
-       uint32  platform_id;
-};
-
-struct component_info{
-	char *version;
-	char *manufacture;
-};
 
 static struct component_info component_info_desc[COMPONENT_MAX];
 
@@ -64,6 +43,7 @@ static DEVICE_ATTR(ddr_reserve_info, S_IRUGO, project_info_get, NULL);
 static DEVICE_ATTR(secboot_status, S_IRUGO, project_info_get, NULL);
 static DEVICE_ATTR(platform_id, S_IRUGO, project_info_get, NULL);
 
+
 uint32 get_secureboot_fuse_status(void)
 {
     void __iomem *oem_config_base;
@@ -81,34 +61,37 @@ static ssize_t project_info_get(struct device *dev,
 			    struct device_attribute *attr,
 			    char *buf)
 {
-	if (attr == &dev_attr_project_name)
-		return sprintf(buf, "%s\n", project_info_desc->project_name);
-	if (attr == &dev_attr_hw_id)
-		return sprintf(buf, "%d\n", project_info_desc->hw_version);
-	if (attr == &dev_attr_rf_id_v1)
-		return sprintf(buf, "%d\n", project_info_desc->rf_v1);
-	if (attr == &dev_attr_rf_id_v2)
-		return sprintf(buf, "%d\n", project_info_desc->rf_v2);
-	if (attr == &dev_attr_rf_id_v3)
-		return sprintf(buf, "%d\n", project_info_desc->rf_v3);
-	if (attr == &dev_attr_modem)
-		return sprintf(buf, "%d\n", project_info_desc->modem);
-	if (attr == &dev_attr_operator_no)
-		return sprintf(buf, "%d\n", project_info_desc->operator);
-	if (attr == &dev_attr_ddr_manufacture_info)
-		return sprintf(buf, "%d\n", project_info_desc->ddr_manufacture_info);
-	if (attr == &dev_attr_ddr_raw)
-		return sprintf(buf, "%d\n", project_info_desc->ddr_raw);
-	if (attr == &dev_attr_ddr_column)
-		return sprintf(buf, "%d\n", project_info_desc->ddr_column);
-	if (attr == &dev_attr_ddr_reserve_info)
-		return sprintf(buf, "%d\n", project_info_desc->ddr_reserve_info);
-	if (attr == &dev_attr_secboot_status) {
-		//return sprintf(buf, "%d\n", project_info_desc->ddr_reserve_info);
-		return sprintf(buf, "%d\n",get_secureboot_fuse_status());
+	if(project_info_desc)
+	{
+		if (attr == &dev_attr_project_name)
+			return sprintf(buf, "%s\n", project_info_desc->project_name);
+		if (attr == &dev_attr_hw_id)
+			return sprintf(buf, "%d\n", project_info_desc->hw_version);
+		if (attr == &dev_attr_rf_id_v1)
+			return sprintf(buf, "%d\n", project_info_desc->rf_v1);
+		if (attr == &dev_attr_rf_id_v2)
+			return sprintf(buf, "%d\n", project_info_desc->rf_v2);
+		if (attr == &dev_attr_rf_id_v3)
+			return sprintf(buf, "%d\n", project_info_desc->rf_v3);
+		if (attr == &dev_attr_modem)
+			return sprintf(buf, "%d\n", project_info_desc->modem);
+		if (attr == &dev_attr_operator_no)
+			return sprintf(buf, "%d\n", project_info_desc->operator);
+		if (attr == &dev_attr_ddr_manufacture_info)
+			return sprintf(buf, "%d\n", project_info_desc->ddr_manufacture_info);
+		if (attr == &dev_attr_ddr_raw)
+			return sprintf(buf, "%d\n", project_info_desc->ddr_raw);
+		if (attr == &dev_attr_ddr_column)
+			return sprintf(buf, "%d\n", project_info_desc->ddr_column);
+		if (attr == &dev_attr_ddr_reserve_info)
+			return sprintf(buf, "%d\n", project_info_desc->ddr_reserve_info);
+		if (attr == &dev_attr_secboot_status) {
+			//return sprintf(buf, "%d\n", project_info_desc->ddr_reserve_info);
+			return sprintf(buf, "%d\n",get_secureboot_fuse_status());
+		}
+		if (attr == &dev_attr_platform_id)
+			return sprintf(buf, "%d\n", project_info_desc->platform_id);
 	}
-	if (attr == &dev_attr_platform_id)
-		return sprintf(buf, "%d\n", socinfo_get_id());
 
 	return -EINVAL;
 
@@ -154,6 +137,8 @@ static DEVICE_ATTR(ufs, S_IRUGO, component_info_get, NULL);
 static DEVICE_ATTR(Aboard, S_IRUGO, component_info_get, NULL);
 static DEVICE_ATTR(nfc, S_IRUGO, component_info_get, NULL);
 static DEVICE_ATTR(fast_charge, S_IRUGO, component_info_get, NULL);
+static DEVICE_ATTR(cpu, S_IRUGO, component_info_get, NULL);
+
 
 char *get_component_version( enum COMPONENT_TYPE type)
 {
@@ -221,6 +206,7 @@ static struct attribute *component_info_sysfs_entries[] = {
     &dev_attr_Aboard.attr,
     &dev_attr_nfc.attr,
     &dev_attr_fast_charge.attr,
+    &dev_attr_cpu.attr,
 	NULL,
 };
 
@@ -270,7 +256,8 @@ static ssize_t component_info_get(struct device *dev,
 		return sprintf(buf, "VER:\t%s\nMANU:\t%s\n", get_component_version(NFC), get_component_manufacture(NFC));
 	if (attr == &dev_attr_fast_charge)
 		return sprintf(buf, "VER:\t%s\nMANU:\t%s\n", get_component_version(FAST_CHARGE), get_component_manufacture(FAST_CHARGE));
-
+	if (attr == &dev_attr_cpu)
+		return sprintf(buf, "VER:\t%s\nMANU:\t%s\n", get_component_version(CPU), get_component_manufacture(CPU));
 	return -EINVAL;
 }
 
@@ -309,6 +296,7 @@ struct ddr_manufacture{
 //ddr id and ddr name
 static char ddr_version[32] = {0};
 static char ddr_manufacture[20] = {0};
+static char cpu_type[20] = {0};
 
 struct ddr_manufacture ddr_manufacture_list[]={
      {1,"Samsung "},
@@ -324,15 +312,55 @@ struct ddr_manufacture ddr_manufacture_list[]={
 	 {0,"Unknown"},
 };
 
+
+struct cpu_list{
+	int id;
+	char name[20];
+};
+
+struct cpu_list cpu_list_msm[]={
+     {194,"MSM8974AC "},
+	 {217,"MSM8974AA "},
+	 {218,"MSM8974AB "},
+	 {207,"MSM8994 "},
+	 {246,"MSM8996 "},
+	 {302,"MSM8996L "},
+	 {305,"MSM8996SG "},
+	 {310,"MSM8996AU "},
+	 {0,"Unknown"},
+};
+
+
 void get_ddr_manufacture_name(void){
 	int i;
-	int id = project_info_desc->ddr_manufacture_info;
-	for(i = 0; i < (sizeof(ddr_manufacture_list)/sizeof(ddr_manufacture_list[0])); i++)
+
+	if(project_info_desc)
 	{
-		if(ddr_manufacture_list[i].id == id)
+		int id = project_info_desc->ddr_manufacture_info;
+		for(i = 0; i < (sizeof(ddr_manufacture_list)/sizeof(ddr_manufacture_list[0])); i++)
 		{
-			sprintf(ddr_manufacture, "%s", ddr_manufacture_list[i].name);
-			break;
+			if(ddr_manufacture_list[i].id == id)
+			{
+				sprintf(ddr_manufacture, "%s", ddr_manufacture_list[i].name);
+				break;
+			}
+		}
+	}
+}
+
+void get_cpu_type(void){
+	int i;
+
+	if(project_info_desc)
+	{
+		int id = project_info_desc->platform_id;
+		for(i = 0; i < (sizeof(cpu_list_msm)/sizeof(cpu_list_msm[0])); i++)
+		{
+			if(cpu_list_msm[i].id == id)
+			{
+				sprintf(cpu_type, "%s", cpu_list_msm[i].name);
+				break;
+			}
 		}
 	}
 }
@@ -356,11 +384,28 @@ void init_a_board_gpio(void)
         pr_err("%s: Aboard_gpio %d is invalid\n",__func__,Aboard_gpio);
 }
 
+uint32 get_hw_version(void)
+{
+	project_info_desc = smem_find(SMEM_PROJECT_INFO,
+				sizeof(struct project_info),
+				0,
+				SMEM_ANY_HOST_FLAG);
+
+	if (IS_ERR_OR_NULL(project_info_desc))
+		pr_err("%s: get project_info failure\n",__func__);
+	else
+	{
+		pr_err("%s: hw version: %d\n",__func__, project_info_desc->hw_version);
+		return project_info_desc->hw_version;
+	}
+	return 0;
+}
+
+
 int __init init_project_info(void)
 {
 	static bool project_info_init_done;
 	int ddr_size;
-	int fw_version = 1;
 
 	if (project_info_init_done)
 		return 0;
@@ -370,24 +415,15 @@ int __init init_project_info(void)
 				0,
 				SMEM_ANY_HOST_FLAG);
 
-	if (IS_ERR_OR_NULL(project_info_desc)) {
-		/* Retry for old fw version */
-		project_info_desc = smem_find(SMEM_PROJECT_INFO,
-					sizeof(struct project_info) -
-					sizeof(uint32), 0,
-					SMEM_ANY_HOST_FLAG);
-
-		fw_version = 0;
-	}
-
-	if (IS_ERR_OR_NULL(project_info_desc)) {
+	if (IS_ERR_OR_NULL(project_info_desc))
+	{
 		pr_err("%s: get project_info failure\n",__func__);
-		goto error;
-	} else {
-		pr_info("%s: project_name: %s, fw_version: %d, hw_version: %d, rf_v1: %d, rf_v2: %d, rf_v3: %d\n",
-			__func__, project_info_desc->project_name, fw_version, project_info_desc->hw_version,
-			project_info_desc->rf_v1, project_info_desc->rf_v2, project_info_desc->rf_v3);
+		return 0;
 	}
+	else
+		pr_err("%s: project_name: %s hw_version: %d rf_v1: %d rf_v2: %d: rf_v3: %d  paltform_id:%d\n",
+						__func__, project_info_desc->project_name, project_info_desc->hw_version,
+								project_info_desc->rf_v1, project_info_desc->rf_v2, project_info_desc->rf_v3 ,project_info_desc->platform_id);
 
 	//snprintf(mainboard_version, sizeof(mainboard_version), "%d",project_info_desc->hw_version);
 	switch(project_info_desc->hw_version) {
@@ -448,9 +484,11 @@ int __init init_project_info(void)
 	snprintf(ddr_version, sizeof(ddr_version), "size_%dG_r_%d_c_%d", ddr_size, project_info_desc->ddr_raw,project_info_desc->ddr_column);
 	push_component_info(DDR,ddr_version, ddr_manufacture);
 
-error:
+	get_cpu_type();
+	push_component_info(CPU,cpu_type, "Qualcomm");
 	project_info_init_done = true;
 
 	return 0;
 }
+
 subsys_initcall(init_project_info);

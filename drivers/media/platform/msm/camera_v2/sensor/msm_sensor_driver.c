@@ -30,6 +30,8 @@ struct camera_vendor_match_tbl {
 static struct camera_vendor_match_tbl match_tbl[] = {
     {"imx298","Sony"},
     {"imx179","Sony"},
+    {"s5k3p8","Samsung"},
+    {"s5k3p8sp","Samsung"},
 };
 
 /* Logging macro */
