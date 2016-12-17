@@ -2156,6 +2156,7 @@ static int a5xx_microcode_load(struct adreno_device *adreno_dev)
 	void *ptr;
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	uint64_t gpuaddr;
+	const char *zap_name;
 
 	gpuaddr = adreno_dev->pm4.gpuaddr;
 	kgsl_regwrite(device, A5XX_CP_PM4_INSTR_BASE_LO,
@@ -2192,8 +2193,11 @@ static int a5xx_microcode_load(struct adreno_device *adreno_dev)
 	}
 
 	/* Load the zap shader firmware through PIL if its available */
-	if (adreno_dev->gpucore->zap_name && !zap_ucode_loaded) {
-		ptr = subsystem_get(adreno_dev->gpucore->zap_name);
+	if (!zap_ucode_loaded) {
+		if (of_property_read_string(device->pdev->dev.of_node, "cm,firmware-name", &zap_name))
+			zap_name = adreno_dev->gpucore->zap_name;
+		if (zap_name)
+			ptr = subsystem_get(zap_name);
 
 		/* Return error if the zap shader cannot be loaded */
 		if (IS_ERR_OR_NULL(ptr))
