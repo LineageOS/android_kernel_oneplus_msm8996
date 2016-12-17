@@ -2435,3 +2435,11 @@
 	qcom,levels = <1555200 1555200 1555200>;
 };
 //msm8996-v3.dtsi end
+//msm8996-gpu.dtsi start
+&msm_gpu {
+	cm,firmware-name = "a530_zap-pro";
+};
+&pil_gpu {
+	qcom,firmware-name = "a530_zap-pro";
+};
+//msm8996-gpu.dtsi end
