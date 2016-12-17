@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5f681702_43bf97cf",
+        "filename": "arch/arm/boot/dts/qcom/15811/dsi-panel-samsung_s6e3fa5r9s_1080p_cmd.dtsi",
+        "patchSetId": 8
+      },
+      "lineNbr": 95,
+      "author": {
+        "id": 8328
+      },
+      "writtenOn": "2016-12-17T15:21:32Z",
+      "side": 1,
+      "message": "https://github.com/CyanogenMod/android_kernel_oneplus_msm8996/commit/65854eaf0670a3d4641d3d1dcf0ea08174a0b773\n\n\nmaybe that should be adjusted as well?",
+      "range": {
+        "startLine": 94,
+        "startChar": 2,
+        "endLine": 95,
+        "endChar": 40
+      },
+      "revId": "917e34728992385078dbbe5893a8754027dd5284",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
