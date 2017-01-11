@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa3479d7_31a7ce51",
+        "filename": "drivers/usb/dwc3/dwc3-msm.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2499,
+      "author": {
+        "id": 3133
+      },
+      "writtenOn": "2017-01-11T17:49:33Z",
+      "side": 1,
+      "message": "Causing warning\ndrivers/usb/dwc3/dwc3-msm.c:2499:15: warning: unused variable \u0027dwc\u0027 [-Wunused-variable]\nerror, forbidden warning: dwc3-msm.c:2499",
+      "range": {
+        "startLine": 2499,
+        "startChar": 14,
+        "endLine": 2499,
+        "endChar": 17
+      },
+      "revId": "1711d7cc0ad9542d71a604460458b3a2e172c856",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
