@@ -5895,10 +5895,10 @@ eHalStatus sme_RoamSetKey(tHalHandle hHal, tANI_U8 sessionId, tCsrRoamSetKey *pS
       smsLog(pMac, LOGE, FL("Invalid key length %d"), pSetKey->keyLength);
       return eHAL_STATUS_FAILURE;
    }
-   /*Once Setkey is done, we can go in BMPS*/
+   /*Once Setkey is done, we can go in BMPS */
    if(pSetKey->keyLength) {
-     pMac->pmc.remainInPowerActiveTillDHCP = FALSE;
-     smsLog(pMac, LOG1, FL("Reset remainInPowerActiveTillDHCP"
+     pMac->pmc.full_power_till_set_key = false;
+     smsLog(pMac, LOG1, FL("Reset full_power_till_set_key"
                            " to allow BMPS"));
    }
 
@@ -17802,17 +17802,9 @@ uint8_t sme_is_any_session_in_connected_state(tHalHandle h_hal)
  */
 eHalStatus vos_send_flush_logs_cmd_to_fw(tpAniSirGlobal mac)
 {
-	eHalStatus status;
+	eHalStatus status = eHAL_STATUS_SUCCESS;
 	VOS_STATUS vos_status;
 	vos_msg_t vos_message;
-
-	status = sme_AcquireGlobalLock(&mac->sme);
-	if (status != eHAL_STATUS_SUCCESS) {
-		smsLog(mac, LOGE,
-			FL("sme_AcquireGlobalLock failed!(status=%d)"),
-			status);
-		return status;
-	}
 
 	/* Serialize the req through MC thread */
 	vos_message.bodyptr = NULL;
@@ -17824,7 +17816,6 @@ eHalStatus vos_send_flush_logs_cmd_to_fw(tpAniSirGlobal mac)
 			vos_status);
 		status = eHAL_STATUS_FAILURE;
 	}
-	sme_ReleaseGlobalLock(&mac->sme);
 	return status;
 }
 

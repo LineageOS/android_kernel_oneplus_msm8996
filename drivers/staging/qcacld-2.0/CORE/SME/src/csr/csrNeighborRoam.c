@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -4997,6 +4997,9 @@ eHalStatus csrNeighborRoamIndicateDisconnect(tpAniSirGlobal pMac,
                                                   eCSR_NEIGHBOR_ROAM_STATE_INIT,
                                                   sessionId);
                 pNeighborRoamInfo->roamChannelInfo.IAPPNeighborListReceived = eANI_BOOLEAN_FALSE;
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+                pNeighborRoamInfo->uOsRequestedHandoff = 0;
+#endif
             }
             break;
 
@@ -5033,6 +5036,7 @@ eHalStatus csrNeighborRoamIndicateDisconnect(tpAniSirGlobal pMac,
             pNeighborRoamInfo->roamChannelInfo.IAPPNeighborListReceived = eANI_BOOLEAN_FALSE;
             csrNeighborRoamResetCfgListChanScanControlInfo(pMac, sessionId);
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+            pNeighborRoamInfo->uOsRequestedHandoff = 0;
             if (!csrRoamIsRoamOffloadScanEnabled(pMac))
             {
 #endif
@@ -5070,6 +5074,9 @@ eHalStatus csrNeighborRoamIndicateDisconnect(tpAniSirGlobal pMac,
             CSR_NEIGHBOR_ROAM_STATE_TRANSITION(eCSR_NEIGHBOR_ROAM_STATE_INIT,
                                                sessionId)
             pNeighborRoamInfo->roamChannelInfo.IAPPNeighborListReceived = eANI_BOOLEAN_FALSE;
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+            pNeighborRoamInfo->uOsRequestedHandoff = 0;
+#endif
             break;
     }
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
@@ -5198,6 +5205,9 @@ eHalStatus csrNeighborRoamIndicateConnect(tpAniSirGlobal pMac,
                                                   eCSR_NEIGHBOR_ROAM_STATE_INIT,
                                                   sessionId)
                 pNeighborRoamInfo->roamChannelInfo.IAPPNeighborListReceived = eANI_BOOLEAN_FALSE;
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+                pNeighborRoamInfo->uOsRequestedHandoff = 0;
+#endif
                 break;
             }
             /* Fall through if the status is SUCCESS */
@@ -5616,6 +5626,9 @@ eHalStatus csrNeighborRoamInit(tpAniSirGlobal pMac, tANI_U8 sessionId)
     pNeighborRoamInfo->roamChannelInfo.IAPPNeighborListReceived = eANI_BOOLEAN_FALSE;
     /* Set the Last Sent Cmd as RSO_STOP */
     pNeighborRoamInfo->lastSentCmd = ROAM_SCAN_OFFLOAD_STOP;
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+    pNeighborRoamInfo->uOsRequestedHandoff = 0;
+#endif
     return eHAL_STATUS_SUCCESS;
 }
 
@@ -5966,6 +5979,9 @@ void csrNeighborRoamTranistionPreauthDoneToDisconnected(tpAniSirGlobal pMac,
     // Transition to init state
     CSR_NEIGHBOR_ROAM_STATE_TRANSITION(eCSR_NEIGHBOR_ROAM_STATE_INIT, sessionId)
     pNeighborRoamInfo->roamChannelInfo.IAPPNeighborListReceived = eANI_BOOLEAN_FALSE;
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+    pNeighborRoamInfo->uOsRequestedHandoff = 0;
+#endif
 }
 
 /* ---------------------------------------------------------------------------

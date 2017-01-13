@@ -270,11 +270,6 @@ void hdd_tx_resume_cb(void *adapter_context,
        {
           vos_timer_stop(&pAdapter->tx_flow_control_timer);
        }
-       if (adf_os_unlikely(hdd_sta_ctx->hdd_ReassocScenario)) {
-           hddLog(LOGW,
-                  FL("flow control, tx queues un-pause avoided as we are in REASSOCIATING state"));
-           return;
-       }
        hddLog(LOG1, FL("Enabling queues"));
        wlan_hdd_netif_queue_control(pAdapter,
             WLAN_WAKE_ALL_NETIF_QUEUE,
@@ -502,7 +497,7 @@ int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
        hdd_get_transmit_sta_id(pAdapter, pDestMacAddress, &STAId);
        if (STAId == HDD_WLAN_INVALID_STA_ID) {
-           hddLog(LOGE, "Invalid station id, transmit operation suspended");
+           hddLog(LOG1, "Invalid station id, transmit operation suspended");
            goto drop_pkt;
        }
 
