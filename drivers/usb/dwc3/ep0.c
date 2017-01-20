@@ -729,6 +729,20 @@ static int dwc3_ep0_set_isoch_delay(struct dwc3 *dwc, struct usb_ctrlrequest *ct
 	return 0;
 }
 
+static struct notify_usb_enumeration_status *usb_enumeration_status = NULL;
+
+void regsister_notify_usb_enumeration_status(struct notify_usb_enumeration_status *status)
+{
+	if (usb_enumeration_status) {
+		usb_enumeration_status = status;
+		pr_err("usb_enumeration_status %s multiple usb_enumeration_status called\n",
+				__func__);
+	} else {
+		usb_enumeration_status = status;
+	}
+}
+EXPORT_SYMBOL(regsister_notify_usb_enumeration_status);
+
 static int dwc3_ep0_std_request(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
 {
 	int ret;
