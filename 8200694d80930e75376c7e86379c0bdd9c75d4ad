@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a437d4f_9ba10eac",
+        "filename": "arch/arm/boot/dts/qcom/15801/dsi-panel-samsung_s6e3fa5_1080p_cmd.dtsi",
+        "patchSetId": 3
+      },
+      "lineNbr": 190,
+      "author": {
+        "id": 8328
+      },
+      "writtenOn": "2017-01-22T14:30:39Z",
+      "side": 1,
+      "message": "causes display glitches on my S6E3FA5 panel\n\n\nhttps://review.lineageos.org/95097",
+      "range": {
+        "startLine": 189,
+        "startChar": 2,
+        "endLine": 190,
+        "endChar": 52
+      },
+      "revId": "8200694d80930e75376c7e86379c0bdd9c75d4ad",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
