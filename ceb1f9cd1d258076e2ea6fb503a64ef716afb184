@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a437d4f_16acc8ec",
+        "filename": "drivers/gpu/msm/adreno_a5xx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2199,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2017-01-26T10:44:19Z",
+      "side": 1,
+      "message": "white space",
+      "range": {
+        "startLine": 2196,
+        "startChar": 0,
+        "endLine": 2199,
+        "endChar": 34
+      },
+      "revId": "ceb1f9cd1d258076e2ea6fb503a64ef716afb184",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
