@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a437d4f_3e1aec17",
+        "filename": "drivers/input/touchscreen/synaptics_driver_s3320.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2459,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2017-02-01T10:22:13Z",
+      "side": 1,
+      "message": "break touch events",
+      "range": {
+        "startLine": 2454,
+        "startChar": 0,
+        "endLine": 2459,
+        "endChar": 47
+      },
+      "revId": "3ea1e7a5c94aeaa085946278b06c21c356d57a6e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
