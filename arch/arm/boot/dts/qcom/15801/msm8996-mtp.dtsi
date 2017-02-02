@@ -1902,7 +1902,7 @@
 	qcom,init-voltage = <1100000>;
 };
 &pm8994_l13 {
-	regulator-min-microvolt = <29500000>;
+	regulator-min-microvolt = <2950000>;
 };
 &pm8994_l14 {
 	status = "disabled";
