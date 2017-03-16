@@ -694,6 +694,7 @@ void pwm_put(struct pwm_device *pwm)
 
 	if (!test_and_clear_bit(PWMF_REQUESTED, &pwm->flags)) {
 		pr_warn("PWM device already freed\n");
+		dump_stack();
 		goto out;
 	}
 
