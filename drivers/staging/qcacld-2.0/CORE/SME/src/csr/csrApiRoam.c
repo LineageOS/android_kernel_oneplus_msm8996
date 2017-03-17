@@ -10571,6 +10571,13 @@ void csrRoamCheckForLinkStatusChange( tpAniSirGlobal pMac, tSirSmeRsp *pSirMsg )
                                              &roamInfo, 0,
                                              eCSR_ROAM_LOSTLINK,
                                              eCSR_ROAM_RESULT_DISASSOC_IND);
+                pSession = CSR_GET_SESSION(pMac,
+                                 pDisConDoneInd->sessionId);
+                if (pSession &&
+                   !CSR_IS_INFRA_AP(&pSession->connectedProfile))
+                      csrRoamStateChange(pMac,
+                               eCSR_ROAMING_STATE_IDLE,
+                               pDisConDoneInd->sessionId);
            }
            else
            {
@@ -11659,17 +11666,7 @@ eHalStatus csrRoamLostLink( tpAniSirGlobal pMac, tANI_U32 sessionId, tANI_U32 ty
         result = eCSR_ROAM_RESULT_DEAUTH_IND;
         pDeauthIndMsg = (tSirSmeDeauthInd *)pSirMsg;
         pSession->roamingStatusCode = pDeauthIndMsg->statusCode;
-        /* Convert into proper reason code */
-        if ((pDeauthIndMsg->reasonCode == eSIR_BEACON_MISSED) ||
-            (pDeauthIndMsg->reasonCode ==
-                 eSIR_MAC_DISASSOC_DUE_TO_INACTIVITY_REASON))
-            pSession->joinFailStatusCode.reasonCode = 0;
-        else
-            pSession->joinFailStatusCode.reasonCode = pDeauthIndMsg->reasonCode;
-        /*
-         * cfg layer expects 0 as reason code if the driver doesn't know the
-         * reason code eSIR_BEACON_MISSED is defined as locally
-         */
+        pSession->joinFailStatusCode.reasonCode = pDeauthIndMsg->reasonCode;
     }
     else
     {
@@ -11682,9 +11679,6 @@ eHalStatus csrRoamLostLink( tpAniSirGlobal pMac, tANI_U32 sessionId, tANI_U32 ty
     if(!CSR_IS_INFRA_AP(&pSession->connectedProfile))
     {
         csrRoamCallCallback(pMac, sessionId, NULL, 0, eCSR_ROAM_LOSTLINK_DETECTED, result);
-        /*Move the state to Idle after disconnection*/
-        csrRoamStateChange( pMac, eCSR_ROAMING_STATE_IDLE, sessionId );
-
     }
 
     if ( eWNI_SME_DISASSOC_IND == type )
