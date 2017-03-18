@@ -2076,6 +2076,7 @@
 &pmi8994_charger {
 	qcom,iterm-ma = <200>;
 	qcom,float-voltage-mv = <4320>;
+	qcom,override-usb-current;
 	/* ibatmax setting for different temp regions */
 	qcom,ibatmax-little-cold-ma = <300>;
 	qcom,ibatmax-cool-ma = <400>;

@@ -265,7 +265,6 @@ static void msm_fd_stop_streaming(struct vb2_queue *q)
 	struct fd_ctx *ctx = vb2_get_drv_priv(q);
 
 	mutex_lock(&ctx->fd_device->recovery_lock);
-	//dev_err(ctx->fd_device->dev, "_GM_ msm_fd_stop_streaming called by v4l2\n");
 	msm_fd_hw_remove_buffers_from_queue(ctx->fd_device, q);
 	msm_fd_hw_put(ctx->fd_device);
 	mutex_unlock(&ctx->fd_device->recovery_lock);
@@ -340,10 +339,9 @@ static int msm_fd_vbif_error_handler(void *handle, uint32_t error)
 	struct msm_fd_buffer *active_buf;
 	int ret;
 
-	if (NULL == handle) {
-		dev_err(fd->dev, "FD Ctx is null, Cannot recover\n");
+	if (handle == NULL)
 		return 0;
-	}
+
 	ctx = (struct fd_ctx *)handle;
 	fd = (struct msm_fd_device *)ctx->fd_device;
 
@@ -811,7 +809,7 @@ static int msm_fd_streamoff(struct file *file,
 {
 	struct fd_ctx *ctx = msm_fd_ctx_from_fh(fh);
 	int ret;
-	//dev_err(ctx->fd_device->dev, "_GM_ user calls Streamoff\n");
+
 	ret = vb2_streamoff(&ctx->vb2_q, buf_type);
 	if (ret < 0)
 		dev_err(ctx->fd_device->dev, "Stream off fails\n");
@@ -1220,7 +1218,6 @@ static void msm_fd_wq_handler(struct work_struct *work)
 	int i;
 
 	fd = container_of(work, struct msm_fd_device, work);
-	//dev_err(fd->dev, "_GM_ msm_fd_wq_handler E\n");
 	MSM_FD_SPIN_LOCK(fd->slock, 1);
 	active_buf = msm_fd_hw_get_active_buffer(fd, 0);
 	if (!active_buf) {
@@ -1257,7 +1254,6 @@ static void msm_fd_wq_handler(struct work_struct *work)
 
 	if (fd->state == MSM_FD_DEVICE_RUNNING) {
 		/* We have the data from fd hw, we can start next processing */
-		//dev_err(fd->dev, "_GM_ call schedule next buf from WQ_handler\n");
 		msm_fd_hw_schedule_next_buffer(fd, 0);
 	}
 
@@ -1274,13 +1270,10 @@ static void msm_fd_wq_handler(struct work_struct *work)
 	fd_event->frame_id = ctx->sequence;
 	v4l2_event_queue_fh(&ctx->fh, &event);
 
-	if (fd->state == MSM_FD_DEVICE_RUNNING) {
-		/* Release buffer from the device */
-		msm_fd_hw_buffer_done(fd, active_buf, 0);
-	}
+	/* Release buffer from the device */
+	msm_fd_hw_buffer_done(fd, active_buf, 0);
 
 	MSM_FD_SPIN_UNLOCK(fd->slock, 1);
-	//dev_err(fd->dev, "_GM_ msm_fd_wq_handler X\n");
 }
 
 /*
