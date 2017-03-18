@@ -38,9 +38,9 @@
 /* Face detection bus client name */
 #define MSM_FD_BUS_CLIENT_NAME "msm_face_detect"
 /* Face detection processing timeout in ms */
-#define MSM_FD_PROCESSING_TIMEOUT_MS 300
+#define MSM_FD_PROCESSING_TIMEOUT_MS 150
 /* Face detection halt timeout in ms */
-#define MSM_FD_HALT_TIMEOUT_MS 200
+#define MSM_FD_HALT_TIMEOUT_MS 100
 /* Smmu callback name */
 #define MSM_FD_SMMU_CB_NAME "camera_fd"
 /*
@@ -1192,24 +1192,21 @@ void msm_fd_hw_remove_buffers_from_queue(struct msm_fd_device *fd,
 
 	/* We need to wait active buffer to finish */
 	if (active_buffer) {
-		//dev_err(fd->dev, "_GM_ Wait for completion\n");
 		time = wait_for_completion_timeout(&active_buffer->completion,
 			msecs_to_jiffies(MSM_FD_PROCESSING_TIMEOUT_MS));
 
 		MSM_FD_SPIN_LOCK(fd->slock, 1);
 		if (!time) {
-			//dev_err(fd->dev, "_GM_ Wait for completion timeout\n");
 			if (atomic_read(&active_buffer->active)) {
 				atomic_set(&active_buffer->active, 0);
 				/* Do a vb2 buffer done since it timed out */
 				vb2_buffer_done(&active_buffer->vb, VB2_BUF_STATE_DONE);
 				/* Remove active buffer */
 				msm_fd_hw_get_active_buffer(fd, 0);
-				/* Schedule if other buffers are present in device */
-				//dev_err(fd->dev, "_GM_ call schedule next buf from remove_buffers_from_queue\n");
+				/* Schedule if other buffers are present */
 				msm_fd_hw_schedule_next_buffer(fd, 0);
 			} else {
-				dev_err(fd->dev, "_GM_ activ buf no longer active remove_buffers_from_queue\n");
+				dev_err(fd->dev, "activ buf no longer active\n");
 			}
 		}
 		fd->state = MSM_FD_DEVICE_IDLE;
@@ -1232,10 +1229,8 @@ int msm_fd_hw_buffer_done(struct msm_fd_device *fd,
 
 	if (atomic_read(&buffer->active)) {
 		atomic_set(&buffer->active, 0);
-		//dev_err(fd->dev, "_GM_ send complete all in buf done\n");
 		complete_all(&buffer->completion);
 	} else {
-		dev_err(fd->dev, "_GM_ Buffer is not active in buf done\n");
 		ret = -1;
 	}
 
@@ -1310,7 +1305,7 @@ int msm_fd_hw_schedule_next_buffer(struct msm_fd_device *fd, u8 lock_flag)
 	if (buf) {
 		ret = msm_fd_hw_try_enable(fd, buf, MSM_FD_DEVICE_RUNNING);
 		if (0 == ret) {
-			dev_err(fd->dev, "_GM_ Ouch can not process next buffer\n");
+			dev_err(fd->dev, "Can not process next buffer\n");
 			MSM_FD_SPIN_UNLOCK(fd->slock, lock_flag);
 			return -EBUSY;
 		}

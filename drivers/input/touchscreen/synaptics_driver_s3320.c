@@ -265,6 +265,7 @@ static int F12_2D_QUERY_BASE;
 static int F12_2D_CMD_BASE;
 static int F12_2D_CTRL_BASE;
 static int F12_2D_DATA_BASE;
+static int F12_2D_DATA15;
 
 static int F34_FLASH_QUERY_BASE;
 static int F34_FLASH_CMD_BASE;
@@ -1284,7 +1285,10 @@ extern struct completion key_cm;
 void int_touch(void)
 {
 	int ret = -1,i = 0;
-	uint8_t buf[80];
+	uint8_t buf[90];
+	uint8_t count_data = 0;
+	uint8_t object_attention[2];
+	uint16_t total_status = 0;
 	uint8_t finger_num = 0;
 	uint8_t finger_status = 0;
 	struct point_info points;
@@ -1322,9 +1326,32 @@ void int_touch(void)
     }
 #endif
 	ret = i2c_smbus_write_byte_data(ts->client, 0xff, 0x0);
-	ret = synaptics_rmi4_i2c_read_block(ts->client, F12_2D_DATA_BASE, 80, buf);
+	if(version_is_s3508)
+		F12_2D_DATA15 = 0x0009;
+	else
+		F12_2D_DATA15 = 0x000C;
+	ret = synaptics_rmi4_i2c_read_block(ts->client, F12_2D_DATA15, 2, object_attention);
+    if (ret < 0) {
+        TPD_ERR("synaptics_int_touch F12_2D_DATA15: i2c_transfer failed\n");
+        goto INT_TOUCH_END;
+    }
+	total_status = (object_attention[1] << 8) | object_attention[0];
+
+	if(total_status){
+		while(total_status){
+			count_data++;
+			total_status >>= 1;
+		}
+	}else{
+		count_data = 0;
+	}
+    if(count_data > 10){
+        TPD_ERR("synaptics_int_touch count_data is %d\n", count_data);
+        goto INT_TOUCH_END;
+    }
+	ret = synaptics_rmi4_i2c_read_block(ts->client, F12_2D_DATA_BASE, count_data*8+1, buf);
 	if (ret < 0) {
-		TPD_ERR("synaptics_int_touch: i2c_transfer failed\n");
+		TPD_ERR("synaptics_int_touch F12_2D_DATA_BASE: i2c_transfer failed\n");
 		goto INT_TOUCH_END;
 	}
 
@@ -1333,7 +1360,7 @@ void int_touch(void)
 	input_event(ts->input_dev, EV_SYN, SYN_TIME_NSEC,
 			ktime_to_timespec(ts->timestamp).tv_nsec);
 
-	for( i = 0; i < ts->max_num; i++ ) {
+	for( i = 0; i < count_data; i++ ) {
 		points.status = buf[i*8];
 		points.x = ((buf[i*8+2]&0x0f)<<8) | (buf[i*8+1] & 0xff);
 		points.raw_x = buf[i*8+6] & 0x0f;
@@ -1370,6 +1397,7 @@ void int_touch(void)
 
 		}
 	}
+	finger_info <<= (ts->max_num - count_data);
 
 	for ( i = 0; i < ts->max_num; i++ )
 	{
@@ -4398,6 +4426,8 @@ static int synaptics_i2c_suspend(struct device *dev)
 		return -1;
 	}
     if(ts->support_hw_poweroff && (ts->gesture_enable == 0)){
+	    atomic_set(&ts->is_stop,1);
+	    touch_disable(ts);
 	    ret = tpd_power(ts,0);
 	    if (ret < 0)
 	        TPD_ERR("%s power off err\n",__func__);
