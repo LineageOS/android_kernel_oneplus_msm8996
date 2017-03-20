@@ -552,7 +552,7 @@ static void fastcg_work_func(struct work_struct *work)
 	struct fastchg_device_info *di = container_of(work,
 			struct fastchg_device_info,
 			fastcg_work);
-	pr_info("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 	if (di->irq_enabled) {
 		free_irq(di->irq, di);
 		msleep(25);
@@ -620,7 +620,7 @@ static int dash_read(struct fastchg_device_info *di)
 		bit = gpio_get_value(di->ap_data);
 		data |= bit<<(6-i);
 	}
-	pr_info("recv data:0x%x\n", data);
+	pr_debug("recv data:0x%x\n", data);
 	return data;
 }
 

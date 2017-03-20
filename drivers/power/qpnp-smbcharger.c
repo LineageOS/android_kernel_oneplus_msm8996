@@ -9525,7 +9525,7 @@ static int set_dash_charger_present(int status)
 			power_supply_set_current_limit(g_chip->usb_psy, DEFAULT_WALL_CHG_MA * 1000);
 		}
 		power_supply_changed(&g_chip->batt_psy);
-		pr_info("dash_present = %d, charger_present = %d\n",
+		pr_debug("dash_present = %d, charger_present = %d\n",
 				g_chip->dash_present, charger_present);
 	} else {
 		pr_err("set_dash_charger_present error\n");
