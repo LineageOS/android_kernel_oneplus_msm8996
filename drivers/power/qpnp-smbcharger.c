@@ -10046,7 +10046,7 @@ static int set_dash_charger_present(int status)
 #endif
 		}
 		power_supply_changed(&g_chip->batt_psy);
-		pr_info("dash_present = %d, charger_present = %d\n",
+		pr_debug("dash_present = %d, charger_present = %d\n",
 				g_chip->dash_present, charger_present);
 	} else {
 		pr_err("set_dash_charger_present error\n");
