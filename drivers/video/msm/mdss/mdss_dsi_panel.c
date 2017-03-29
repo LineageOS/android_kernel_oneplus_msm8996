@@ -270,6 +270,65 @@ disp_en_gpio_err:
 	return rc;
 }
 
+static int lcd_power_request_gpios(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
+{
+
+	int rc = 0;
+
+	rc = gpio_request(ctrl_pdata->lcd_power_1v8_en, "lcd_1v8_en");
+	if (rc) {
+		pr_err("request lcd 1v8 en gpio failed, rc=%d\n",
+				rc);
+		goto lcd_1v8_gpio_err;
+	 }
+	return rc;
+
+lcd_1v8_gpio_err:
+	if (gpio_is_valid(ctrl_pdata->lcd_power_1v8_en))
+			gpio_free(ctrl_pdata->lcd_power_1v8_en);
+	return rc;
+}
+
+int vendor_lcd_power_on(struct mdss_panel_data *pdata, int enable)
+{
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo = NULL;
+	int rc = 0;
+
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+			panel_data);
+
+	if (!gpio_is_valid(ctrl_pdata->lcd_power_1v8_en)) {
+		pr_err("%s:%d, lcd 1v8 en line not configured\n",
+				__func__, __LINE__);
+		return rc;
+	}
+
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+	if (enable) {
+		rc = lcd_power_request_gpios(ctrl_pdata);
+		if (rc) {
+			pr_err("lcd power gpio request failed\n");
+			return rc;
+		}
+		gpio_set_value((ctrl_pdata->lcd_power_1v8_en), 1);
+		usleep_range(2 * 1000,2 * 1000);
+	}
+	else{
+		gpio_set_value((ctrl_pdata->lcd_power_1v8_en), 0);
+		usleep_range(5 * 1000,5 * 1000);
+		gpio_free(ctrl_pdata->lcd_power_1v8_en);
+	}
+	return rc;
+
+}
+
 int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
