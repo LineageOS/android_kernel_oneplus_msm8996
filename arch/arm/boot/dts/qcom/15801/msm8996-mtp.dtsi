@@ -723,6 +723,13 @@
 		pinctrl-0 = <&pmx_gpio_switch_pin_active>;
 		pinctrl-1 = <&pmx_gpio_switch_pin_suspend>;
 	};
+	qcom,bcl {
+		/delete-property/ qcom,bcl-hotplug-list;
+		/delete-property/ qcom,bcl-soc-hotplug-list;
+		qcom,ibat-monitor {
+			qcom,mitigation-freq-khz = <1132800>;
+		};
+	};
 };
 
 &pm8994_gpios {
