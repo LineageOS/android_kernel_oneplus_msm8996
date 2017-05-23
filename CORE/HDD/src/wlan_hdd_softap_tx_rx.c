@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -311,7 +311,7 @@ int __hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
                goto drop_pkt;
            }
 
-           if (STAId == HDD_WLAN_INVALID_STA_ID)
+           if (STAId == HDD_WLAN_INVALID_STA_ID || STAId >= WLAN_MAX_STA_COUNT)
            {
                VOS_TRACE( VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_WARN,
                           "%s: Failed to find right station", __func__);
@@ -410,6 +410,11 @@ int __hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
        pAdapter->stats.tx_bytes += skb->len;
        ++pAdapter->stats.tx_packets;
 
+       /* Per peer tx/rx statistics */
+       pAdapter->aStaInfo[STAId].tx_packets++;
+       pAdapter->aStaInfo[STAId].tx_bytes += skb->len;
+       pAdapter->aStaInfo[STAId].last_tx_rx_ts = vos_system_ticks();
+
        if (!list_head) {
            list_head = skb;
            list_tail = skb;
@@ -426,11 +431,13 @@ int __hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
        DPTRACE(adf_dp_trace(skb, ADF_DP_TRACE_HDD_TX_PACKET_PTR_RECORD,
                   (uint8_t *)&skb->data, sizeof(skb->data), ADF_TX));
        DPTRACE(adf_dp_trace(skb, ADF_DP_TRACE_HDD_TX_PACKET_RECORD,
-                  (uint8_t *)skb->data, skb->len, ADF_TX));
-       if (skb->len > ADF_DP_TRACE_RECORD_SIZE)
+                  (uint8_t *)skb->data, adf_nbuf_len(skb), ADF_TX));
+
+       if (adf_nbuf_len(skb) > ADF_DP_TRACE_RECORD_SIZE)
             DPTRACE(adf_dp_trace(skb, ADF_DP_TRACE_HDD_TX_PACKET_RECORD,
-                  (uint8_t *)&skb->data[ADF_DP_TRACE_RECORD_SIZE],
-                  (skb->len - ADF_DP_TRACE_RECORD_SIZE), ADF_TX));
+                    (uint8_t *)&skb->data[ADF_DP_TRACE_RECORD_SIZE],
+                    (adf_nbuf_len(skb) - ADF_DP_TRACE_RECORD_SIZE),
+                    ADF_TX));
 
        skb = skb_next;
        continue;
@@ -462,8 +469,11 @@ drop_pkt:
        is_update_ac_stats = TRUE;
        goto drop_list;
    }
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,7,0))
+   netif_trans_update(dev);
+#else
    dev->trans_start = jiffies;
+#endif
    return NETDEV_TX_OK;
 
 drop_list:
@@ -515,11 +525,15 @@ static void __hdd_softap_tx_timeout(struct net_device *dev)
     * case of disassociation it is ok to ignore this. But if associated, we have
     * do possible recovery here.
     */
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,7,0))
+    VOS_TRACE(VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_ERROR,
+        "%s: Transmission timeout occurred jiffies %lu",
+        __func__, jiffies);
+#else
     VOS_TRACE(VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_ERROR,
         "%s: Transmission timeout occurred jiffies %lu trans_start %lu",
         __func__, jiffies, dev->trans_start);
-
+#endif
     for (i = 0; i < NUM_TX_QUEUES; i++) {
         txq = netdev_get_tx_queue(dev, i);
         VOS_TRACE(VOS_MODULE_ID_HDD_SAP_DATA,
@@ -816,7 +830,7 @@ VOS_STATUS hdd_softap_rx_packet_cbk(v_VOID_t *vosContext,
    struct sk_buff *skb = NULL;
    hdd_context_t *pHddCtx = NULL;
 #ifdef QCA_PKT_PROTO_TRACE
-   v_U8_t proto_type;
+   v_U8_t proto_type = 0;
 #endif /* QCA_PKT_PROTO_TRACE */
    struct sk_buff *skb_next;
    unsigned int cpu_index;
@@ -867,10 +881,24 @@ VOS_STATUS hdd_softap_rx_packet_cbk(v_VOID_t *vosContext,
       ++pAdapter->stats.rx_packets;
       pAdapter->stats.rx_bytes += skb->len;
 
+      pAdapter->aStaInfo[staId].rx_packets++;
+      pAdapter->aStaInfo[staId].rx_bytes += skb->len;
+      pAdapter->aStaInfo[staId].last_tx_rx_ts = vos_system_ticks();
+
       DPTRACE(adf_dp_trace(skb,
               ADF_DP_TRACE_RX_HDD_PACKET_PTR_RECORD,
               adf_nbuf_data_addr(skb),
               sizeof(adf_nbuf_data(skb)), ADF_RX));
+      DPTRACE(adf_dp_trace(skb,
+              ADF_DP_TRACE_HDD_RX_PACKET_RECORD,
+              (uint8_t *)skb->data, adf_nbuf_len(skb), ADF_RX));
+
+      if (adf_nbuf_len(skb) > ADF_DP_TRACE_RECORD_SIZE)
+          DPTRACE(adf_dp_trace(skb,
+                  ADF_DP_TRACE_HDD_RX_PACKET_RECORD,
+                  (uint8_t *)&skb->data[ADF_DP_TRACE_RECORD_SIZE],
+                  (adf_nbuf_len(skb) - ADF_DP_TRACE_RECORD_SIZE),
+                  ADF_RX));
 
 #ifdef QCA_PKT_PROTO_TRACE
       if ((pHddCtx->cfg_ini->gEnableDebugLog & VOS_PKT_TRAC_TYPE_EAPOL) ||
@@ -914,11 +942,12 @@ VOS_STATUS hdd_softap_rx_packet_cbk(v_VOID_t *vosContext,
       if (skb->next) {
          rxstat = netif_rx(skb);
       } else {
-#ifdef WLAN_FEATURE_HOLD_RX_WAKELOCK
-         vos_wake_lock_timeout_acquire(&pHddCtx->rx_wake_lock,
-                                       HDD_WAKE_LOCK_DURATION,
-                                       WIFI_POWER_EVENT_WAKELOCK_HOLD_RX);
-#endif
+         if ((pHddCtx->cfg_ini->rx_wakelock_timeout) &&
+             (PACKET_BROADCAST != skb->pkt_type) &&
+             (PACKET_MULTICAST != skb->pkt_type))
+               vos_wake_lock_timeout_acquire(&pHddCtx->rx_wake_lock,
+                              pHddCtx->cfg_ini->rx_wakelock_timeout,
+                              WIFI_POWER_EVENT_WAKELOCK_HOLD_RX);
          /*
           * This is the last packet on the chain
           * Scheduling rx sirq

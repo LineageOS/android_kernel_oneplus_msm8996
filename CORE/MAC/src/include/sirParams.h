@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -535,11 +535,11 @@ typedef struct sSirMbMsgP2p
 
 #define SIR_HAL_FLUSH_LOG_TO_FW            (SIR_HAL_ITC_MSG_TYPES_BEGIN + 218)
 
-#define SIR_HAL_GET_RSSI                   (SIR_HAL_ITC_MSG_TYPES_BEGIN + 219)
+#define SIR_HAL_GET_PEER_INFO              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 219)
 
 #define SIR_HAL_SMPS_FORCE_MODE_IND        (SIR_HAL_ITC_MSG_TYPES_BEGIN + 220)
 
-/* 221 unused */
+#define SIR_HAL_GET_ISOLATION              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 221)
 
 #define SIR_HAL_START_ROAM_CANDIDATE_LOOKUP_REQ (SIR_HAL_ITC_MSG_TYPES_BEGIN + 222)
 
@@ -725,7 +725,7 @@ typedef struct sSirMbMsgP2p
 #define SIR_HAL_CONFIG_GUARD_TIME          (SIR_HAL_ITC_MSG_TYPES_BEGIN + 315)
 #define SIR_HAL_SET_PASSPOINT_LIST_REQ     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 316)
 #define SIR_HAL_RESET_PASSPOINT_LIST_REQ   (SIR_HAL_ITC_MSG_TYPES_BEGIN + 317)
-#define SIR_HAL_EXTSCAN_SET_SSID_HOTLIST_REQ   (SIR_HAL_ITC_MSG_TYPES_BEGIN + 318)
+/* 318 unused */
 
 #define SIR_HAL_OCB_SET_CONFIG_CMD          (SIR_HAL_ITC_MSG_TYPES_BEGIN + 319)
 #define SIR_HAL_OCB_SET_UTC_TIME_CMD        (SIR_HAL_ITC_MSG_TYPES_BEGIN + 320)
@@ -792,6 +792,9 @@ typedef struct sSirMbMsgP2p
 #define SIR_HAL_SET_RX_BLOCKSIZE_CMDID      (SIR_HAL_ITC_MSG_TYPES_BEGIN + 369)
 #define SIR_HAL_GET_CHAIN_RSSI_REQ          (SIR_HAL_ITC_MSG_TYPES_BEGIN + 370)
 #define SIR_HAL_POWER_DEBUG_STATS_REQ       (SIR_HAL_ITC_MSG_TYPES_BEGIN + 371)
+#define SIR_HAL_GET_PEER_INFO_EXT           (SIR_HAL_ITC_MSG_TYPES_BEGIN + 372)
+#define SIR_HAL_GET_PEER_INFO_EXT_IND       (SIR_HAL_ITC_MSG_TYPES_BEGIN + 373)
+#define SIR_HAL_ACTION_FRAME_RANDOM_MAC     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 374)
 
 #define SIR_HAL_MSG_TYPES_END              (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 

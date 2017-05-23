@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -318,6 +318,8 @@ typedef void (*wda_tgt_cfg_cb) (void *context, void *param);
  */
 typedef bool (*wda_dfs_radar_indication_cb) (void *context, void *param);
 
+typedef void (*wda_dfs_block_tx_cb) (void *context, bool cac_block_tx);
+
 typedef struct
 {
    tANI_U16 ucValidStaIndex ;
@@ -449,6 +451,7 @@ VOS_STATUS WDA_TxPacket(void *pWDA,
 VOS_STATUS WDA_open(v_PVOID_t pVosContext, v_PVOID_t pOSContext,
                           wda_tgt_cfg_cb pTgtUpdCB,
                           wda_dfs_radar_indication_cb radar_ind_cb,
+                          wda_dfs_block_tx_cb dfs_block_tx_cb,
                           tMacOpenParameters *pMacParams ) ;
 
 #define WDA_start wma_start
@@ -968,7 +971,11 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_DEAUTH_TX_COMP         SIR_HAL_DEAUTH_TX_COMP
 #define WDA_GET_LINK_SPEED         SIR_HAL_GET_LINK_SPEED
 
-#define WDA_GET_RSSI               SIR_HAL_GET_RSSI
+#define WDA_GET_PEER_INFO               SIR_HAL_GET_PEER_INFO
+#define WDA_GET_PEER_INFO_EXT      SIR_HAL_GET_PEER_INFO_EXT
+#define WDA_GET_PEER_INFO_EXT_IND  SIR_HAL_GET_PEER_INFO_EXT_IND
+
+#define WDA_GET_ISOLATION          SIR_HAL_GET_ISOLATION
 
 #define WDA_MODEM_POWER_STATE_IND SIR_HAL_MODEM_POWER_STATE_IND
 
@@ -1105,6 +1112,7 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 
 
 #define WDA_UPDATE_STA_INACTIVITY_TIMEOUT     SIR_HAL_STA_INACTIVITY_TIMEOUT
+#define WDA_ACTION_FRAME_RANDOM_MAC           SIR_HAL_ACTION_FRAME_RANDOM_MAC
 
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -46,6 +46,7 @@
 #include "vos_api.h"
 #include "vos_sched.h"
 #include "wma_api.h"
+#include "wma.h"
 #include "adf_os_atomic.h"
 #include "wlan_hdd_power.h"
 #include "wlan_hdd_main.h"
@@ -899,7 +900,7 @@ static int hif_pci_autopm_debugfs_show(struct seq_file *s, void *data)
 						"SUSPENDED"};
 	unsigned int msecs_age;
 	int pm_state = atomic_read(&sc->pm_state);
-	unsigned long timer_expires, flags;
+	unsigned long timer_expires;
 	struct hif_pm_runtime_context *ctx;
 
 	seq_printf(s, "%30s: %s\n", "Runtime PM state",
@@ -937,9 +938,9 @@ static int hif_pci_autopm_debugfs_show(struct seq_file *s, void *data)
 				msecs_age / 1000, msecs_age % 1000);
 	}
 
-	spin_lock_irqsave(&sc->runtime_lock, flags);
+	spin_lock_bh(&sc->runtime_lock);
 	if (list_empty(&sc->prevent_suspend_list)) {
-		spin_unlock_irqrestore(&sc->runtime_lock, flags);
+		spin_unlock_bh(&sc->runtime_lock);
 		return 0;
 	}
 
@@ -951,7 +952,7 @@ static int hif_pci_autopm_debugfs_show(struct seq_file *s, void *data)
 		seq_puts(s, " ");
 	}
 	seq_puts(s, "\n");
-	spin_unlock_irqrestore(&sc->runtime_lock, flags);
+	spin_unlock_bh(&sc->runtime_lock);
 
 	return 0;
 #undef HIF_PCI_AUTOPM_STATS
@@ -1052,18 +1053,15 @@ void hif_runtime_test_init(struct hif_pci_softc *sc)
 {
 	int i;
 	struct hif_pm_runtime_context *ctx = NULL, *tmp;
-	unsigned long flags;
 
 	for (i = 0; i < MAX_RUNTIME_DEBUG_CONTEXT; i++) {
 		ctx = &rpm_data[i];
 		ctx->active = false;
 		ctx->name = NULL;
-		spin_lock_irqsave(&sc->runtime_lock, flags);
 		list_for_each_entry_safe(ctx, tmp,
 				&sc->prevent_suspend_list, list) {
 			list_del(&ctx->list);
 		}
-		spin_unlock_irqrestore(&sc->runtime_lock, flags);
 	}
 }
 
@@ -1499,7 +1497,6 @@ static void hif_pci_pm_runtime_exit(struct hif_pci_softc *sc)
  */
 static void hif_pci_pm_runtime_post_exit(struct hif_pci_softc *sc)
 {
-	unsigned long flags;
 	struct hif_pm_runtime_context *ctx, *tmp;
 
 	/*
@@ -1507,20 +1504,18 @@ static void hif_pci_pm_runtime_post_exit(struct hif_pci_softc *sc)
 	 * HTT/WMI pkts should get tx complete and driver should
 	 * will increment the usage count to 1 to prevent any suspend
 	 */
-	if (atomic_read(&sc->dev->power.usage_count) != 1) {
-		spin_lock_irqsave(&sc->runtime_lock, flags);
+	if (atomic_read(&sc->dev->power.usage_count) != 1)
 		hif_pci_runtime_pm_warn(sc, "Driver UnLoading");
-		spin_unlock_irqrestore(&sc->runtime_lock, flags);
-	} else
+	else
 		return;
 
-	spin_lock_irqsave(&sc->runtime_lock, flags);
+	spin_lock_bh(&sc->runtime_lock);
 	list_for_each_entry_safe(ctx, tmp, &sc->prevent_suspend_list, list) {
-		spin_unlock_irqrestore(&sc->runtime_lock, flags);
+		spin_unlock_bh(&sc->runtime_lock);
 		hif_runtime_pm_prevent_suspend_deinit(ctx);
-		spin_lock_irqsave(&sc->runtime_lock, flags);
+		spin_lock_bh(&sc->runtime_lock);
 	}
-	spin_unlock_irqrestore(&sc->runtime_lock, flags);
+	spin_unlock_bh(&sc->runtime_lock);
 	/*
 	 * This is totally a preventive measure to ensure Runtime PM
 	 * isn't disabled for life time.
@@ -1547,14 +1542,13 @@ static void hif_pci_pm_runtime_post_exit(struct hif_pci_softc *sc)
  */
 static void hif_pci_pm_runtime_ssr_post_exit(struct hif_pci_softc *sc)
 {
-	unsigned long flags;
 	struct hif_pm_runtime_context *ctx, *tmp;
 
-	spin_lock_irqsave(&sc->runtime_lock, flags);
+	spin_lock_bh(&sc->runtime_lock);
 	list_for_each_entry_safe(ctx, tmp, &sc->prevent_suspend_list, list) {
 		hif_pm_ssr_runtime_allow_suspend(sc, ctx);
 	}
-	spin_unlock_irqrestore(&sc->runtime_lock, flags);
+	spin_unlock_bh(&sc->runtime_lock);
 }
 
 #else
@@ -1682,6 +1676,7 @@ again:
 
     OS_MEMZERO(sc, sizeof(*sc));
     sc->mem = mem;
+    sc->mem_len = pci_resource_len(pdev, BAR_NUM);
     sc->pdev = pdev;
     sc->dev = &pdev->dev;
 
@@ -2657,9 +2652,38 @@ static void hif_dump_crash_debug_info(struct hif_pci_softc *sc)
 	struct HIF_CE_state *hif_state = (struct HIF_CE_state *)sc->hif_device;
 	struct ol_softc *scn = sc->ol_sc;
 	int ret;
+	tp_wma_handle wma_handle;
+	void *vos_context = vos_get_global_context(VOS_MODULE_ID_HIF, NULL);
 
 	if (!hif_state)
 		return;
+	if (vos_context == NULL) {
+		pr_err("%s: vos context is null\n", __func__);
+		return;
+	}
+	wma_handle = (tp_wma_handle) vos_get_context(
+			VOS_MODULE_ID_WDA, vos_context);
+	if (wma_handle == NULL) {
+		pr_err("%s: wma_handle is null\n", __func__);
+		return;
+	}
+
+	/*
+	 * When kernel panic happen, if WiFi FW is still active,
+	 * it may cause NOC errors/memory corruption, to avoid
+	 * this, inject a fw crash first.
+	 * send crash_inject to FW directly, because we are now
+	 * in an atomic context, and preempt has been disabled,
+	 * MCThread won't be scheduled at the moment, at the same
+	 * time, TargetFailure event wont't be received after inject
+	 * crash due to the same reason
+	 */
+	ret = wma_crash_inject(wma_handle, 1, 0);
+	if (ret) {
+		pr_err("%s: failed to send crash inject - %d\n",
+				__func__, ret);
+		return;
+	}
 
 	adf_os_spin_lock_irqsave(&hif_state->suspend_lock);
 	hif_irq_record(HIF_CRASH, sc);
@@ -3000,8 +3024,12 @@ __hif_pci_resume(struct pci_dev *pdev, bool runtime_pm)
         if (retry > MAX_REG_READ_RETRIES) {
             pr_err("%s: PCIe link is possible down!\n", __func__);
             print_config_soc_reg(sc);
-            VOS_ASSERT(0);
-            break;
+            adf_os_atomic_set(&sc->pci_link_suspended, 1);
+            adf_os_atomic_set(&sc->wow_done, 1);
+            sc->recovery = true;
+            vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
+            vos_wlan_pci_link_down();
+            return -EACCES;
         }
 
         A_MDELAY(1);

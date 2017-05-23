@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -376,15 +376,27 @@ populate_dot11f_sub_20_channel_width_ie(
 	tDot11fIEQComVendorIE *dot11f_ptr,
 	tpPESession pe_session)
 {
-	if (mac_ctx_ptr->sub20_dynamic_channelwidth == 0)
+	uint8_t  sub20_static_channelwidth;
+	uint8_t  sub20_dynamic_channelwidth;
+	uint8_t  sub20_capability;
+
+	sub20_static_channelwidth = mac_ctx_ptr->sub20_channelwidth;
+	sub20_dynamic_channelwidth = mac_ctx_ptr->sub20_dynamic_channelwidth;
+
+	if (sub20_static_channelwidth == 0 &&
+	    sub20_dynamic_channelwidth == 0)
 		return;
+
+	if (sub20_dynamic_channelwidth != 0)
+		sub20_capability = sub20_dynamic_channelwidth;
+	else
+		sub20_capability = sub20_static_channelwidth;
 
 	if (LIM_IS_AP_ROLE(pe_session) ||
 	    LIM_IS_STA_ROLE(pe_session)) {
 		dot11f_ptr->present = true;
 		dot11f_ptr->Sub20Info.present = true;
-		dot11f_ptr->Sub20Info.capability =
-			 mac_ctx_ptr->sub20_dynamic_channelwidth;
+		dot11f_ptr->Sub20Info.capability = sub20_capability;
 	}
 
 	if (LIM_IS_AP_ROLE(pe_session) &&
@@ -2967,7 +2979,7 @@ sirConvertAssocRespFrame2Struct(tpAniSirGlobal pMac,
 #endif
 
 #ifdef WLAN_FEATURE_VOWIFI_11R
-    if (ar.num_RICDataDesc) {
+    if (ar.num_RICDataDesc <= 2) {
         for (cnt=0; cnt < ar.num_RICDataDesc; cnt++) {
             if (ar.RICDataDesc[cnt].present) {
                 vos_mem_copy( &pAssocRsp->RICData[cnt], &ar.RICDataDesc[cnt],

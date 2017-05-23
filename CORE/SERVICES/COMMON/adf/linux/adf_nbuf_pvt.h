@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -36,7 +36,11 @@
 #include <linux/netdevice.h>
 #include <linux/dma-mapping.h>
 #include <asm/types.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0))
+#include <linux/scatterlist.h>
+#else
 #include <asm/scatterlist.h>
+#endif
 #include <adf_os_types.h>
 #include <adf_nbuf.h>
 
@@ -66,6 +70,8 @@ typedef void (*__adf_nbuf_callback_fn) (struct sk_buff *skb);
 
 typedef void (*adf_nbuf_trace_update_t)(char *);
 
+#pragma pack(push)
+#pragma pack(1)
 struct cvg_nbuf_cb {
     /*
      * Store a pointer to a parent network buffer.
@@ -136,7 +142,6 @@ struct cvg_nbuf_cb {
 #endif /* QCA_MDM_DEVICE */
 #ifdef QCA_PKT_PROTO_TRACE
     unsigned char proto_type;
-    unsigned char vdev_id;
 #endif /* QCA_PKT_PROTO_TRACE */
 #ifdef QOS_FWD_SUPPORT
     unsigned char fwd_flag: 1;
@@ -145,15 +150,17 @@ struct cvg_nbuf_cb {
     unsigned char tx_htt2_frm: 1;
 #endif /* QCA_TX_HTT2_SUPPORT */
     struct {
-        uint8_t is_eapol: 1;
-        uint8_t is_arp: 1;
-        uint8_t is_dhcp: 1;
-        uint8_t is_wapi: 1;
-        uint8_t is_mcast: 1;
-        uint8_t is_bcast: 1;
-        uint8_t reserved: 2;
+        uint8_t is_eapol:1;
+        uint8_t is_arp:1;
+        uint8_t is_dhcp:1;
+        uint8_t is_wapi:1;
+        uint8_t is_mcast:1;
+        uint8_t is_bcast:1;
+        uint8_t reserved:1;
+        uint8_t print:1;
     } packet_type;
 } __packed;
+#pragma pack(pop)
 
 #ifdef QCA_ARP_SPOOFING_WAR
 #define NBUF_CB_PTR(skb) \
@@ -261,6 +268,9 @@ struct cvg_nbuf_cb {
 
 #define ADF_NBUF_CB_TX_DP_TRACE(skb) \
     (((struct cvg_nbuf_cb *)((skb)->cb))->trace.dp_trace_tx)
+
+#define ADF_NBUF_CB_DP_TRACE_PRINT(skb) \
+	(((struct cvg_nbuf_cb *)((skb)->cb))->packet_type.print)
 
 #define ADF_NBUF_CB_RX_DP_TRACE(skb) \
     (((struct cvg_nbuf_cb *)((skb)->cb))->trace.dp_trace_rx)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -38,6 +38,7 @@
 #include <ol_htt_rx_api.h>     /* htt_rx_peer_id, etc. */
 
 /* internal API header files */
+#include <ol_txrx.h>           /* ol_txrx_peer_unref_delete */
 #include <ol_txrx_types.h>     /* ol_txrx_vdev_t, etc. */
 #include <ol_txrx_peer_find.h> /* ol_txrx_peer_find_by_id */
 #include <ol_rx_reorder.h>     /* ol_rx_reorder_store, etc. */
@@ -224,6 +225,79 @@ OL_RX_MPDU_RSSI_UPDATE(
 #define OL_RX_IND_RSSI_UPDATE(peer, rx_ind_msg) /* no-op */
 #define OL_RX_MPDU_RSSI_UPDATE(peer, rx_mpdu_desc) /* no-op */
 #endif /* QCA_SUPPORT_PEER_DATA_RX_RSSI */
+
+/**
+ * ol_rx_mon_indication_handler() - htt rx indication message handler
+ * for HL monitor mode.
+ * @pdev: pointer to struct ol_txrx_pdev_handle
+ * @rx_ind_msg:      htt rx indication message
+ * @peer_id:         peer id
+ * @tid:             tid
+ * @num_mpdu_ranges: number of mpdu ranges
+ *
+ * This function pops amsdu from rx indication message and directly
+ * deliver to upper layer.
+ */
+void
+ol_rx_mon_indication_handler(
+	ol_txrx_pdev_handle pdev,
+	adf_nbuf_t rx_ind_msg,
+	u_int16_t peer_id,
+	u_int8_t tid,
+	int num_mpdu_ranges)
+{
+	int mpdu_range;
+	struct ol_txrx_peer_t *peer;
+	htt_pdev_handle htt_pdev;
+	struct ol_txrx_vdev_t *vdev = NULL;
+
+	htt_pdev = pdev->htt_pdev;
+
+	adf_os_spin_lock_bh(&pdev->peer_ref_mutex);
+	peer = pdev->self_peer;
+	if (peer) {
+		adf_os_atomic_inc(&peer->ref_cnt);
+		vdev = peer->vdev;
+	}
+	adf_os_spin_unlock_bh(&pdev->peer_ref_mutex);
+
+	for (mpdu_range = 0; mpdu_range < num_mpdu_ranges; mpdu_range++) {
+		enum htt_rx_status status;
+		int i, num_mpdus;
+		adf_nbuf_t head_msdu, tail_msdu;
+
+		htt_rx_ind_mpdu_range_info(
+			pdev->htt_pdev,
+			rx_ind_msg,
+			mpdu_range,
+			&status,
+			&num_mpdus);
+
+		TXRX_STATS_ADD(pdev, priv.rx.normal.mpdus, num_mpdus);
+
+		for (i = 0; i < num_mpdus; i++) {
+			htt_rx_amsdu_pop(
+				htt_pdev, rx_ind_msg, &head_msdu, &tail_msdu);
+			if (peer && vdev) {
+				peer->rx_opt_proc(vdev, peer, tid, head_msdu);
+			} else {
+				while (1) {
+					adf_nbuf_t next;
+					next = adf_nbuf_next(head_msdu);
+					htt_rx_desc_frame_free(
+						htt_pdev,
+						head_msdu);
+					if (head_msdu == tail_msdu)
+						break;
+					head_msdu = next;
+				}
+			}
+		}
+	}
+
+	if (peer)
+		ol_txrx_peer_unref_delete(peer);
+}
 
 void
 ol_rx_indication_handler(
@@ -911,6 +985,25 @@ ol_rx_filter(
     return FILTER_STATUS_REJECT;
 }
 
+#ifdef WLAN_FEATURE_TSF_PLUS
+static inline void ol_rx_timestamp(void *rx_desc, adf_nbuf_t msdu)
+{
+	struct htt_rx_ppdu_desc_t *rx_ppdu_desc;
+
+	if (!rx_desc || !msdu)
+		return;
+
+	rx_ppdu_desc = (struct htt_rx_ppdu_desc_t *)((uint8_t *)(rx_desc) -
+			HTT_RX_IND_HL_BYTES + HTT_RX_IND_HDR_PREFIX_BYTES);
+	msdu->tstamp = ns_to_ktime((u_int64_t)rx_ppdu_desc->tsf32 *
+			NSEC_PER_USEC);
+}
+#else
+static inline void ol_rx_timestamp(void *rx_desc, adf_nbuf_t msdu)
+{
+}
+#endif
+
 void
 ol_rx_deliver(
     struct ol_txrx_vdev_t *vdev,
@@ -1076,6 +1169,8 @@ DONE:
             OL_RX_PEER_STATS_UPDATE(peer, msdu);
             OL_RX_ERR_STATISTICS_1(pdev, vdev, peer, rx_desc, OL_RX_ERR_NONE);
             TXRX_STATS_MSDU_INCR(vdev->pdev, rx.delivered, msdu);
+
+            ol_rx_timestamp(rx_desc, msdu);
 
             OL_TXRX_LIST_APPEND(deliver_list_head, deliver_list_tail, msdu);
         }

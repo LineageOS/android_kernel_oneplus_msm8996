@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -538,6 +538,8 @@ ol_txrx_pdev_attach(
         pdev->htt_pkt_type = htt_pkt_type_native_wifi;
     } else if (pdev->frame_format == wlan_frm_fmt_802_3) {
         pdev->htt_pkt_type = htt_pkt_type_ethernet;
+    } else if (pdev->frame_format == wlan_frm_fmt_raw) {
+        pdev->htt_pkt_type = htt_pkt_type_raw;
     } else {
         VOS_TRACE(VOS_MODULE_ID_TXRX, VOS_TRACE_LEVEL_ERROR,
             "%s Invalid standard frame type: %d\n",
@@ -632,7 +634,9 @@ ol_txrx_pdev_attach(
             pdev->rx_opt_proc = ol_rx_fwd_check;
         }
     } else {
-        if (ol_cfg_rx_pn_check(pdev->ctrl_pdev)) {
+        if (VOS_MONITOR_MODE == vos_get_conparam()) {
+            pdev->rx_opt_proc = ol_rx_deliver;
+        } else if (ol_cfg_rx_pn_check(pdev->ctrl_pdev)) {
             if (ol_cfg_rx_fwd_disabled(pdev->ctrl_pdev)) {
                 /*
                  * PN check done on host, rx->tx forwarding not done at all.
@@ -1726,12 +1730,17 @@ ol_txrx_peer_unref_delete(ol_txrx_peer_handle peer)
     if (adf_os_atomic_dec_and_test(&peer->ref_cnt)) {
         u_int16_t peer_id;
 
-        TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+        TXRX_PRINT(TXRX_PRINT_LEVEL_INFO1,
             "Deleting peer %p (%02x:%02x:%02x:%02x:%02x:%02x)\n",
             peer,
             peer->mac_addr.raw[0], peer->mac_addr.raw[1],
             peer->mac_addr.raw[2], peer->mac_addr.raw[3],
             peer->mac_addr.raw[4], peer->mac_addr.raw[5]);
+
+        /* set self_peer to null, otherwise may crash when unload driver */
+        if (peer == pdev->self_peer &&
+            VOS_MONITOR_MODE == vos_get_conparam())
+            pdev->self_peer = NULL;
 
         peer_id = peer->local_id;
         /* remove the reference to the peer from the hash table */
@@ -1858,7 +1867,7 @@ ol_txrx_peer_detach(ol_txrx_peer_handle peer)
     /* debug print to dump rx reorder state */
     //htt_rx_reorder_log_print(vdev->pdev->htt_pdev);
 
-    TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+    TXRX_PRINT(TXRX_PRINT_LEVEL_INFO1,
         "%s:peer %p (%02x:%02x:%02x:%02x:%02x:%02x)\n",
           __func__, peer,
           peer->mac_addr.raw[0], peer->mac_addr.raw[1],
@@ -2038,7 +2047,8 @@ ol_txrx_fw_stats_cfg(
 A_STATUS
 ol_txrx_fw_stats_get(
     ol_txrx_vdev_handle vdev,
-    struct ol_txrx_stats_req *req)
+    struct ol_txrx_stats_req *req,
+    bool response_expected)
 {
     struct ol_txrx_pdev_t *pdev = vdev->pdev;
     u_int64_t cookie;
@@ -2081,6 +2091,8 @@ ol_txrx_fw_stats_get(
     if (req->wait.blocking) {
         while (adf_os_mutex_acquire(pdev->osdev, req->wait.sem_ptr)) {}
     }
+    if (response_expected == false)
+        adf_os_mem_free(non_volatile_req);
 
     return A_OK;
 }

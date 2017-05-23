@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -670,6 +670,7 @@ VOS_STATUS vos_watchdog_open
   vos_mem_zero(pWdContext, sizeof(VosWatchdogContext));
   pWdContext->pVContext = pVosContext;
   gpVosWatchdogContext = pWdContext;
+  pWdContext->thread_stuck_timer.state = VOS_TIMER_STATE_UNUSED;
 
   //Initialize the helper events and event queues
   init_completion(&pWdContext->WdStartEvent);
@@ -1045,6 +1046,30 @@ static void vos_wd_detect_thread_stuck_cb(void *priv)
 	}
 }
 
+ /**
+ * vos_thread_stuck_timer_init - Initialize thread stuck timer
+ *
+ * @wd_ctx: watchdog context.
+ *
+ * Return: void
+ */
+void vos_thread_stuck_timer_init(pVosWatchdogContext wd_ctx)
+{
+    if (vos_timer_init(&wd_ctx->thread_stuck_timer,
+                       VOS_TIMER_TYPE_SW,
+                       vos_wd_detect_thread_stuck_cb, NULL))
+        hddLog(LOGE, FL("Unable to initialize thread stuck timer"));
+    else
+    {
+        if (VOS_STATUS_SUCCESS !=
+                 vos_timer_start(&wd_ctx->thread_stuck_timer,
+                                 THREAD_STUCK_TIMER_VAL))
+            hddLog(LOGE, FL("Unable to start thread stuck timer"));
+        else
+            hddLog(LOG1, FL("Successfully started thread stuck timer"));
+    }
+}
+
 /**
  * vos_wd_reset_thread_stuck_count()- Callback to
  * probe msg sent to Threads.
@@ -1085,7 +1110,7 @@ VosWDThread
   v_BOOL_t shutdown              = VOS_FALSE;
   int count                      = 0;
   VOS_STATUS vosStatus = VOS_STATUS_SUCCESS;
-  set_user_nice(current, -3);
+  set_user_nice(current, -4);
 
   if (Arg == NULL)
   {
@@ -1097,22 +1122,6 @@ VosWDThread
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0))
   daemonize("WD_Thread");
 #endif
-  /* Initialize the timer to detect thread stuck issues */
-  if (vos_timer_init(&gpVosWatchdogContext->thread_stuck_timer,
-        VOS_TIMER_TYPE_SW, vos_wd_detect_thread_stuck_cb, NULL)) {
-      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                "Unable to initialize thread stuck timer");
-  } else {
-      if (VOS_STATUS_SUCCESS !=
-              vos_timer_start(&gpVosWatchdogContext->thread_stuck_timer,
-                           THREAD_STUCK_TIMER_VAL))
-          VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                        "Unable to start thread stuck timer");
-      else
-          VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
-                        "Successfully started thread stuck timer");
-  }
-
   /*
   ** Ack back to the context from which the Watchdog thread has been
   ** created.
@@ -1244,7 +1253,10 @@ VosWDThread
     } // while message loop processing
   } // while shutdown
 
-  vos_timer_destroy(&pWdContext->thread_stuck_timer);
+  /* destroy the timer only if intialized */
+  if (pWdContext->thread_stuck_timer.state != VOS_TIMER_STATE_UNUSED) {
+    vos_timer_destroy(&pWdContext->thread_stuck_timer);
+  }
   // If we get here the Watchdog thread must exit
   VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
       "%s: Watchdog Thread exiting !!!!", __func__);

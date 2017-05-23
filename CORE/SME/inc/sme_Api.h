@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -3604,16 +3604,6 @@ eHalStatus sme_AddPeriodicTxPtrn(tHalHandle hHal, tSirAddPeriodicTxPtrn
   ---------------------------------------------------------------------------*/
 eHalStatus sme_DelPeriodicTxPtrn(tHalHandle hHal, tSirDelPeriodicTxPtrn
                                  *delPeriodicTxPtrnParams);
-/*--------------------------------------------------------------------------
-  \brief sme_enable_disable_split_scan() - a wrapper function to set the split
-                                          scan parameter.
-  This is a synchronous call
-  \param hHal - The handle returned by macOpen
-  \return None.
-  \sa
-  --------------------------------------------------------------------------*/
-void sme_enable_disable_split_scan (tHalHandle hHal, tANI_U8 nNumStaChan,
-                                    tANI_U8 nNumP2PChan);
 
 /**
  * sme_enable_rmc() - enable RMC
@@ -3845,10 +3835,30 @@ eHalStatus sme_TxpowerLimit( tHalHandle hHal, tSirTxPowerLimit *psmetx);
 eHalStatus sme_GetLinkSpeed(tHalHandle hHal,tSirLinkSpeedInfo *lsReq,void *plsContext,
                             void (*pCallbackfn)(tSirLinkSpeedInfo *indParam, void *pContext) );
 
-eHalStatus sme_get_rssi(tHalHandle hal, struct sir_rssi_req req,
+eHalStatus sme_get_peer_info(tHalHandle hal, struct sir_peer_info_req req,
 			void *context,
-			void (*callbackfn)(struct sir_rssi_resp *param,
+			void (*callbackfn)(struct sir_peer_info_resp *param,
 						void *pcontext));
+
+eHalStatus sme_get_isolation(tHalHandle hal,
+           void *context,
+           void (*callbackfn)(struct sir_isolation_resp *param,
+                       void *pcontext));
+
+/*----------------------------------------------------------------------------
+ \fn  sme_get_peer_info_ext
+ \brief  This function sends msg to get info for remote peer
+ \param  hHal - global structure
+ \param  req - get peer info request pointer
+ \param  context - event handle context
+ \param  callbackfn - callback fn with response
+ \- return Success or failure
+-----------------------------------------------------------------------------*/
+eHalStatus sme_get_peer_info_ext(tHalHandle hal,
+		struct sir_peer_info_ext_req *req,
+		void *context,
+		void (*callbackfn)(struct sir_peer_info_ext_resp *param,
+			void *pcontext));
 
 /*----------------------------------------------------------------------------
  \fn  sme_ModifyAddIE
@@ -4136,10 +4146,6 @@ eHalStatus sme_SetBssHotlist (tHalHandle hHal,
     -------------------------------------------------------------------------*/
 eHalStatus sme_ResetBssHotlist (tHalHandle hHal,
                              tSirExtScanResetBssidHotlistReqParams *pResetReq);
-
-eHalStatus
-sme_set_ssid_hotlist(tHalHandle hal,
-		     struct sir_set_ssid_hotlist_request *request);
 
 /* ---------------------------------------------------------------------------
     \fn sme_SetSignificantChange
@@ -4579,7 +4585,8 @@ void sme_add_set_thermal_level_callback(tHalHandle hHal,
 eHalStatus sme_handle_set_fcc_channel(tHalHandle hHal,
 		bool fcc_constraint,
 		uint32_t scan_pending);
-
+eHalStatus sme_set_sta_chanlist_with_sub20(tHalHandle hal_ptr,
+					   uint8_t chan_width);
 eHalStatus sme_set_rssi_monitoring(tHalHandle hal,
 					struct rssi_monitor_req *input);
 eHalStatus sme_set_rssi_threshold_breached_cb(tHalHandle hal,
@@ -4753,4 +4760,41 @@ eHalStatus sme_power_debug_stats_req(tHalHandle hal, void (*callback_fn)
 			(struct power_stats_response *response,
 			void *context), void *power_stats_context);
 #endif
+
+/**
+ * sme_set_random_mac() - Set random mac address filter
+ * @hal: hal handle for getting global mac struct
+ * @callback: callback to be invoked for response from firmware
+ * @session_id: interface id
+ * @random_mac: random mac address to be set
+ * @context: parameter to callback
+ *
+ * This function is used to set random mac address filter for action frames
+ * which are send with the same address, callback is invoked when corresponding
+ * event from firmware has come.
+ *
+ * Return: eHalStatus enumeration.
+ */
+eHalStatus sme_set_random_mac(tHalHandle hal,
+			      action_frame_random_filter_callback callback,
+			      uint32_t session_id, uint8_t *random_mac,
+			      void *context);
+
+/**
+ * sme_clear_random_mac() - clear random mac address filter
+ * @hal: HAL handle
+ * @session_id: interface id
+ * @random_mac: random mac address to be cleared
+ *
+ * This function is used to clear the randmom mac address filters
+ * which are set with sme_set_random_mac
+ *
+ * Return: eHalStatus enumeration.
+ */
+eHalStatus sme_clear_random_mac(tHalHandle hal, uint32_t session_id,
+				uint8_t *random_mac);
+
+eHalStatus sme_set_chip_pwr_save_fail_cb(tHalHandle hal, void (*cb)( void *,
+				struct chip_pwr_save_fail_detected_params *));
+
 #endif //#if !defined( __SME_API_H )

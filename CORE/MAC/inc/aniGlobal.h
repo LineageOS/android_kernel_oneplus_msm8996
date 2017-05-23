@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -230,6 +230,7 @@ enum log_dump_trace_mask {
  * @WLAN_LOG_REASON_SME_OUT_OF_CMD_BUFL sme out of cmd buffer
  * @WLAN_LOG_REASON_NO_SCAN_RESULTS: no scan results to report from HDD
  * This enum contains the different reason codes for bug report
+ * @WLAN_LOG_REASON_SCAN_NOT_ALLOWED: scan not allowed due to connection states
  */
 enum log_event_host_reason_code {
 	WLAN_LOG_REASON_CODE_UNUSED,
@@ -250,6 +251,7 @@ enum log_event_host_reason_code {
 	WLAN_LOG_REASON_SME_OUT_OF_CMD_BUF,
 	WLAN_LOG_REASON_NO_SCAN_RESULTS,
 	WLAN_LOG_REASON_STALE_SESSION_FOUND,
+	WLAN_LOG_REASON_SCAN_NOT_ALLOWED,
 };
 
 
@@ -1289,6 +1291,8 @@ typedef struct sAniSirGlobal
     uint8_t  sub20_config_info;
     uint8_t  sub20_channelwidth;
     uint8_t  sub20_dynamic_channelwidth;
+    uint8_t  sta_sub20_current_channelwidth;
+    bool max_power_cmd_pending;
 } tAniSirGlobal;
 
 typedef enum

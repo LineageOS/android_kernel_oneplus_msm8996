@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -43,6 +43,8 @@
 #include <wlan_hdd_tx_rx.h>
 #include <wlan_hdd_softap_tx_rx.h>
 #include <wlan_hdd_dp_utils.h>
+#include <wlan_hdd_tsf.h>
+
 #include <wlan_qct_tl.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
@@ -267,11 +269,6 @@ void hdd_tx_resume_cb(void *adapter_context,
        {
           vos_timer_stop(&pAdapter->tx_flow_control_timer);
        }
-       if (adf_os_unlikely(hdd_sta_ctx->hdd_ReassocScenario)) {
-           hddLog(LOGW,
-                  FL("flow control, tx queues un-pause avoided as we are in REASSOCIATING state"));
-           return;
-       }
        hddLog(LOG1, FL("Enabling queues"));
        wlan_hdd_netif_queue_control(pAdapter,
             WLAN_WAKE_ALL_NETIF_QUEUE,
@@ -430,6 +427,8 @@ static void hdd_get_transmit_sta_id(hdd_adapter_t *adapter,
 		 */
 		if (mcbc_addr)
 			*station_id = IBSS_BROADCAST_STAID;
+	} else if (adapter->device_mode == WLAN_HDD_OCB) {
+		*station_id = sta_ctx->conn_info.staId[0];
 	} else if (adapter->device_mode == WLAN_HDD_NDI) {
 		/*
 		 * This check is necessary to make sure station id is not
@@ -520,14 +519,20 @@ int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 #endif
 #endif
 
-       hdd_get_transmit_sta_id(pAdapter, pDestMacAddress, &STAId);
-       if (STAId == HDD_WLAN_INVALID_STA_ID) {
-           hddLog(LOGE, "Invalid station id, transmit operation suspended");
-           goto drop_pkt;
-       }
+       /* use self peer directly in monitor mode */
+       if (VOS_MONITOR_MODE != vos_get_conparam()) {
+           hdd_get_transmit_sta_id(pAdapter, pDestMacAddress, &STAId);
+           if (STAId == HDD_WLAN_INVALID_STA_ID) {
+               hddLog(LOG1, "Invalid station id, transmit operation suspended");
+               goto drop_pkt;
+           }
 
-       vdev_temp = tlshim_peer_validity(
-                     (WLAN_HDD_GET_CTX(pAdapter))->pvosContext, STAId);
+           vdev_temp = tlshim_peer_validity(
+                   (WLAN_HDD_GET_CTX(pAdapter))->pvosContext, STAId);
+       } else {
+           vdev_temp =
+               tlshim_selfpeer_vdev((WLAN_HDD_GET_CTX(pAdapter))->pvosContext);
+       }
        if (!vdev_temp)
            goto drop_pkt;
 
@@ -682,11 +687,14 @@ int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
        DPTRACE(adf_dp_trace(skb, ADF_DP_TRACE_HDD_TX_PACKET_PTR_RECORD,
                  (uint8_t *)&skb->data, sizeof(skb->data), ADF_TX));
        DPTRACE(adf_dp_trace(skb, ADF_DP_TRACE_HDD_TX_PACKET_RECORD,
-                 (uint8_t *)skb->data, skb->len, ADF_TX));
-       if (skb->len > ADF_DP_TRACE_RECORD_SIZE)
-           DPTRACE(adf_dp_trace(skb, ADF_DP_TRACE_HDD_TX_PACKET_RECORD,
-                      (uint8_t *)&skb->data[ADF_DP_TRACE_RECORD_SIZE],
-                      (skb->len - ADF_DP_TRACE_RECORD_SIZE), ADF_TX));
+                 (uint8_t *)skb->data, adf_nbuf_len(skb), ADF_TX));
+
+       if (adf_nbuf_len(skb) > ADF_DP_TRACE_RECORD_SIZE)
+            DPTRACE(adf_dp_trace(skb, ADF_DP_TRACE_HDD_TX_PACKET_RECORD,
+                    (uint8_t *)&skb->data[ADF_DP_TRACE_RECORD_SIZE],
+                    (adf_nbuf_len(skb) - ADF_DP_TRACE_RECORD_SIZE),
+                    ADF_TX));
+
        skb = skb_next;
        continue;
 
@@ -719,8 +727,11 @@ drop_pkt:
         is_update_ac_stats = TRUE;
         goto drop_list;
    }
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,7,0))
+   netif_trans_update(dev);
+#else
    dev->trans_start = jiffies;
+#endif
    return NETDEV_TX_OK;
 
 drop_list:
@@ -861,8 +872,12 @@ static void __hdd_tx_timeout(struct net_device *dev)
    struct netdev_queue *txq;
    int i = 0;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,7,0))
+   hddLog(LOGE, FL("Transmission timeout occurred jiffies %lu"),jiffies);
+#else
    hddLog(LOGE, FL("Transmission timeout occurred jiffies %lu trans_start %lu"),
           jiffies, dev->trans_start);
+#endif
    DPTRACE(adf_dp_trace(NULL, ADF_DP_TRACE_HDD_TX_TIMEOUT,
                         NULL, 0, ADF_TX));
    /*
@@ -1112,6 +1127,40 @@ bool drop_ip6_mcast(struct sk_buff *skb)
 #define drop_ip6_mcast(_a) 0
 #endif
 
+#ifdef CONFIG_HL_SUPPORT
+/*
+ * hdd_move_radiotap_header_forward - move radiotap header to head of skb
+ * @skb: skb to be modified
+ *
+ * For HL monitor mode, radiotap is appended to tail when update radiotap
+ * info in htt layer. Need to copy it ahead of skb before indicating to OS.
+ */
+static void hdd_move_radiotap_header_forward(struct sk_buff *skb)
+{
+	adf_nbuf_t msdu = (adf_nbuf_t)skb;
+	struct ieee80211_radiotap_header *rthdr;
+	uint8_t rtap_len;
+
+	adf_nbuf_put_tail(msdu,
+		sizeof(struct ieee80211_radiotap_header));
+	rthdr = (struct ieee80211_radiotap_header *)
+	    (adf_nbuf_data(msdu) + adf_nbuf_len(msdu) -
+	     sizeof(struct ieee80211_radiotap_header));
+	rtap_len = rthdr->it_len;
+	adf_nbuf_put_tail(msdu,
+			  rtap_len -
+			  sizeof(struct ieee80211_radiotap_header));
+	adf_nbuf_push_head(msdu, rtap_len);
+	adf_os_mem_copy(adf_nbuf_data(msdu), rthdr, rtap_len);
+	adf_nbuf_trim_tail(msdu, rtap_len);
+}
+#else
+static inline void hdd_move_radiotap_header_forward(struct sk_buff *skb)
+{
+    /* no-op */
+}
+#endif
+
 /**
  * hdd_mon_rx_packet_cbk() - Receive callback registered with TLSHIM.
  * @vosContext: [in] pointer to VOS context
@@ -1161,6 +1210,8 @@ VOS_STATUS hdd_mon_rx_packet_cbk(v_VOID_t *vos_ctx, adf_nbuf_t rx_buf,
 	/* walk the chain until all are processed */
 	skb = (struct sk_buff *) rx_buf;
 	while (NULL != skb) {
+		hdd_move_radiotap_header_forward(skb);
+
 		skb_next = skb->next;
 		skb->dev = adapter->dev;
 
@@ -1195,7 +1246,6 @@ VOS_STATUS hdd_mon_rx_packet_cbk(v_VOID_t *vos_ctx, adf_nbuf_t rx_buf,
 	return VOS_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_FEATURE_HOLD_RX_WAKELOCK
 /**
  * hdd_is_arp_local() - check if local or non local arp
  * @skb: pointer to sk_buff
@@ -1235,7 +1285,6 @@ static bool hdd_is_arp_local(struct sk_buff *skb)
 	}
 	return true;
 }
-#endif
 
 /**============================================================================
   @brief hdd_rx_packet_cbk() - Receive callback registered with TL.
@@ -1259,12 +1308,11 @@ VOS_STATUS hdd_rx_packet_cbk(v_VOID_t *vosContext,
    struct sk_buff *skb_next;
    unsigned int cpu_index;
 #ifdef QCA_PKT_PROTO_TRACE
-   v_U8_t proto_type;
+   v_U8_t proto_type = 0;
 #endif /* QCA_PKT_PROTO_TRACE */
    hdd_station_ctx_t *pHddStaCtx = NULL;
-#ifdef WLAN_FEATURE_HOLD_RX_WAKELOCK
    bool wake_lock = false;
-#endif
+
    //Sanity check on inputs
    if ((NULL == vosContext) || (NULL == rxBuf))
    {
@@ -1317,6 +1365,16 @@ VOS_STATUS hdd_rx_packet_cbk(v_VOID_t *vosContext,
               ADF_DP_TRACE_RX_HDD_PACKET_PTR_RECORD,
               adf_nbuf_data_addr(skb),
               sizeof(adf_nbuf_data(skb)), ADF_RX));
+      DPTRACE(adf_dp_trace(skb,
+              ADF_DP_TRACE_HDD_RX_PACKET_RECORD,
+              (uint8_t *)skb->data, adf_nbuf_len(skb), ADF_RX));
+
+      if (adf_nbuf_len(skb) > ADF_DP_TRACE_RECORD_SIZE)
+          DPTRACE(adf_dp_trace(skb,
+                  ADF_DP_TRACE_HDD_RX_PACKET_RECORD,
+                  (uint8_t *)&skb->data[ADF_DP_TRACE_RECORD_SIZE],
+                  (adf_nbuf_len(skb) - ADF_DP_TRACE_RECORD_SIZE),
+                  ADF_RX));
 
 #ifdef QCA_PKT_PROTO_TRACE
       if ((pHddCtx->cfg_ini->gEnableDebugLog & VOS_PKT_TRAC_TYPE_EAPOL) ||
@@ -1371,7 +1429,6 @@ VOS_STATUS hdd_rx_packet_cbk(v_VOID_t *vosContext,
        */
       adf_net_buf_debug_release_skb(skb);
 
-#ifdef WLAN_FEATURE_HOLD_RX_WAKELOCK
       if (!wake_lock) {
          if (skb->protocol == htons(ETH_P_ARP)) {
             if (hdd_is_arp_local(skb))
@@ -1380,7 +1437,9 @@ VOS_STATUS hdd_rx_packet_cbk(v_VOID_t *vosContext,
          else
             wake_lock = true;
       }
-#endif
+
+      hdd_rx_timestamp(skb, ktime_to_us(skb->tstamp));
+
       /*
        * If this is not a last packet on the chain
        * Just put packet into backlog queue, not scheduling RX sirq
@@ -1388,17 +1447,20 @@ VOS_STATUS hdd_rx_packet_cbk(v_VOID_t *vosContext,
       if (skb->next) {
          rxstat = netif_rx(skb);
       } else {
-#ifdef WLAN_FEATURE_HOLD_RX_WAKELOCK
-      if (wake_lock)
-         vos_wake_lock_timeout_acquire(&pHddCtx->rx_wake_lock,
-                                       HDD_WAKE_LOCK_DURATION,
-                                       WIFI_POWER_EVENT_WAKELOCK_HOLD_RX);
-#endif
-         /*
-          * This is the last packet on the chain
-          * Scheduling rx sirq
-          */
-         rxstat = netif_rx_ni(skb);
+          if ((pHddCtx->cfg_ini->rx_wakelock_timeout) &&
+              (PACKET_BROADCAST != skb->pkt_type) &&
+              (PACKET_MULTICAST != skb->pkt_type))
+                wake_lock = true;
+
+          if (wake_lock)
+             vos_wake_lock_timeout_acquire(&pHddCtx->rx_wake_lock,
+                            pHddCtx->cfg_ini->rx_wakelock_timeout,
+                            WIFI_POWER_EVENT_WAKELOCK_HOLD_RX);
+             /*
+              * This is the last packet on the chain
+              * Scheduling rx sirq
+              */
+             rxstat = netif_rx_ni(skb);
       }
 
       if (NET_RX_SUCCESS == rxstat)

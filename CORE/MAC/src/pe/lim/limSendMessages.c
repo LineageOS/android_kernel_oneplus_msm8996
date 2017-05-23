@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014, 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014, 2016, 2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -235,6 +235,7 @@ tSirRetStatus limSendSwitchChnlParams(tpAniSirGlobal pMac,
     tSirRetStatus   retCode = eSIR_SUCCESS;
     tSirMsgQ msgQ;
     tpPESession pSessionEntry;
+
     if((pSessionEntry = peFindSessionBySessionId(pMac, peSessionId)) == NULL)
     {
        limLog( pMac, LOGP,
@@ -270,11 +271,19 @@ tSirRetStatus limSendSwitchChnlParams(tpAniSirGlobal pMac,
        pChnlParams->isDfsChannel = VOS_FALSE;
 
     pChnlParams->restart_on_chan_switch = is_restart;
+    pChnlParams->reduced_beacon_interval =
+       pMac->sap.SapDfsInfo.reduced_beacon_interval;
 
     if (pSessionEntry->sub20_channelwidth == SUB20_MODE_5MHZ)
             pChnlParams->channelwidth = CH_WIDTH_5MHZ;
     else if (pSessionEntry->sub20_channelwidth == SUB20_MODE_10MHZ)
             pChnlParams->channelwidth = CH_WIDTH_10MHZ;
+
+    if (pSessionEntry->bssType == eSIR_INFRASTRUCTURE_MODE &&
+        pSessionEntry->sub20_channelwidth !=
+        pMac->sta_sub20_current_channelwidth)
+        sme_set_sta_chanlist_with_sub20(pMac,
+                                        pSessionEntry->sub20_channelwidth);
 
     limLog(pMac, LOG1, FL("Set sub20 channel width %d"),
            pSessionEntry->sub20_channelwidth);

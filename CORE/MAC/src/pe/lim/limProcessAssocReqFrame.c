@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -57,6 +57,7 @@
 
 #include "vos_types.h"
 #include "vos_utils.h"
+#include "wma.h"
 /**
  * limConvertSupportedChannels
  *
@@ -264,6 +265,11 @@ limProcessAssocReqFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,
           psessionEntry->peSessionId, GET_LIM_SYSTEM_ROLE(psessionEntry),
           psessionEntry->limMlmState, MAC_ADDR_ARRAY(pHdr->sa));
 
+   if (pMac->sap.SapDfsInfo.sap_enable_radar_war && (NV_CHANNEL_DFS ==
+           vos_nv_getChannelEnabledState(psessionEntry->currentOperChannel))) {
+       wma_ignore_radar_soon_after_assoc();
+       wma_stop_radar_delay_timer();
+   }
    if (LIM_IS_STA_ROLE(psessionEntry) ||
        LIM_IS_BT_AMP_STA_ROLE(psessionEntry)) {
         limLog(pMac, LOGE, FL("received unexpected ASSOC REQ on sessionid: %d "
@@ -1309,6 +1315,12 @@ sendIndToSme:
         pStaDs->vhtLdpcCapable = (tANI_U8)vht_caps->ldpcCodingCap;
     }
 
+    if (pAssocReq->ExtCap.present)
+            pStaDs->non_ecsa_capable =
+                !((struct s_ext_cap *)pAssocReq->ExtCap.bytes)->extChanSwitch;
+    else
+            pStaDs->non_ecsa_capable = 1;
+
     if (!pAssocReq->wmeInfoPresent) {
         pStaDs->mlmStaContext.htCapability = 0;
 #ifdef WLAN_FEATURE_11AC
@@ -1599,7 +1611,55 @@ error:
 
 } /*** end limProcessAssocReqFrame() ***/
 
+static uint8_t lim_get_max_rate_idx(tSirMacRateSet *rateset)
+{
+	uint8_t maxidx = 0;
+	int i;
 
+	maxidx = rateset->rate[0] & 0x7f;
+	for (i = 1; i < rateset->numRates; i++) {
+		if ((rateset->rate[i] & 0x7f) > maxidx)
+			maxidx = rateset->rate[i] & 0x7f;
+	}
+
+	return maxidx;
+}
+
+#ifdef WLAN_FEATURE_11AC
+static void fill_mlm_assoc_ind_vht(tpSirAssocReq assocreq,
+		tpDphHashNode stads,
+		tpLimMlmAssocInd assocind)
+{
+	if (stads->mlmStaContext.vhtCapability) {
+		/* ampdu */
+		assocind->ampdu = 1;
+
+		/* sgi */
+		if (assocreq->VHTCaps.shortGI80MHz ||
+		    assocreq->VHTCaps.shortGI160and80plus80MHz)
+			assocind->sgi_enable = 1;
+
+		/* stbc */
+		assocind->tx_stbc = assocreq->VHTCaps.txSTBC;
+		assocind->rx_stbc = assocreq->VHTCaps.rxSTBC;
+
+		/* ch width */
+		assocind->ch_width = stads->vhtSupportedChannelWidthSet ?
+			eHT_CHANNEL_WIDTH_80MHZ :
+			stads->htSupportedChannelWidthSet ?
+			eHT_CHANNEL_WIDTH_40MHZ : eHT_CHANNEL_WIDTH_20MHZ;
+
+		/* mode */
+		assocind->mode = SIR_SME_PHY_MODE_VHT;
+		assocind->rx_mcs_map = assocreq->VHTCaps.rxMCSMap & 0xff;
+		assocind->tx_mcs_map = assocreq->VHTCaps.txMCSMap & 0xff;
+	}
+}
+#else
+static void fill_assoc_ind_vht(tpSirAssocReq assocreq,
+		tpDphHashNode stads,
+		tpLimMlmAssocInd assocind) { }
+#endif
 
 /**---------------------------------------------------------------
 \fn     limSendMlmAssocInd
@@ -1629,6 +1689,7 @@ void limSendMlmAssocInd(tpAniSirGlobal pMac, tpDphHashNode pStaDs, tpPESession p
     tANI_U8                 subType;
     tANI_U8                 *wpsIe = NULL;
     tANI_U32                tmp;
+    uint8_t                 maxidx;
     tANI_U16                i, j=0;
 
     // Get a copy of the already parsed Assoc Request
@@ -1857,7 +1918,54 @@ void limSendMlmAssocInd(tpAniSirGlobal pMac, tpDphHashNode pStaDs, tpPESession p
 
         pMlmAssocInd->chan_info.sub20_channelwidth =
                  pStaDs->sub20_dynamic_channelwidth;
+        if (pAssocReq->ExtCap.present)
+                pMlmAssocInd->ecsa_capable =
+                  ((struct s_ext_cap *)pAssocReq->ExtCap.bytes)->extChanSwitch;
+        pMlmAssocInd->ampdu = 0;
+        pMlmAssocInd->sgi_enable = 0;
+        pMlmAssocInd->tx_stbc = 0;
+        pMlmAssocInd->rx_stbc = 0;
+        pMlmAssocInd->ch_width = eHT_CHANNEL_WIDTH_20MHZ;
+        pMlmAssocInd->mode = SIR_SME_PHY_MODE_LEGACY;
+        pMlmAssocInd->max_supp_idx = 0xff;
+        pMlmAssocInd->max_ext_idx = 0xff;
+        pMlmAssocInd->max_mcs_idx = 0xff;
+        pMlmAssocInd->rx_mcs_map = 0xff;
+        pMlmAssocInd->tx_mcs_map = 0xff;
 
+        if (pAssocReq->supportedRates.numRates)
+            pMlmAssocInd->max_supp_idx =
+                lim_get_max_rate_idx(&pAssocReq->supportedRates);
+        if (pAssocReq->extendedRates.numRates)
+            pMlmAssocInd->max_ext_idx =
+                lim_get_max_rate_idx(&pAssocReq->extendedRates);
+
+        if (pStaDs->mlmStaContext.htCapability) {
+            /* ampdu */
+            pMlmAssocInd->ampdu = 1;
+
+            /* sgi */
+            if (pStaDs->htShortGI20Mhz || pStaDs->htShortGI40Mhz)
+                pMlmAssocInd->sgi_enable = 1;
+
+            /* stbc */
+            pMlmAssocInd->tx_stbc = pAssocReq->HTCaps.txSTBC;
+            pMlmAssocInd->rx_stbc = pAssocReq->HTCaps.rxSTBC;
+
+            /* ch width */
+            pMlmAssocInd->ch_width = pStaDs->htSupportedChannelWidthSet ?
+                eHT_CHANNEL_WIDTH_40MHZ: eHT_CHANNEL_WIDTH_20MHZ;
+
+            /* mode */
+            pMlmAssocInd->mode = SIR_SME_PHY_MODE_HT;
+            maxidx = 0;
+            for (i = 0; i < 8; i++) {
+                if (pAssocReq->HTCaps.supportedMCSSet[0] & 1 << i)
+                    maxidx = i;
+            }
+            pMlmAssocInd->max_mcs_idx = maxidx;
+        }
+        fill_mlm_assoc_ind_vht(pAssocReq, pStaDs, pMlmAssocInd);
         limPostSmeMessage(pMac, LIM_MLM_ASSOC_IND, (tANI_U32 *) pMlmAssocInd);
         vos_mem_free(pMlmAssocInd);
     }
@@ -1993,6 +2101,10 @@ void limSendMlmAssocInd(tpAniSirGlobal pMac, tpDphHashNode pStaDs, tpPESession p
 
         pMlmReassocInd->beaconPtr = psessionEntry->beacon;
         pMlmReassocInd->beaconLength = psessionEntry->bcnLen;
+
+        if (pAssocReq->ExtCap.present)
+                pMlmReassocInd->ecsa_capable =
+                   ((struct s_ext_cap *)pAssocReq->ExtCap.bytes)->extChanSwitch;
 
         limPostSmeMessage(pMac, LIM_MLM_REASSOC_IND, (tANI_U32 *) pMlmReassocInd);
         vos_mem_free(pMlmReassocInd);

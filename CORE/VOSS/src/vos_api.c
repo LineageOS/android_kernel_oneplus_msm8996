@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -423,8 +423,6 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
    /* Initialize the timer module */
    vos_timer_module_init();
 
-   vos_wdthread_init_timer_work(vos_process_wd_timer);
-
    /* Initialize bug reporting structure */
    vos_init_log_completion();
 
@@ -651,6 +649,7 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
    vStatus = WDA_open( gpVosContext, gpVosContext->pHDDContext,
                        hdd_update_tgt_cfg,
                        hdd_dfs_indicate_radar,
+                       hdd_update_dfs_cac_block_tx_flag,
                        &macOpenParms );
 
    if (!VOS_IS_STATUS_SUCCESS(vStatus))
@@ -1449,6 +1448,9 @@ void vos_set_logp_in_progress(VOS_MODULE_ID moduleId, v_U8_t value)
         "%s: global voss context is NULL", __func__);
     return;
   }
+
+  VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_DEBUG,
+           "%s:%pS setting value %d",__func__, (void *)_RET_IP_, value);
   gpVosContext->isLogpInProgress = value;
 
   /* HDD uses it's own context variable to check if SSR in progress,
@@ -2659,6 +2661,26 @@ uint8_t vos_is_multicast_logging(void)
 }
 
 /*
+ * vos_reset_log_completion() - Reset log param structure
+ *@vos_context: Pointer to global vos context
+ *
+ * This function is used to reset the logging related
+ * parameters to default.
+ *
+ * Return: None
+ */
+void vos_reset_log_completion(VosContextType *vos_context)
+{
+	/* Vos Context is validated by the caller */
+	vos_spin_lock_acquire(&vos_context->bug_report_lock);
+	vos_context->log_complete.indicator = WLAN_LOG_INDICATOR_UNUSED;
+	vos_context->log_complete.is_fatal = WLAN_LOG_TYPE_NON_FATAL;
+	vos_context->log_complete.is_report_in_progress = false;
+	vos_context->log_complete.reason_code = WLAN_LOG_REASON_CODE_UNUSED;
+	vos_spin_lock_release(&vos_context->bug_report_lock);
+}
+
+/*
  * vos_init_log_completion() - Initialize log param structure
  *
  * This function is used to initialize the logging related
@@ -2681,9 +2703,7 @@ void vos_init_log_completion(void)
 	vos_context->log_complete.indicator = WLAN_LOG_INDICATOR_UNUSED;
 	vos_context->log_complete.reason_code = WLAN_LOG_REASON_CODE_UNUSED;
 	vos_context->log_complete.is_report_in_progress = false;
-	/* Attempting to initialize an already initialized lock
-	 * results in a failure. This must be ok here.
-	 */
+
 	vos_spin_lock_init(&vos_context->bug_report_lock);
 }
 
@@ -2776,17 +2796,15 @@ void vos_get_log_and_reset_completion(uint32_t *is_fatal,
 	if ((WLAN_LOG_INDICATOR_HOST_DRIVER == *indicator) &&
 	    ((WLAN_LOG_REASON_SME_OUT_OF_CMD_BUF == *reason_code) ||
 		 (WLAN_LOG_REASON_SME_COMMAND_STUCK == *reason_code) ||
-		 (WLAN_LOG_REASON_STALE_SESSION_FOUND == *reason_code)))
+		 (WLAN_LOG_REASON_STALE_SESSION_FOUND == *reason_code) ||
+		 (WLAN_LOG_REASON_SCAN_NOT_ALLOWED == *reason_code)))
 		*is_ssr_needed = true;
 	else
 		*is_ssr_needed = false;
 
-	/* reset */
-	vos_context->log_complete.indicator = WLAN_LOG_INDICATOR_UNUSED;
-	vos_context->log_complete.is_fatal = WLAN_LOG_TYPE_NON_FATAL;
-	vos_context->log_complete.is_report_in_progress = false;
-	vos_context->log_complete.reason_code = WLAN_LOG_REASON_CODE_UNUSED;
 	vos_spin_lock_release(&vos_context->bug_report_lock);
+
+	vos_reset_log_completion(vos_context);
 }
 
 /**
@@ -2849,7 +2867,7 @@ uint32_t vos_get_log_indicator(void)
 		vos_context->isLogpInProgress ||
 		vos_context->isReInitInProgress) {
 		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-			  FL("vos context initialization is in progress LoadUnload: %u LogP: %u ReInit: %u"),
+			  FL("In LoadUnload: %u LogP: %u ReInit: %u"),
 			     vos_context->isLoadUnloadInProgress,
 			     vos_context->isLogpInProgress,
 			     vos_context->isReInitInProgress);
@@ -2953,7 +2971,7 @@ VOS_STATUS vos_flush_logs(uint32_t is_fatal,
 	if (0 != ret) {
 		VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
 			"%s: Failed to send flush FW log", __func__);
-		vos_init_log_completion();
+		vos_reset_log_completion(vos_context);
 		return VOS_STATUS_E_FAILURE;
 	}
 
@@ -3096,4 +3114,56 @@ uint64_t vos_do_div(uint64_t dividend, uint32_t divisor)
 	do_div(dividend, divisor);
 	/*do_div macro updates dividend with Quotient of dividend/divisor */
 	return dividend;
+}
+
+/**
+ * vos_force_fw_dump() - force target to dump
+ *
+ *return
+ * VOS_STATUS_SUCCESS   - Operation completed successfully.
+ * VOS_STATUS_E_FAILURE - Operation failed.
+ */
+VOS_STATUS vos_force_fw_dump(void)
+{
+	struct ol_softc *scn;
+
+	scn = vos_get_context(VOS_MODULE_ID_HIF, gpVosContext);
+	if (!scn) {
+		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+			  "%s: scn is null!", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
+	VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+		  "%s:enter!", __func__);
+
+	ol_target_failure(scn, A_ERROR);
+
+	return VOS_STATUS_SUCCESS;
+}
+
+/**
+ * vos_is_probe_rsp_offload_enabled - API to check if probe response offload
+ *                                    feature is enabled from ini
+ *
+ * return - false: probe response offload is disabled/any-error
+ *          true: probe response offload is enabled
+ */
+bool vos_is_probe_rsp_offload_enabled(void)
+{
+	hdd_context_t *pHddCtx = NULL;
+
+	if (gpVosContext == NULL) {
+		pr_err("global voss context is NULL\n");
+		return false;
+	}
+
+	pHddCtx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD,
+						   gpVosContext);
+	if (!pHddCtx) {
+		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+			  "%s: HDD context is Null", __func__);
+		return false;
+	}
+
+	return pHddCtx->cfg_ini->sap_probe_resp_offload;
 }

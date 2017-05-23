@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -609,6 +609,10 @@ struct ol_txrx_pdev_t {
 	tp_ol_packetdump_cb ol_tx_packetdump_cb;
 	tp_ol_packetdump_cb ol_rx_packetdump_cb;
 
+#ifdef WLAN_FEATURE_TSF_PLUS
+	tp_ol_timestamp_cb ol_tx_timestamp_cb;
+#endif
+
 	/* tx descriptor pool */
 	struct {
 		u_int16_t pool_size;
@@ -858,6 +862,12 @@ struct ol_txrx_pdev_t {
 
 	struct ol_txrx_peer_t *self_peer;
 	uint32_t total_bundle_queue_length;
+
+#ifdef MAC_NOTIFICATION_FEATURE
+	/* Callback to indicate failure to user space */
+	void (*tx_failure_cb)(void *ctx, unsigned int num_msdu,
+			      unsigned char tid, unsigned int status);
+#endif
 };
 
 struct ol_txrx_ocb_chan_info {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -231,6 +231,32 @@ typedef struct
 } vos_event_wlan_powersave_wow_payload_type;
 
 /*-------------------------------------------------------------------------
+  Event ID: EVENT_WLAN_POWERSAVE_WOW_STATS
+  ------------------------------------------------------------------------*/
+typedef struct
+{
+   uint32_t    wow_ucast_wake_up_count;
+   uint32_t    wow_bcast_wake_up_count;
+   uint32_t    wow_ipv4_mcast_wake_up_count;
+   uint32_t    wow_ipv6_mcast_wake_up_count;
+   uint32_t    wow_ipv6_mcast_ra_stats;
+   uint32_t    wow_ipv6_mcast_ns_stats;
+   uint32_t    wow_ipv6_mcast_na_stats;
+   uint32_t    wow_pno_match_wake_up_count;
+   uint32_t    wow_pno_complete_wake_up_count;
+   uint32_t    wow_gscan_wake_up_count;
+   uint32_t    wow_low_rssi_wake_up_count;
+   uint32_t    wow_rssi_breach_wake_up_count;
+   uint32_t    wow_icmpv4_count;
+   uint32_t    wow_icmpv6_count;
+   uint32_t    wow_oem_response_wake_up_count;
+   uint32_t    Reserved_1;
+   uint32_t    Reserved_2;
+   uint32_t    Reserved_3;
+   uint32_t    Reserved_4;
+} vos_event_wlan_powersave_wow_stats;
+
+/*-------------------------------------------------------------------------
   Event ID: EVENT_WLAN_BTC
   ------------------------------------------------------------------------*/
 typedef struct
@@ -404,6 +430,46 @@ struct vos_event_tdls_tx_rx_mgmt {
 	uint8_t   type;
 	uint8_t   action_sub_type;
 	uint8_t   peer_mac[6];
+};
+
+/*-------------------------------------------------------------------------
+  Event ID: EVENT_WLAN_SSR_REINIT_SUBSYSTEM
+  ------------------------------------------------------------------------*/
+/**
+ * struct host_event_wlan_css - Holds diag event details
+ * @status: Indicates the status of event
+ *
+ * This structure holds the host diag event related information
+ */
+struct host_event_wlan_ssr_reinit {
+	uint32_t status;
+};
+
+/*-------------------------------------------------------------------------
+  Event ID: EVENT_WLAN_SSR_SHUTDOWN_SUBSYSTEM
+  ------------------------------------------------------------------------*/
+/**
+ * struct host_event_wlan_ssr_shutdown - Holds diag event details
+ * @status: Indicates the status of event
+ *
+ * This structure holds the host diag event related information
+ */
+struct host_event_wlan_ssr_shutdown {
+	uint32_t status;
+};
+
+/*-------------------------------------------------------------------------
+  Function declarations and documenation
+  ------------------------------------------------------------------------*/
+/**
+ * enum_host_ssr_events - Enum containing ssr subtype
+ * @SSR_SUB_SYSTEM_REINIT: Indicate ssr reinit state
+ * @SSR_SUB_SYSTEM_SHUTDOWN: Indicate ssr shutdown status
+ *
+ */
+enum host_ssr_events {
+	SSR_SUB_SYSTEM_SHUTDOWN,
+	SSR_SUB_SYSTEM_REINIT,
 };
 
 /*-------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -666,7 +666,8 @@ limCheckMgmtRegisteredFrames(tpAniSirGlobal pMac, tANI_U8 *pBd,
         limSendSmeMgmtFrameInd( pMac, pHdr->fc.subType, (tANI_U8*)pHdr,
                      WDA_GET_RX_PAYLOAD_LEN(pBd) + sizeof(tSirMacMgmtHdr),
                      pLimMgmtRegistration->sessionId,
-                     WDA_GET_RX_CH(pBd), psessionEntry, 0);
+                     WDA_GET_RX_CH(pBd), psessionEntry,
+                     WDA_GET_RX_RSSI_NORMALIZED(pBd));
 
         if ( (type == SIR_MAC_MGMT_FRAME) && (fc.type == SIR_MAC_MGMT_FRAME)
               && (subType == SIR_MAC_MGMT_RESERVED15) )
@@ -739,13 +740,15 @@ limHandle80211Frames(tpAniSirGlobal pMac, tpSirMsgQ limMsg, tANI_U8 *pDeferMsg)
             (fc.subType != SIR_MAC_MGMT_BEACON))
     {
          limLog(pMac, LOG1, FL("RX MGMT - Type %hu, SubType %hu, "
-                "BSSID: "MAC_ADDRESS_STR " RSSI %d Seq.no %d"),
+                "BSSID: "MAC_ADDRESS_STR " RSSI %d Seq.no %d"
+		" Source-Addr: "MAC_ADDRESS_STR),
                 fc.type, fc.subType, MAC_ADDR_ARRAY(pHdr->bssId),
                 (uint8_t)abs(
                 (tANI_S8)WDA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo)),
                 ((pHdr->seqControl.seqNumHi << 4) |
-                               (pHdr->seqControl.seqNumLo)));
-     }
+                               (pHdr->seqControl.seqNumLo)),
+                MAC_ADDR_ARRAY(pHdr->sa));
+    }
 
 #ifdef FEATURE_WLAN_EXTSCAN
     if (WMA_IS_EXTSCAN_SCAN_SRC(pRxPacketInfo) ||
@@ -815,7 +818,10 @@ limHandle80211Frames(tpAniSirGlobal pMac, tpSirMsgQ limMsg, tANI_U8 *pDeferMsg)
         if((fc.subType != SIR_MAC_MGMT_PROBE_RSP )&&
             (fc.subType != SIR_MAC_MGMT_BEACON)&&
             (fc.subType != SIR_MAC_MGMT_PROBE_REQ)
-            && (fc.subType != SIR_MAC_MGMT_ACTION ) //Public action frame can be received from non-associated stations.
+            /* TA for 11p DSRC */
+            && (fc.subType != SIR_MAC_MGMT_TIME_ADVERT)
+            /* Public action frame can be received from non-associated STAs */
+            && (fc.subType != SIR_MAC_MGMT_ACTION )
           )
         {
 
@@ -933,6 +939,16 @@ limHandle80211Frames(tpAniSirGlobal pMac, tpSirMsgQ limMsg, tANI_U8 *pDeferMsg)
 
                 case SIR_MAC_MGMT_DEAUTH:
                     limProcessDeauthFrame(pMac, pRxPacketInfo,psessionEntry);
+                    break;
+
+                case SIR_MAC_MGMT_TIME_ADVERT:
+                {
+                    tANI_U32 frameLen = WDA_GET_RX_PAYLOAD_LEN(pRxPacketInfo);
+                    limSendSmeMgmtFrameInd(pMac, SIR_MAC_MGMT_TIME_ADVERT,
+                            (tANI_U8*)pHdr, frameLen + sizeof(tSirMacMgmtHdr),
+                            0, WDA_GET_RX_CH(pRxPacketInfo), NULL,
+                            WDA_GET_RX_RSSI_RAW(pRxPacketInfo));
+                }
                     break;
 
                 case SIR_MAC_MGMT_ACTION:
@@ -1376,12 +1392,10 @@ limProcessMessages(tpAniSirGlobal pMac, tpSirMsgQ  limMsg)
             break;
         case eWNI_SME_SCAN_ABORT_IND:
           {
-            tSirMbMsg *pMsg = limMsg->bodyptr;
-            tANI_U8 sessionId;
+            tSirSmeScanAbortReq *pMsg = (tSirSmeScanAbortReq *)limMsg->bodyptr;
             if (pMsg)
             {
-               sessionId = (tANI_U8) pMsg->data[0];
-               limProcessAbortScanInd(pMac, sessionId);
+               limProcessAbortScanInd(pMac, pMsg->sessionId);
                vos_mem_free((v_VOID_t *)limMsg->bodyptr);
                limMsg->bodyptr = NULL;
             }

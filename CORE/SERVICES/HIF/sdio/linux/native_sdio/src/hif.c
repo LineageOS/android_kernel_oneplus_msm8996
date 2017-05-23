@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -960,6 +960,7 @@ static int async_task(void *param)
     A_STATUS status;
     unsigned long flags;
 
+    set_user_nice(current, -3);
     device = (HIF_DEVICE *)param;
     AR_DEBUG_PRINTF(ATH_DEBUG_TRACE, ("AR6000: async task\n"));
     set_current_state(TASK_INTERRUPTIBLE);
@@ -1784,7 +1785,19 @@ TODO: MMC SDIO3.0 Setting should also be modified in ReInit() function when Powe
 #endif
 
     ret = hifEnableFunc(device, func);
-    return (ret == A_OK || ret == A_PENDING) ? 0 : -1;
+    if (ret == A_OK || ret == A_PENDING) {
+        return 0;
+    } else {
+        for (i = 0; i < MAX_HIF_DEVICES; ++i) {
+            if (hif_devices[i] == device) {
+                hif_devices[i] = NULL;
+                break;
+            }
+        }
+        sdio_set_drvdata(func, NULL);
+        delHifDevice(device);
+        return -1;
+    }
 }
 
 
@@ -2088,9 +2101,17 @@ static A_STATUS hifEnableFunc(HIF_DEVICE *device, struct sdio_func *func)
         ret = osdrvCallbacks.deviceInsertedHandler(
             osdrvCallbacks.context,device);
         /* start  up inform DRV layer */
-        if (ret != A_OK)
+        if (ret != A_OK) {
             AR_DEBUG_PRINTF(ATH_DEBUG_TRACE,
                 ("AR6k: Device rejected error:%d \n", ret));
+            /*
+             * Disable the SDIO func & Reset the sdio
+             * for automated tests to move ahead, where
+             * the card does not need to be removed at
+             * the end of the test.
+             */
+            hifDisableFunc(device, func);
+        }
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27) && defined(CONFIG_PM)
     } else {
         AR_DEBUG_PRINTF(ATH_DEBUG_TRACE,
@@ -2584,9 +2605,59 @@ static void hif_flush_async_task(HIF_DEVICE *device)
     }
 }
 
+/**
+ * hif_reset_target() - Reset target device
+ * @hif_device: pointer to hif_device structure
+ *
+ * Reset the target by invoking power off and power on
+ * sequence to bring back target into active state.
+ * This API shall be called only when driver load/unload
+ * is in progress.
+ *
+ * Return: 0 on success, error for failure case.
+ */
+static int hif_reset_target(HIF_DEVICE *hif_device)
+{
+	int ret;
+
+	if (!hif_device || !hif_device->func|| !hif_device->func->card) {
+		AR_DEBUG_PRINTF(ATH_DEBUG_ERROR,
+			("AR6000: %s invalid HIF DEVICE \n", __func__));
+		return -ENODEV;
+	}
+	/* Disable sdio func->pull down WLAN_EN-->pull down DAT_2 line */
+	ret = mmc_power_save_host(hif_device->func->card->host);
+	if(ret) {
+		AR_DEBUG_PRINTF(ATH_DEBUG_ERROR,
+			("AR6000: %s Failed to save mmc Power host %d\n",
+			__func__, ret));
+		goto done;
+	}
+
+	/* pull up DAT_2 line->pull up WLAN_EN-->Enable sdio func */
+	ret = mmc_power_restore_host(hif_device->func->card->host);
+	if(ret) {
+		AR_DEBUG_PRINTF(ATH_DEBUG_ERROR,
+			("AR6000: %s Failed to restore mmc Power host %d\n",
+			__func__, ret));
+	}
+
+done:
+	return ret;
+}
+
 void HIFDetachHTC(HIF_DEVICE *device)
 {
     hif_flush_async_task(device);
+    if (device->ctrl_response_timeout) {
+        /* Reset the target by invoking power off and power on sequence to
+         * the card to bring back into active state.
+         */
+        if(hif_reset_target(device))
+            VOS_BUG(0);
+        device->ctrl_response_timeout = false;
+    }
+
     A_MEMZERO(&device->htcCallbacks,sizeof(device->htcCallbacks));
 }
 
@@ -2717,12 +2788,21 @@ static int hif_sdio_device_inserted(struct sdio_func *func, const struct sdio_de
 
 static void hif_sdio_device_removed(struct sdio_func *func)
 {
-	if (func != NULL)
-		hifDeviceRemoved(func);
+	HIF_DEVICE * device = NULL;
+
+	if (func != NULL) {
+		device = getHifDevice(func);
+		if (device != NULL)
+			hifDeviceRemoved(func);
+	}
 }
 
 static int hif_sdio_device_reinit(struct sdio_func *func, const struct sdio_device_id * id)
 {
+	if (vos_is_load_unload_in_progress(VOS_MODULE_ID_HIF, NULL)) {
+		printk("Load/unload in progress, ignore SSR reinit\n");
+		return 0;
+	}
 	if ((func != NULL) && (id != NULL))
 		return hifDeviceInserted(func, id);
 	else
@@ -2734,6 +2814,11 @@ static int hif_sdio_device_reinit(struct sdio_func *func, const struct sdio_devi
 static void hif_sdio_device_shutdown(struct sdio_func *func)
 {
 	vos_set_logp_in_progress(VOS_MODULE_ID_HIF, TRUE);
+	if (vos_is_load_unload_in_progress(VOS_MODULE_ID_HIF, NULL)) {
+		vos_set_logp_in_progress(VOS_MODULE_ID_HIF, FALSE);
+		printk("Load/unload in progress, ignore SSR shutdown\n");
+		return;
+	}
 	vos_set_shutdown_in_progress(VOS_MODULE_ID_HIF, TRUE);
 	if (!vos_is_ssr_ready(__func__))
 		pr_err(" %s Host driver is not ready for SSR, attempting anyway\n", __func__);
@@ -2762,42 +2847,23 @@ static int hif_sdio_device_resume(struct device *dev)
 #endif
 
 /**
- * hif_reset_target() - Reset target device
+ * hif_set_target_reset() - Reset target device
  * @hif_device: pointer to hif_device structure
  *
- * Reset the target by invoking power off and power on
- * sequence to bring back target into active state.
+ * Set the target reset flag.
  * This API shall be called only when driver load/unload
  * is in progress.
  *
  * Return: 0 on success, error for failure case.
  */
-int hif_reset_target(HIF_DEVICE *hif_device)
+int hif_set_target_reset(HIF_DEVICE *hif_device)
 {
-	int ret;
-
 	if (!hif_device || !hif_device->func|| !hif_device->func->card) {
 		AR_DEBUG_PRINTF(ATH_DEBUG_ERROR,
 			("AR6000: %s invalid HIF DEVICE \n", __func__));
 		return -ENODEV;
 	}
-	/* Disable sdio func->pull down WLAN_EN-->pull down DAT_2 line */
-	ret = mmc_power_save_host(hif_device->func->card->host);
-	if(ret) {
-		AR_DEBUG_PRINTF(ATH_DEBUG_ERROR,
-			("AR6000: %s Failed to save mmc Power host %d\n",
-			__func__, ret));
-		goto done;
-	}
+	hif_device->ctrl_response_timeout = true;
 
-	/* pull up DAT_2 line->pull up WLAN_EN-->Enable sdio func */
-	ret = mmc_power_restore_host(hif_device->func->card->host);
-	if(ret) {
-		AR_DEBUG_PRINTF(ATH_DEBUG_ERROR,
-			("AR6000: %s Failed to restore mmc Power host %d\n",
-			__func__, ret));
-	}
-
-done:
-	return ret;
+	return 0;
 }

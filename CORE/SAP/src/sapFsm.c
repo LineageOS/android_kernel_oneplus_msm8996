@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1382,6 +1382,37 @@ sap_check_in_avoid_ch_list(ptSapContext sap_ctx, uint8_t channel)
 }
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
+/**
+ * sap_is_valid_acs_channel() - checks if given channel is in acs channel range
+ * @sap_ctx: sap context.
+ * @channel: channel to be checked in acs range
+ *
+ * Return: true, if channel is valid, false otherwise.
+ */
+static bool sap_is_valid_acs_channel(ptSapContext sap_ctx, uint8_t channel)
+{
+	int i = 0;
+
+	/* Check whether acs is enabled */
+	if (!sap_ctx->acs_cfg->acs_mode)
+		return true;
+
+	if ((channel < sap_ctx->acs_cfg->start_ch) ||
+			(channel > sap_ctx->acs_cfg->end_ch)) {
+		return false;
+	}
+	if (!sap_ctx->acs_cfg->ch_list) {
+		/* List not present, return */
+		return true;
+	} else {
+		for (i = 0; i < sap_ctx->acs_cfg->ch_list_count; i++)
+			if (channel == sap_ctx->acs_cfg->ch_list[i])
+				return true;
+	}
+
+	return false;
+}
+
 /*
  * This function randomly pick up an AVAILABLE channel
  */
@@ -1397,7 +1428,7 @@ static v_U8_t sapRandomChannelSel(ptSapContext sapContext)
     uint8_t  avail_non_dfs_chan_list[WNI_CFG_VALID_CHANNEL_LIST_LEN] = {0,};
     v_U8_t   target_channel = 0;
     v_BOOL_t isChannelNol = VOS_FALSE;
-    v_BOOL_t isOutOfRange = VOS_FALSE;
+    v_BOOL_t is_valid_acs_chan = VOS_FALSE;
     chan_bonding_bitmap channelBitmap;
     v_U8_t   i = 0;
     v_U8_t   channelID;
@@ -1567,16 +1598,17 @@ static v_U8_t sapRandomChannelSel(ptSapContext sapContext)
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
         /* check if the channel is within ACS channel range */
-        isOutOfRange = sapAcsChannelCheck(sapContext,
+        is_valid_acs_chan = sap_is_valid_acs_channel(sapContext,
                                           channelID);
-        if (VOS_TRUE == isOutOfRange)
+        if (is_valid_acs_chan == false)
         {
             /*
              * mark this channel invalid since it is out of ACS channel range
              */
             VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_LOW,
-                     FL("index: %d, Channel = %d out of ACS channel range"),
-                     i, channelID);
+                     FL("index: %d, Channel=%d out of ACS channel range %d-%d"),
+                     i, channelID, sapContext->acs_cfg->start_ch,
+                     sapContext->acs_cfg->end_ch);
             sapContext->SapAllChnlList.channelList[i].valid = VOS_FALSE;
             valid_chnl_count--;
             continue;
@@ -1761,26 +1793,6 @@ static v_U8_t sapRandomChannelSel(ptSapContext sapContext)
     return target_channel;
 }
 
-v_BOOL_t
-sapAcsChannelCheck(ptSapContext sapContext, v_U8_t channelNumber)
-{
-    int i = 0;
-    if (!sapContext->acs_cfg->acs_mode)
-        return VOS_FALSE;
-
-    if ((channelNumber >= sapContext->acs_cfg->start_ch) ||
-        (channelNumber <= sapContext->acs_cfg->end_ch)) {
-        if (!sapContext->acs_cfg->ch_list) {
-            return VOS_FALSE;
-        } else {
-            for (i = 0; i < sapContext->acs_cfg->ch_list_count; i++)
-                if (channelNumber == sapContext->acs_cfg->ch_list[i])
-                    return VOS_FALSE;
-        }
-    }
-    return VOS_TRUE;
-}
-
 /*
  * Mark the channels in NOL with time and eSAP_DFS_CHANNEL_UNAVAILABLE
  */
@@ -1954,7 +1966,7 @@ v_BOOL_t
 sapDfsIsChannelInNolList(ptSapContext sapContext, v_U8_t channelNumber,
         ePhyChanBondState chanBondState)
 {
-    int i, j;
+    int i = 0, j;
     v_U64_t timeElapsedSinceLastRadar,timeWhenRadarFound,currentTime = 0;
     v_U64_t max_jiffies;
     tHalHandle hHal = VOS_GET_HAL_CB(sapContext->pvosGCtx);
@@ -2686,7 +2698,8 @@ sapGotoChannelSel
             sapContext->dfs_ch_disable = VOS_TRUE;
         else if (VOS_IS_DFS_CH(sapContext->channel)) {
             VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_WARN,
-                       "In %s, DFS not supported in STA_AP Mode", __func__);
+                       "In %s, DFS not supported in STA_AP Mode, chan=%d",
+                       __func__, sapContext->channel);
             return VOS_STATUS_E_ABORTED;
         }
 #endif
@@ -2708,6 +2721,9 @@ sapGotoChannelSel
         if (con_ch)
         { /*if a valid channel is returned then use concurrent channel.
                   Else take whatever comes from configuartion*/
+            VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO,
+                FL("Channel overridden due to MCC->SCC switch: %d -> %d"),
+                sapContext->channel, con_ch);
             sapContext->channel = con_ch;
             sme_SelectCBMode(hHal, sapContext->csrRoamProfile.phyMode,
                                 con_ch, 0, &sapContext->vht_channel_width,
@@ -2888,7 +2904,6 @@ sapGotoChannelSel
                        __func__, sapContext->channel);
 
             sapContext->acs_cfg->pri_ch = sapContext->channel;
-            sapContext->acs_cfg->ch_width = sapContext->ch_width_orig;
             sap_config_acs_result(hHal, sapContext, 0);
             return VOS_STATUS_E_CANCELED;
         }
@@ -3106,7 +3121,7 @@ sapGotoDisconnecting
     return VOS_STATUS_SUCCESS;
 }
 
-static eHalStatus sapRoamSessionCloseCallback(void *pContext)
+eHalStatus sapRoamSessionCloseCallback(void *pContext)
 {
     ptSapContext sapContext = (ptSapContext)pContext;
     return sapSignalHDDevent(sapContext, NULL,
@@ -3251,6 +3266,9 @@ sapSignalHDDevent
             sapApAppEvent.sapevt.sapAssocIndication.assocReqLength = pCsrRoamInfo->assocReqLength;
             sapApAppEvent.sapevt.sapAssocIndication.assocReqPtr = pCsrRoamInfo->assocReqPtr;
             sapApAppEvent.sapevt.sapAssocIndication.fWmmEnabled = pCsrRoamInfo->wmmEnabledSta;
+            sapApAppEvent.sapevt.sapAssocIndication.ecsa_capable =
+                pCsrRoamInfo->ecsa_capable;
+
             if ( pCsrRoamInfo->u.pConnectedProfile != NULL )
             {
                sapApAppEvent.sapevt.sapAssocIndication.negotiatedAuthType = pCsrRoamInfo->u.pConnectedProfile->AuthType;
@@ -3270,7 +3288,9 @@ sapSignalHDDevent
             }
             else
             {
-                sapApAppEvent.sapevt.sapStartBssCompleteEvent.staId = 0;
+                sapApAppEvent.sapevt.sapStartBssCompleteEvent.staId =
+                    tl_shim_get_sta_id_by_addr(sapContext->pvosGCtx,
+                        sapContext->self_mac_addr);
             }
 
             VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH, "%s(eSAP_START_BSS_EVENT): staId = %d",
@@ -3333,6 +3353,10 @@ sapSignalHDDevent
         case eSAP_STA_REASSOC_EVENT:
         {
             tSirSmeChanInfo *pChanInfo;
+            tSap_StationAssocReassocCompleteEvent *sta_event_ptr;
+
+            sta_event_ptr =
+                &sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent;
             VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
                        FL("SAP event callback event = %s"),
                           "eSAP_STA_ASSOC_EVENT");
@@ -3342,21 +3366,32 @@ sapSignalHDDevent
                 sapApAppEvent.sapHddEventCode = eSAP_STA_ASSOC_EVENT;
 
             //TODO: Need to fill the SET KEY information and pass to HDD
-            vos_mem_copy( &sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.staMac,
+            vos_mem_copy(&sta_event_ptr->staMac,
                          pCsrRoamInfo->peerMac,sizeof(tSirMacAddr));
-            sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.staId = pCsrRoamInfo->staId ;
-            sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.statusCode = pCsrRoamInfo->statusCode;
-            sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.iesLen = pCsrRoamInfo->rsnIELen;
-            vos_mem_copy(sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.ies, pCsrRoamInfo->prsnIE,
-                        pCsrRoamInfo->rsnIELen);
+            sta_event_ptr->staId = pCsrRoamInfo->staId;
+            sta_event_ptr->statusCode = pCsrRoamInfo->statusCode;
+            sta_event_ptr->iesLen = pCsrRoamInfo->rsnIELen;
+            vos_mem_copy(sta_event_ptr->ies, pCsrRoamInfo->prsnIE,
+                         pCsrRoamInfo->rsnIELen);
+            sta_event_ptr->ampdu = pCsrRoamInfo->ampdu;
+            sta_event_ptr->sgi_enable = pCsrRoamInfo->sgi_enable;
+            sta_event_ptr->tx_stbc = pCsrRoamInfo->tx_stbc;
+            sta_event_ptr->rx_stbc = pCsrRoamInfo->rx_stbc;
+            sta_event_ptr->ch_width = pCsrRoamInfo->ch_width;
+            sta_event_ptr->mode = pCsrRoamInfo->mode;
+            sta_event_ptr->max_supp_idx = pCsrRoamInfo->max_supp_idx;
+            sta_event_ptr->max_ext_idx = pCsrRoamInfo->max_ext_idx;
+            sta_event_ptr->max_mcs_idx = pCsrRoamInfo->max_mcs_idx;
+            sta_event_ptr->rx_mcs_map = pCsrRoamInfo->rx_mcs_map;
+            sta_event_ptr->tx_mcs_map = pCsrRoamInfo->tx_mcs_map;
 
 #ifdef FEATURE_WLAN_WAPI
             if(pCsrRoamInfo->wapiIELen)
             {
-                v_U8_t  len = sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.iesLen;
-                sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.iesLen
+                v_U8_t  len = sta_event_ptr->iesLen;
+                sta_event_ptr->iesLen
                                                         += pCsrRoamInfo->wapiIELen;
-                vos_mem_copy(&sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.ies[len],
+                vos_mem_copy(&sta_event_ptr->ies[len],
                         pCsrRoamInfo->pwapiIE,
                             pCsrRoamInfo->wapiIELen);
             }
@@ -3364,16 +3399,16 @@ sapSignalHDDevent
 
             if(pCsrRoamInfo->addIELen)
             {
-                v_U8_t  len = sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.iesLen;
-                sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.iesLen
+                v_U8_t  len = sta_event_ptr->iesLen;
+                sta_event_ptr->iesLen
                                                         += pCsrRoamInfo->addIELen;
-                vos_mem_copy(&sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.ies[len], pCsrRoamInfo->paddIE,
+                vos_mem_copy(&sta_event_ptr->ies[len], pCsrRoamInfo->paddIE,
                             pCsrRoamInfo->addIELen);
             }
 
             /* also fill up the channel info from the csrRoamInfo */
             pChanInfo =
-            &sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.chan_info;
+            &sta_event_ptr->chan_info;
 
             pChanInfo->chan_id = pCsrRoamInfo->chan_info.chan_id;
             pChanInfo->mhz = pCsrRoamInfo->chan_info.mhz;
@@ -3386,9 +3421,10 @@ sapSignalHDDevent
             pChanInfo->rate_flags = pCsrRoamInfo->chan_info.rate_flags;
             pChanInfo->sub20_channelwidth =
                                      pCsrRoamInfo->chan_info.sub20_channelwidth;
-            sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.wmmEnabled = pCsrRoamInfo->wmmEnabledSta;
-            sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.status = (eSapStatus )context;
-            sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.timingMeasCap = pCsrRoamInfo->timingMeasCap;
+            sta_event_ptr->wmmEnabled = pCsrRoamInfo->wmmEnabledSta;
+            sta_event_ptr->status = (eSapStatus )context;
+            sta_event_ptr->timingMeasCap = pCsrRoamInfo->timingMeasCap;
+            sta_event_ptr->ecsa_capable = pCsrRoamInfo->ecsa_capable;
             //TODO: Need to fill sapAuthType
             //sapApAppEvent.sapevt.sapStationAssocReassocCompleteEvent.SapAuthType = pCsrRoamInfo->pProfile->negotiatedAuthType;
             break;
@@ -3874,6 +3910,53 @@ VOS_STATUS sap_CacEndNotify(tHalHandle hHal, tCsrRoamInfo *roamInfo)
       return vosStatus;
 }
 
+/**
+ * sap_relaunch_acs_result_handler() - handle relaunched ACS result
+ * @sap_context: pointer of ptSapContext
+ * @roam_info:   pointer to tCsrRoamInfo which contains result channel
+ *
+ * This function handle the relaunched ACS result and check if need to
+ * trigger CSA.
+ *
+ * Return: VOS_STATUS
+ */
+VOS_STATUS
+sap_relaunch_acs_result_handler(ptSapContext sap_context,
+				tCsrRoamInfo *roam_info)
+{
+	VOS_STATUS vos_status;
+
+	vos_mem_zero(sap_context->acs_cfg,
+		     sizeof(struct sap_acs_cfg));
+
+	vos_status = sapSignalHDDevent(sap_context, NULL,
+				       eSAP_ACS_CHANNEL_SELECTED,
+				       (v_PVOID_t)eSAP_STATUS_SUCCESS);
+
+	if (!VOS_IS_STATUS_SUCCESS(vos_status))
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+			  FL("Failed to indicate ACS complete."));
+
+	VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO,
+		  "In %s: acs_target_channel=%d cur_channel=%d",
+		  __func__,
+		  roam_info->target_channel,
+		  sap_context->channel);
+
+	if (!((roam_info->target_channel == sap_context->channel) ||
+	      (roam_info->target_channel == SAP_CHANNEL_NOT_SELECTED))) {
+		vos_status = sapSignalHDDevent(sap_context, roam_info,
+					       eSAP_ECSA_CHANGE_CHAN_IND,
+					       (v_PVOID_t)NULL);
+		if (!VOS_IS_STATUS_SUCCESS(vos_status))
+			VOS_TRACE(VOS_MODULE_ID_SAP,
+				  VOS_TRACE_LEVEL_ERROR,
+				  FL("trigger channel switch failed"));
+	}
+
+	return vos_status;
+}
+
 /*==========================================================================
   FUNCTION    sapFsm
 
@@ -4125,6 +4208,8 @@ sapFsm
                  VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
                            "\n\n***In %s, Cannot start BSS, ACS Fail***\n\n",
                              __func__);
+                sapSignalHDDevent(sapContext, NULL, eSAP_START_BSS_EVENT,
+                               (v_PVOID_t) eSAP_STATUS_FAILURE);
             } else if (msg == eSAP_HDD_STOP_INFRA_BSS) {
                  sapContext->sapsMachine = eSAP_DISCONNECTED;
                  sapSignalHDDevent(sapContext, NULL, eSAP_START_BSS_EVENT,
@@ -4435,6 +4520,27 @@ sapFsm
                         }
                     }
                 }
+            } else if (eSAP_MAC_SCAN_COMPLETE == msg) {
+                if (!sapContext->acs_cfg->acs_mode) {
+                    VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                              "In %s, not a in ACS mode", __func__);
+                    return VOS_STATUS_E_INVAL;
+                }
+
+                VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                          "In %s, ACS scan complete in state %s",
+                          __func__,
+                          "eSAP_STARTED");
+
+                if (!roamInfo) {
+                    VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                              "In %s, roam info can't be NULL",
+                              __func__);
+                    return VOS_STATUS_E_INVAL;
+                }
+
+                vosStatus = sap_relaunch_acs_result_handler(sapContext,
+                                                            roamInfo);
             }
             else
             {

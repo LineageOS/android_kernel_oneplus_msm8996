@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -467,8 +467,10 @@ typedef struct {
 	u_int32_t txpow5g;
 	u_int32_t burst_enable;
 	u_int32_t burst_dur;
-	u_int32_t chainmask_2g;
-	u_int32_t chainmask_5g;
+	u_int32_t chainmask_2g_tx;
+	u_int32_t chainmask_5g_tx;
+	u_int32_t chainmask_2g_rx;
+	u_int32_t chainmask_5g_rx;
 } pdev_cli_config_t;
 
 typedef struct {
@@ -644,7 +646,9 @@ struct wma_txrx_node {
 	uint8_t wep_default_key_idx;
 	bool is_vdev_valid;
 	uint16_t channelwidth;
-
+	struct action_frame_random_filter *action_frame_filter;
+	uint8_t in_bmps;
+	uint8_t in_imps;
 };
 
 #if defined(QCA_WIFI_FTM)
@@ -774,6 +778,7 @@ typedef struct wma_handle {
 	wda_tgt_cfg_cb tgt_cfg_update_cb;
    /*Callback to indicate radar to HDD*/
    wda_dfs_radar_indication_cb dfs_radar_indication_cb;
+	wda_dfs_block_tx_cb dfs_block_tx_cb;
 	HAL_REG_CAPABILITIES reg_cap;
 	u_int32_t scan_id;
 	struct wma_txrx_node *interfaces;
@@ -802,7 +807,7 @@ typedef struct wma_handle {
 	v_BOOL_t ptrn_match_enable_all_vdev;
 	void* pGetRssiReq;
 	v_S7_t first_rssi;
-	bool get_sta_rssi;
+	bool get_sta_peer_info;
 	v_MACADDR_t peer_macaddr;
 	t_thermal_mgmt thermal_mgmt_info;
         v_BOOL_t  roam_offload_enabled;
@@ -843,9 +848,18 @@ typedef struct wma_handle {
 	vos_wake_lock_t extscan_wake_lock;
 #endif
 	vos_wake_lock_t wow_wake_lock;
+	vos_wake_lock_t wow_auth_req_wl;
+	vos_wake_lock_t wow_assoc_req_wl;
+	vos_wake_lock_t wow_deauth_rec_wl;
+	vos_wake_lock_t wow_disassoc_rec_wl;
+	vos_wake_lock_t wow_ap_assoc_lost_wl;
+	vos_wake_lock_t wow_auto_shutdown_wl;
+
 	int wow_nack;
 	u_int32_t ap_client_cnt;
 	adf_os_atomic_t is_wow_bus_suspended;
+	adf_os_atomic_t dfs_wmi_event_pending;
+	adf_os_atomic_t dfs_wmi_event_dropped;
 
 	vos_timer_t wma_scan_comp_timer;
 	scan_timer_info wma_scan_timer_info;
@@ -908,6 +922,7 @@ typedef struct wma_handle {
 	uint32_t wow_gscan_wake_up_count;
 	uint32_t wow_low_rssi_wake_up_count;
 	uint32_t wow_rssi_breach_wake_up_count;
+	uint32_t wow_pwr_save_fail_detected_wake_up_count;
 	uint32_t wow_ucast_wake_up_count;
 	uint32_t wow_bcast_wake_up_count;
 	uint32_t wow_ipv4_mcast_wake_up_count;
@@ -918,8 +933,8 @@ typedef struct wma_handle {
 	uint32_t wow_icmpv4_count;
 	uint32_t wow_icmpv6_count;
 	uint32_t wow_oem_response_wake_up_count;
-	uint32_t wow_wakeup_enable_mask;
-	uint32_t wow_wakeup_disable_mask;
+	uint32_t wow_wakeup_enable_mask[4];
+	uint32_t wow_wakeup_disable_mask[4];
 	uint16_t max_mgmt_tx_fail_count;
 	uint32_t ccmp_replays_attack_cnt;
 
@@ -936,6 +951,7 @@ typedef struct wma_handle {
 	struct sir_allowed_action_frames allowed_action_frames;
 	tSirAddonPsReq psSetting;
 	bool sub_20_support;
+	bool get_one_peer_info;
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {
@@ -1471,6 +1487,8 @@ VOS_STATUS wma_send_snr_request(tp_wma_handle wma_handle, void *pGetRssiReq,
 #define WMA_DISASSOC_RECV_WAKE_LOCK_DURATION	(5 * 1000) /* in msec */
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 #define WMA_AUTO_SHUTDOWN_WAKE_LOCK_DURATION    (5 * 1000) /* in msec */
+#else
+#define WMA_AUTO_SHUTDOWN_WAKE_LOCK_DURATION 0
 #endif
 #define WMA_BMISS_EVENT_WAKE_LOCK_DURATION      (4 * 1000) /* in msec */
 
@@ -1686,6 +1704,22 @@ int ol_if_dfs_get_mib_cycle_counts_pct(struct ieee80211com *ic,
 u_int16_t ol_if_dfs_usenol(struct ieee80211com *ic);
 void ieee80211_mark_dfs(struct ieee80211com *ic,
                                struct ieee80211_channel *ichan);
+/**
+ * wma_update_dfs_cac_block_tx - to set dfs_cac_block_tx flag
+ * @cac_block_tx: value to be set
+ *
+ * Return: none
+ */
+void wma_update_dfs_cac_block_tx(bool cac_block_tx);
+/**
+ * ieee80211_update_dfs_cac_block_tx() - to set dfs_cac_block_tx flag
+ * @cac_block_tx: value to be set
+ *
+ * Return: none
+ */
+static inline void ieee80211_update_dfs_cac_block_tx(bool cac_block_tx) {
+	wma_update_dfs_cac_block_tx(cac_block_tx);
+}
 int  wma_dfs_indicate_radar(struct ieee80211com *ic,
                                struct ieee80211_channel *ichan);
 u_int16_t   dfs_usenol(struct ieee80211com *ic);
@@ -1797,7 +1831,7 @@ uint32_t wma_get_vht_ch_width(void);
 VOS_STATUS wma_get_wakelock_stats(struct sir_wake_lock_stats *wake_lock_stats);
 VOS_STATUS wma_set_tx_rx_aggregation_size
 	(struct sir_set_tx_rx_aggregation_size *tx_rx_aggregation_size);
-VOS_STATUS wma_set_powersave_config(uint8_t val);
+VOS_STATUS wma_set_powersave_config(uint8_t vdev_id, uint8_t val);
 
 /**
  * wma_find_vdev_by_id() - Find vdev handle for given vdev id.
@@ -1860,10 +1894,25 @@ struct wma_version_info {
 	u_int32_t revision;
 };
 
+/**
+ * wma_stop_radar_delay_timer() - stop radar delay found event timer
+ *
+ * Return: none
+ */
+void wma_stop_radar_delay_timer(void);
+
+/**
+ * wma_ignore_radar_soon_after_assoc() - ignore radar found 300ms after assoc
+ *
+ * Return: none
+ */
+void wma_ignore_radar_soon_after_assoc(void);
+
 void wma_remove_peer(tp_wma_handle wma, u_int8_t *bssid,
 			u_int8_t vdev_id, ol_txrx_peer_handle peer,
 			v_BOOL_t roam_synch_in_progress);
 
+#define WOW_BITMAP_FIELD_SIZE 32
 void wma_add_wow_wakeup_event(tp_wma_handle wma, WOW_WAKE_EVENT_TYPE event,
 			bool enable);
 VOS_STATUS wma_create_peer(tp_wma_handle wma, ol_txrx_pdev_handle pdev,
@@ -1873,4 +1922,10 @@ VOS_STATUS wma_create_peer(tp_wma_handle wma, ol_txrx_pdev_handle pdev,
 WLAN_PHY_MODE wma_chan_to_mode(uint8_t chan, ePhyChanBondState chan_offset,
 		uint8_t vht_capable, uint8_t dot11_mode);
 
+#define RESET_BEACON_INTERVAL_TIMEOUT 200
+struct wma_beacon_interval_reset_req {
+	vos_timer_t event_timeout;
+	uint8_t vdev_id;
+	uint16_t interval;
+};
 #endif

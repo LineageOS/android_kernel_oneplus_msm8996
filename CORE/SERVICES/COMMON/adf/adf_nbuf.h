@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -121,6 +121,8 @@
  * @rate: Rate in terms 500Kbps
  * @ant_signal_db: Rx packet RSSI
  * @nr_ant: Number of Antennas used for streaming
+ * @mcs_info: Parsed ht sig info
+ * @vht_info: Parsed vht sig info
  */
 
 struct mon_rx_status {
@@ -131,6 +133,36 @@ struct mon_rx_status {
 	uint8_t  rate;
 	uint8_t  ant_signal_db;
 	uint8_t  nr_ant;
+	struct mon_rx_mcs_info {
+		uint8_t  valid;
+		uint32_t mcs: 7,
+			 bw: 1,
+			 smoothing: 1,
+			 not_sounding: 1,
+			 aggregation: 1,
+			 stbc: 2,
+			 fec: 1,
+			 sgi: 1,
+			 ness: 2,
+			 reserved: 15;
+	} mcs_info;
+
+	struct mon_rx_vht_info {
+		uint8_t  valid;
+		uint32_t bw: 2,
+			 stbc: 1,
+			 gid: 6,
+			 nss: 3,
+			 paid: 9,
+			 txps_forbidden: 1,
+			 sgi: 1,
+			 sgi_disambiguation: 1,
+			 coding: 1,
+			 ldpc_extra_symbol: 1,
+			 mcs: 4,
+			 beamformed: 1,
+			 reserved: 1;
+	} vht_info;
 };
 
 /* DHCP Related Mask */
@@ -178,17 +210,65 @@ struct mon_rx_status {
 #define ICMPV6_SUBTYPE_OFFSET         54
 #define ICMPV6_REQUEST                0x80
 #define ICMPV6_RESPONSE               0x81
+#define ICMPV6_RS                     0x85
+#define ICMPV6_RA                     0x86
 #define ICMPV6_NS                     0x87
 #define ICMPV6_NA                     0x88
 #define ADF_NBUF_IPA_CHECK_MASK       0x80000000
 
+/**
+ * adf_proto_type - protocol type
+ * @ADF_PROTO_TYPE_DHCP - DHCP
+ * @ADF_PROTO_TYPE_EAPOL - EAPOL
+ * @ADF_PROTO_TYPE_ARP - ARP
+ * @ADF_PROTO_TYPE_MGMT - MGMT
+ * @ADF_PROTO_TYPE_EVENT - EVENT
+ */
 enum adf_proto_type {
 	ADF_PROTO_TYPE_DHCP = 0,
 	ADF_PROTO_TYPE_EAPOL,
 	ADF_PROTO_TYPE_ARP,
+	ADF_PROTO_TYPE_MGMT,
+	ADF_PROTO_TYPE_EVENT,
 	ADF_PROTO_TYPE_MAX
 };
 
+/**
+ * adf_proto_subtype - subtype of packet
+ * @ADF_PROTO_EAPOL_M1 - EAPOL 1/4
+ * @ADF_PROTO_EAPOL_M2 - EAPOL 2/4
+ * @ADF_PROTO_EAPOL_M3 - EAPOL 3/4
+ * @ADF_PROTO_EAPOL_M4 - EAPOL 4/4
+ * @ADF_PROTO_DHCP_DISCOVER - discover
+ * @ADF_PROTO_DHCP_REQUEST - request
+ * @ADF_PROTO_DHCP_OFFER - offer
+ * @ADF_PROTO_DHCP_ACK - ACK
+ * @ADF_PROTO_DHCP_NACK - NACK
+ * @ADF_PROTO_DHCP_RELEASE - release
+ * @ADF_PROTO_DHCP_INFORM - inform
+ * @ADF_PROTO_DHCP_DECLINE - decline
+ * @ADF_PROTO_ARP_REQ - arp request
+ * @ADF_PROTO_ARP_RES - arp response
+ * @ADF_PROTO_ICMP_REQ - icmp request
+ * @ADF_PROTO_ICMP_RES - icmp response
+ * @ADF_PROTO_ICMPV6_REQ - icmpv6 request
+ * @ADF_PROTO_ICMPV6_RES - icmpv6 response
+ * @ADF_PROTO_ICMPV6_RS - icmpv6 rs packet
+ * @ADF_PROTO_ICMPV6_RA - icmpv6 ra packet
+ * @ADF_PROTO_ICMPV6_NS - icmpv6 ns packet
+ * @ADF_PROTO_ICMPV6_NA - icmpv6 na packet
+ * @ADF_PROTO_IPV4_UDP - ipv4 udp
+ * @ADF_PROTO_IPV4_TCP - ipv4 tcp
+ * @ADF_PROTO_IPV6_UDP - ipv6 udp
+ * @ADF_PROTO_IPV6_TCP - ipv6 tcp
+ * @ADF_PROTO_MGMT_ASSOC -assoc
+ * @ADF_PROTO_MGMT_DISASSOC - disassoc
+ * @ADF_PROTO_MGMT_AUTH - auth
+ * @ADF_PROTO_MGMT_DEAUTH - deauth
+ * @ADF_ROAM_SYNCH - roam synch indication from fw
+ * @ADF_ROAM_COMPLETE - roam complete cmd to fw
+ * @ADF_ROAM_EVENTID - roam eventid from fw
+ */
 enum adf_proto_subtype {
 	ADF_PROTO_INVALID = 0,
 	ADF_PROTO_EAPOL_M1,
@@ -205,17 +285,25 @@ enum adf_proto_subtype {
 	ADF_PROTO_DHCP_DECLINE,
 	ADF_PROTO_ARP_REQ,
 	ADF_PROTO_ARP_RES,
-	ADF_PROTO_ARP_SUBTYPE,
 	ADF_PROTO_ICMP_REQ,
 	ADF_PROTO_ICMP_RES,
 	ADF_PROTO_ICMPV6_REQ,
 	ADF_PROTO_ICMPV6_RES,
+	ADF_PROTO_ICMPV6_RS,
+	ADF_PROTO_ICMPV6_RA,
 	ADF_PROTO_ICMPV6_NS,
 	ADF_PROTO_ICMPV6_NA,
 	ADF_PROTO_IPV4_UDP,
 	ADF_PROTO_IPV4_TCP,
 	ADF_PROTO_IPV6_UDP,
 	ADF_PROTO_IPV6_TCP,
+	ADF_PROTO_MGMT_ASSOC,
+	ADF_PROTO_MGMT_DISASSOC,
+	ADF_PROTO_MGMT_AUTH,
+	ADF_PROTO_MGMT_DEAUTH,
+	ADF_ROAM_SYNCH,
+	ADF_ROAM_COMPLETE,
+	ADF_ROAM_EVENTID,
 	ADF_PROTO_SUBTYPE_MAX
 };
 

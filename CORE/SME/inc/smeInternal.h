@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -206,9 +206,17 @@ typedef struct tagSmeStruct
     /* link speed callback */
     void (*pLinkSpeedIndCb) (tSirLinkSpeedInfo *indParam, void *pDevContext);
     void *pLinkSpeedCbContext;
-    /* get rssi callback */
-    void (*pget_rssi_ind_cb) (struct sir_rssi_resp *param, void *pcontext);
-    void *pget_rssi_cb_context;
+    /* get peer info callback */
+    void (*pget_peer_info_ind_cb) (struct sir_peer_info_resp *param,
+		    void *pcontext);
+    void *pget_peer_info_cb_context;
+    /* get extended peer info callback */
+    void (*pget_peer_info_ext_ind_cb) (struct sir_peer_info_ext_resp *param,
+		    void *pcontext);
+    void *pget_peer_info_ext_cb_context;
+    /* get isolation callback */
+    void (*get_isolation) (struct sir_isolation_resp *param, void *context);
+    void *get_isolation_cb_context;
 #ifdef FEATURE_WLAN_EXTSCAN
     void (*pExtScanIndCb) (void *, const tANI_U16, void *);
 #endif /* FEATURE_WLAN_EXTSCAN */
@@ -255,6 +263,8 @@ typedef struct tagSmeStruct
     void *mib_stats_context;
     void (*csr_mib_stats_callback) (struct mib_stats_metrics*, void*);
     void (*stats_ext2_cb)(void *, struct stats_ext2_event *);
+    void (*chip_power_save_fail_cb)(void *,
+			struct chip_pwr_save_fail_detected_params *);
 } tSmeStruct, *tpSmeStruct;
 
 

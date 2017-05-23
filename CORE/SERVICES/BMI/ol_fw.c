@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -26,6 +26,7 @@
  */
 
 #include <linux/firmware.h>
+#include <linux/pm_qos.h>
 #include "ol_if_athvar.h"
 #include "ol_fw.h"
 #include "targaddrs.h"
@@ -680,9 +681,10 @@ static int __ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 		break;
 	}
 
-	if (request_firmware(&fw_entry, filename, scn->sc_osdev->device) != 0)
+       status = request_firmware(&fw_entry, filename, scn->sc_osdev->device);
+	if (status)
 	{
-		pr_err("%s: Failed to get %s\n", __func__, filename);
+		pr_err("%s: Failed to get %s:%d\n", __func__, filename, status);
 
 		if (file == ATH_OTP_FILE)
 			return -ENOENT;
@@ -700,10 +702,11 @@ static int __ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 			pr_info("%s: Trying to load default %s\n",
 							__func__, filename);
 
-			if (request_firmware(&fw_entry, filename,
-					scn->sc_osdev->device) != 0) {
-				pr_err("%s: Failed to get %s\n",
-							__func__, filename);
+			status = request_firmware(&fw_entry, filename,
+					scn->sc_osdev->device);
+			if (status) {
+				pr_err("%s: Failed to get %s:%d\n",
+						__func__, filename, status);
 				kfree(bd_id_filename);
 				return -1;
 			}
@@ -717,9 +720,8 @@ static int __ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 
 	if (!fw_entry || !fw_entry->data) {
 		pr_err("%s: Invalid fw_entries\n", __func__);
-		if (bd_id_filename)
-			kfree(bd_id_filename);
-		return A_ERROR;
+		status = A_NO_MEMORY;
+		goto release_fw;
 	}
 
 	fw_entry_size = fw_entry->size;
@@ -909,7 +911,8 @@ end:
 		(filename!=NULL)?filename:"", fw_entry_size);
 
 release_fw:
-	release_firmware(fw_entry);
+	if (fw_entry)
+		release_firmware(fw_entry);
 
 	if (bd_id_filename)
 		kfree(bd_id_filename);
@@ -1012,7 +1015,10 @@ int ol_copy_ramdump(struct ol_softc *scn)
 		goto out;
 	}
 
+	vos_request_pm_qos_type(PM_QOS_CPU_DMA_LATENCY,
+				DISABLE_KRAIT_IDLE_PS_VAL);
 	ret = ol_target_coredump(scn, scn->ramdump_base, scn->ramdump_size);
+	vos_remove_pm_qos();
 
 out:
 	return ret;
@@ -1240,7 +1246,7 @@ void ol_ramdump_handler(struct ol_softc *scn)
 				false);
 		scn->fw_ram_dumping = 0;
 
-		if (scn->enableFwSelfRecovery)
+		if (scn->enableFwSelfRecovery || scn->enableRamdumpCollection)
 			vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
 	}
 	else if (pattern == FW_REG_PATTERN) {
@@ -1468,12 +1474,13 @@ void ol_target_failure(void *instance, A_STATUS status)
 	}
 #endif
 
+	vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
 	if (vos_is_load_unload_in_progress(VOS_MODULE_ID_VOSS, NULL)) {
 		printk("%s: Loading/Unloading is in progress, ignore!\n",
 			__func__);
+		vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, FALSE);
 		return;
 	}
-	vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
 
 #ifdef HIF_PCI
 	ret = hif_pci_check_fw_reg(scn->hif_sc);
@@ -2150,7 +2157,7 @@ int ol_download_firmware(struct ol_softc *scn)
 				bdf_ret = param & 0xff;
 				if (!bdf_ret)
 					scn->board_id = (param >> 8) & 0xffff;
-				pr_debug("%s: chip_id:0x%0x board_id:0x%0x\n",
+				pr_err("%s: chip_id:0x%0x board_id:0x%0x\n",
 						__func__, scn->target_version,
 							scn->board_id);
 			} else if (status < 0) {
@@ -2418,6 +2425,7 @@ static int ol_ath_get_reg_table(uint32_t target_version,
 	switch (target_version) {
 	case AR6320_REV3_VERSION:
 	case AR6320_REV3_2_VERSION:
+	case QCA9377_REV1_1_VERSION:
 		reg_table->section = (tgt_reg_section *)&ar6320v3_reg_table[0];
 		reg_table->section_size = sizeof(ar6320v3_reg_table)/
 			sizeof(ar6320v3_reg_table[0]);
@@ -2726,6 +2734,15 @@ u_int8_t ol_get_number_of_peers_supported(struct ol_softc *scn)
 
 #ifdef HIF_SDIO
 
+#if defined(WLAN_FEATURE_TSF_PLUS)
+#define SDIO_HI_ACS_FLAGS (HI_ACS_FLAGS_SDIO_SWAP_MAILBOX_SET | \
+	HI_ACS_FLAGS_ALT_DATA_CREDIT_SIZE)
+#else
+#define SDIO_HI_ACS_FLAGS (HI_ACS_FLAGS_SDIO_SWAP_MAILBOX_SET | \
+	HI_ACS_FLAGS_SDIO_REDUCE_TX_COMPL_SET | \
+	HI_ACS_FLAGS_ALT_DATA_CREDIT_SIZE)
+#endif
+
 /*Setting SDIO block size, mbox ISR yield limit for SDIO based HIF*/
 static A_STATUS
 ol_sdio_extra_initialization(struct ol_softc *scn)
@@ -2807,9 +2824,11 @@ ol_sdio_extra_initialization(struct ol_softc *scn)
 			break;
 		}
 
-		param |= (HI_ACS_FLAGS_SDIO_SWAP_MAILBOX_SET|
-                  HI_ACS_FLAGS_SDIO_REDUCE_TX_COMPL_SET|
-                  HI_ACS_FLAGS_ALT_DATA_CREDIT_SIZE);
+		param |= SDIO_HI_ACS_FLAGS;
+
+		/* enable TX completion to collect tx_desc for pktlog */
+		if (vos_is_packet_log_enabled())
+			param &= ~HI_ACS_FLAGS_SDIO_REDUCE_TX_COMPL_SET;
 
 		BMIWriteMemory(scn->hif_hdl,
 				host_interest_item_address(scn->target_type,

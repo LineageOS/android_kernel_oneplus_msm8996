@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -5177,7 +5177,7 @@ limDeleteBASessions(tpAniSirGlobal pMac, tpPESession pSessionEntry,
                 LIM_IS_BT_AMP_AP_ROLE(pSessionEntry) ||
                 LIM_IS_IBSS_ROLE(pSessionEntry) ||
                 LIM_IS_P2P_DEVICE_GO(pSessionEntry)) {
-                for (i = 0; i < pMac->lim.maxStation; i++)
+                for (i = 0; i < (pMac->lim.maxStation + 1); i++)
                 {
                     pSta = pSessionEntry->dph.dphHashTable.pDphNodeArray + i;
                     if (pSta && pSta->added)
@@ -6016,30 +6016,46 @@ void lim_add_channel_status_info(tpAniSirGlobal p_mac,
 	uint8_t total_channel = channel_info->total_channel;
 
 	if (ACS_FW_REPORT_PARAM_CONFIGURED) {
-		for (i = 0; i < total_channel; i++) {
-			if (channel_status_list[i].channel_id == channel_id) {
-				vos_mem_copy(
-					&channel_status_list[i],
-					 channel_stat,
-					 sizeof(*channel_status_list));
-				found = true;
-				break;
-			}
+	    for (i = 0; i < total_channel; i++) {
+		if (channel_status_list[i].channel_id == channel_id) {
+		    if (channel_stat->cmd_flags ==
+			    WMI_CHAN_INFO_END_RESP &&
+			    channel_status_list[i].cmd_flags ==
+			    WMI_CHAN_INFO_START_RESP) {
+			/* adjust to delta value for counts */
+			channel_stat->rx_clear_count -=
+			    channel_status_list[i].rx_clear_count;
+			channel_stat->cycle_count -=
+			    channel_status_list[i].cycle_count;
+			channel_stat->rx_frame_count -=
+			    channel_status_list[i].rx_frame_count;
+			channel_stat->tx_frame_count -=
+			    channel_status_list[i].tx_frame_count;
+			channel_stat->bss_rx_cycle_count -=
+			    channel_status_list[i].bss_rx_cycle_count;
+		    }
+		    vos_mem_copy(
+			    &channel_status_list[i],
+			    channel_stat,
+			    sizeof(*channel_status_list));
+		    found = true;
+		    break;
 		}
-		if (!found) {
-			if (total_channel <
-				 SIR_MAX_SUPPORTED_ACS_CHANNEL_LIST) {
-				vos_mem_copy(
-					&channel_status_list[total_channel++],
-					 channel_stat,
-					 sizeof(*channel_status_list));
-				channel_info->total_channel = total_channel;
-			} else {
-				PELOGW(limLog(p_mac, LOGW,
-					FL("Chan cnt exceed, channel_id=%d"),
-					channel_id);)
-			}
+	    }
+	    if (!found) {
+		if (total_channel <
+			SIR_MAX_SUPPORTED_ACS_CHANNEL_LIST) {
+		    vos_mem_copy(
+			    &channel_status_list[total_channel++],
+			    channel_stat,
+			    sizeof(*channel_status_list));
+		    channel_info->total_channel = total_channel;
+		} else {
+		    PELOGW(limLog(p_mac, LOGW,
+				FL("Chan cnt exceed, channel_id=%d"),
+				channel_id);)
 		}
+	    }
 	}
 	return;
 }

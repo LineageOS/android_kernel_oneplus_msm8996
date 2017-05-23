@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -257,6 +257,8 @@ typedef enum
  * TSF_GET_FAIL:                 get fail
  * TSF_RESET_GPIO_FAIL:          GPIO reset fail
  * TSF_SAP_NOT_STARTED_NO_TSF    SAP not started
+ * TSF_NOT_READY: TSF module is not initialized or init failed
+ * TSF_DISABLED_BY_TSFPLUS: cap_tsf/get_tsf are disabled due to TSF_PLUS
  */
 enum hdd_tsf_get_state {
 	TSF_RETURN = 0,
@@ -266,7 +268,9 @@ enum hdd_tsf_get_state {
 	TSF_CAPTURE_FAIL,
 	TSF_GET_FAIL,
 	TSF_RESET_GPIO_FAIL,
-	TSF_SAP_NOT_STARTED_NO_TSF
+	TSF_SAP_NOT_STARTED_NO_TSF,
+	TSF_NOT_READY,
+	TSF_DISABLED_BY_TSFPLUS
 };
 
 /**
@@ -460,7 +464,7 @@ VOS_STATUS iw_set_tdls_params(struct net_device *dev, struct iw_request_info *in
 #endif
 
 #ifdef WLAN_FEATURE_PACKET_FILTERING
-void wlan_hdd_set_mc_addr_list(hdd_adapter_t *pAdapter, v_U8_t set);
+int wlan_hdd_set_mc_addr_list(hdd_adapter_t *pAdapter, v_U8_t set);
 #endif
 void* wlan_hdd_change_country_code_callback(void *pAdapter);
 

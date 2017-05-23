@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -434,6 +434,7 @@ typedef struct tagCsrScanResultFilter
      * used to support whitelist ssid feature.
      */
     uint8_t scan_filter_for_roam;
+    tCsrBssid bssid_hint;
 }tCsrScanResultFilter;
 
 
@@ -1029,6 +1030,7 @@ typedef struct tagCsrRoamProfile
     tSirMacRateSet  supported_rates;
     tSirMacRateSet  extended_rates;
     uint8_t sub20_channelwidth;
+    tCsrBssid bssid_hint;
 }tCsrRoamProfile;
 
 
@@ -1231,10 +1233,6 @@ typedef struct tagCsrConfigParam
     tANI_U32  nActiveMinChnTimeConc;     //in units of milliseconds
     tANI_U32  nActiveMaxChnTimeConc;     //in units of milliseconds
     tANI_U32  nRestTimeConc;             //in units of milliseconds
-    tANI_U8   nNumStaChanCombinedConc;   //number of channels combined for
-                                         //STA in each split scan operation
-    tANI_U8   nNumP2PChanCombinedConc;   //number of channels combined for
-                                         //P2P in each split scan operation
 #endif
     /*In units of milliseconds*/
     uint32_t       min_rest_time_conc;
@@ -1499,6 +1497,20 @@ typedef struct tagCsrRoamInfo
         struct ndi_delete_rsp ndi_delete_params;
     } ndp;
 #endif
+
+    /* Extended capabilities of STA */
+    uint8_t ecsa_capable;
+    bool                 ampdu;
+    bool                 sgi_enable;
+    bool                 tx_stbc;
+    bool                 rx_stbc;
+    tSirMacHTChannelWidth ch_width;
+    enum sir_sme_phy_mode mode;
+    uint8_t              max_supp_idx;
+    uint8_t              max_ext_idx;
+    uint8_t              max_mcs_idx;
+    uint8_t              rx_mcs_map;
+    uint8_t              tx_mcs_map;
 }tCsrRoamInfo;
 
 
@@ -1529,6 +1541,19 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf
     /* Timing and fine Timing measurement capability clubbed together */
     tANI_U8              timingMeasCap;
     tSirSmeChanInfo      chan_info;
+    /* Extended capabilities of STA */
+    uint8_t              ecsa_capable;
+    bool                 ampdu;
+    bool                 sgi_enable;
+    bool                 tx_stbc;
+    tSirMacHTChannelWidth ch_width;
+    enum sir_sme_phy_mode mode;
+    bool                 rx_stbc;
+    uint8_t              max_supp_idx;
+    uint8_t              max_ext_idx;
+    uint8_t              max_mcs_idx;
+    uint8_t              rx_mcs_map;
+    uint8_t              tx_mcs_map;
 } tSirSmeAssocIndToUpperLayerCnf, *tpSirSmeAssocIndToUpperLayerCnf;
 
 typedef struct tagCsrSummaryStatsInfo

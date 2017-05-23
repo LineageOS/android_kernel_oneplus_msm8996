@@ -1392,6 +1392,9 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
     if (LIM_IS_AP_ROLE(psessionEntry)) {
         if(psessionEntry->gLimProtectionControl != WNI_CFG_FORCE_POLICY_PROTECTION_DISABLE)
         limDecideApProtection(pMac, peerMacAddr, &beaconParams,psessionEntry);
+
+        if (NULL != pSta && pSta->non_ecsa_capable)
+                psessionEntry->lim_non_ecsa_cap_num++;
     }
 
     limUpdateShortPreamble(pMac, peerMacAddr, &beaconParams, psessionEntry);
@@ -1411,7 +1414,7 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
         limSendBeaconParams(pMac, &beaconParams, psessionEntry );
     }
 
-    if (pSta->sub20_dynamic_channelwidth != 0)
+    if (NULL != pSta && pSta->sub20_dynamic_channelwidth != 0)
             populate_dot11f_sub_20_channel_width_ie(
                 pMac, &frm.QComVendorIE, psessionEntry);
 

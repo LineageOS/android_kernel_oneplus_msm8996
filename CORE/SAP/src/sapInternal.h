@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -267,6 +267,7 @@ typedef struct sSapContext {
     eCsrBand           currentPreferredBand;
     eCsrBand           scanBandPreference;
     v_U16_t            acsBandSwitchThreshold;
+    uint32_t           auto_channel_select_weight;
     tSapAcsChannelInfo acsBestChannelInfo;
     tANI_BOOLEAN       enableOverLapCh;
 
@@ -302,8 +303,10 @@ typedef struct sSapContext {
     tSirMacRateSet supp_rate_set;
     tSirMacRateSet extended_rate_set;
     vos_event_t sap_session_opened_evt;
+    vos_event_t sap_session_closed_evt;
     eCsrBand	target_band;
     uint8_t     sub20_channelwidth;
+    uint32_t    backup_channel;
 } *ptSapContext;
 
 
@@ -982,8 +985,6 @@ RETURN VALUE  : void.
 SIDE EFFECTS
 ---------------------------------------------------------------------------*/
 void sap_CacResetNotify(tHalHandle hHal);
-
-v_BOOL_t sapAcsChannelCheck(ptSapContext sapContext, v_U8_t channelNumber);
 
 /*
  * This function is added to check if channel is in tx leak range
