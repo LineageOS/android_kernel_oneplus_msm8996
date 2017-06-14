@@ -2825,6 +2825,7 @@ int rmnet_ipa_query_tethering_stats_all(
 	return rc;
 }
 
+
 /**
  * ipa_broadcast_quota_reach_ind() - Send Netlink broadcast on Quota
  * @mux_id - The MUX ID on which the quota has been reached
