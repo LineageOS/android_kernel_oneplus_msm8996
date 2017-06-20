@@ -634,6 +634,7 @@ typedef enum
     eCSR_ROAM_RESULT_ADD_TDLS_PEER,
     eCSR_ROAM_RESULT_UPDATE_TDLS_PEER,
     eCSR_ROAM_RESULT_DELETE_TDLS_PEER,
+    eCSR_ROAM_TDLS_CHECK_BMPS,
     eCSR_ROAM_RESULT_TEARDOWN_TDLS_PEER_IND,
     eCSR_ROAM_RESULT_DELETE_ALL_TDLS_PEER_IND,
     eCSR_ROAM_RESULT_LINK_ESTABLISH_REQ_RSP,
@@ -1370,6 +1371,7 @@ typedef struct tagCsrConfigParam
     uint32_t edca_bk_aifs;
     uint32_t edca_be_aifs;
     struct csr_sta_roam_policy_params sta_roam_policy_params;
+    uint32_t sta_auth_retries_for_code17;
 }tCsrConfigParam;
 
 //Tush

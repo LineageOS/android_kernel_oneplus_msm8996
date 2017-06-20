@@ -1580,15 +1580,21 @@ eHalStatus csrNeighborRoamPreauthRspHandler(tpAniSirGlobal pMac,
         tpCsrNeighborRoamBSSInfo    pNeighborBssNode = NULL;
         tListElem                   *pEntry;
         bool is_dis_pending = false;
+        uint32_t                    retries;
+
+        retries = pMac->sta_auth_retries_for_code17 >
+                  CSR_NEIGHBOR_ROAM_MAX_NUM_PREAUTH_RETRIES ?
+                        pMac->sta_auth_retries_for_code17 :
+                        CSR_NEIGHBOR_ROAM_MAX_NUM_PREAUTH_RETRIES;
 
         smsLog(pMac, LOGE, FL("Preauth failed retry number %d, status = 0x%x"),
                pNeighborRoamInfo->FTRoamInfo.numPreAuthRetries, limStatus);
 
         /* Preauth failed. Add the bssId to the preAuth failed list MAC Address.
            Also remove the AP from roam able AP list */
-        if ((pNeighborRoamInfo->FTRoamInfo.numPreAuthRetries >=
-             CSR_NEIGHBOR_ROAM_MAX_NUM_PREAUTH_RETRIES) ||
-            (eSIR_LIM_MAX_STA_REACHED_ERROR == limStatus))
+        if ((pNeighborRoamInfo->FTRoamInfo.numPreAuthRetries >= retries) ||
+            ((eSIR_LIM_MAX_STA_REACHED_ERROR == limStatus) &&
+            (pMac->sta_auth_retries_for_code17 == 0)))
         {
             /* We are going to remove the node as it fails for more than MAX tries. Reset this count to 0 */
             pNeighborRoamInfo->FTRoamInfo.numPreAuthRetries = 0;
@@ -1639,7 +1645,16 @@ eHalStatus csrNeighborRoamPreauthRspHandler(tpAniSirGlobal pMac,
            goto abort_preauth;
         }
 
-
+        if (pMac->roam.pending_roam_disable)
+        {
+            smsLog(pMac, LOG1, FL("process pending roam disable"));
+            pMac->roam.configParam.isFastRoamIniFeatureEnabled = FALSE;
+            pMac->roam.pending_roam_disable = FALSE;
+            csrNeighborRoamUpdateFastRoamingEnabled(pMac, sessionId, FALSE);
+            CSR_NEIGHBOR_ROAM_STATE_TRANSITION(
+                               eCSR_NEIGHBOR_ROAM_STATE_CONNECTED, sessionId);
+            goto DEQ_PREAUTH;
+        }
 
         /* Issue preauth request for the same/next entry */
         if (eHAL_STATUS_SUCCESS == csrNeighborRoamIssuePreauthReq(pMac,
@@ -5313,6 +5328,13 @@ eHalStatus csrNeighborRoamIndicateConnect(tpAniSirGlobal pMac,
                                 pNeighborRoamInfo->isESEAssoc, init_ft_flag);
 
 #endif
+
+            if (pMac->roam.pending_roam_disable)
+            {
+                smsLog(pMac, LOG1, FL("process pending roam disable"));
+                pMac->roam.configParam.isFastRoamIniFeatureEnabled = FALSE;
+                pMac->roam.pending_roam_disable = FALSE;
+            }
 
 #ifdef FEATURE_WLAN_LFR
             // If "Legacy Fast Roaming" is enabled

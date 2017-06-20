@@ -822,6 +822,7 @@ wlan_hdd_extscan_config_policy[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_
 {
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_REQUEST_ID] = { .type = NLA_U32 },
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_GET_VALID_CHANNELS_CONFIG_PARAM_WIFI_BAND] = { .type = NLA_U32 },
+    [QCA_WLAN_VENDOR_ATTR_EXTSCAN_GET_VALID_CHANNELS_CONFIG_PARAM_MAX_CHANNELS] = { .type = NLA_U32 },
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_CHANNEL_SPEC_CHANNEL] = { .type = NLA_U32 },
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_CHANNEL_SPEC_DWELL_TIME] = { .type = NLA_U32 },
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_CHANNEL_SPEC_PASSIVE] = { .type = NLA_U8 },
@@ -849,6 +850,9 @@ wlan_hdd_extscan_config_policy[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_SIGNIFICANT_CHANGE_PARAMS_LOST_AP_SAMPLE_SIZE] = { .type = NLA_U32 },
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_SIGNIFICANT_CHANGE_PARAMS_MIN_BREACHING] = { .type = NLA_U32 },
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_SIGNIFICANT_CHANGE_PARAMS_NUM_AP] = { .type = NLA_U32 },
+    [QCA_WLAN_VENDOR_ATTR_EXTSCAN_BUCKET_SPEC_MAX_PERIOD] = { .type = NLA_U32 },
+    [QCA_WLAN_VENDOR_ATTR_EXTSCAN_BUCKET_SPEC_BASE] = { .type = NLA_U32 },
+    [QCA_WLAN_VENDOR_ATTR_EXTSCAN_BUCKET_SPEC_STEP_COUNT] = { .type = NLA_U32 },
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_SSID_THRESHOLD_PARAM_SSID] = { .type = NLA_BINARY,
 							.len = IEEE80211_MAX_SSID_LEN + 1 },
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_SSID_HOTLIST_PARAMS_LOST_SSID_SAMPLE_SIZE] = { .type = NLA_U32 },
@@ -857,6 +861,7 @@ wlan_hdd_extscan_config_policy[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_SSID_THRESHOLD_PARAM_RSSI_LOW] = { .type = NLA_S32 },
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_SSID_THRESHOLD_PARAM_RSSI_HIGH] = { .type = NLA_S32 },
     [QCA_WLAN_VENDOR_ATTR_EXTSCAN_CONFIGURATION_FLAGS] = { .type = NLA_U32 },
+    [QCA_WLAN_VENDOR_ATTR_EXTSCAN_BSSID_HOTLIST_PARAMS_LOST_AP_SAMPLE_SIZE] = { .type = NLA_U32 },
 };
 
 static const struct nla_policy
@@ -2068,6 +2073,10 @@ __wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 		}
 		hddLog(VOS_TRACE_LEVEL_DEBUG,
 			FL("Num of Preferred BSSID: %d"), count);
+		if (!tb[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_SET_BSSID_PREFS]) {
+			hddLog(LOGE, FL("attr Preferred BSSID failed"));
+			goto fail;
+		}
 		i = 0;
 		nla_for_each_nested(curr_attr,
 			tb[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_SET_BSSID_PREFS],
@@ -2927,6 +2936,10 @@ static int __wlan_hdd_cfg80211_extscan_set_bssid_hotlist(struct wiphy *wiphy,
     pReqMsg->sessionId = pAdapter->sessionId;
     hddLog(LOG1, FL("Session Id %d"), pReqMsg->sessionId);
 
+    if (!tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_AP_THRESHOLD_PARAM]) {
+        hddLog(LOGE, FL("attr ap threshold failed"));
+        goto fail;
+    }
     i = 0;
     nla_for_each_nested(apTh,
                 tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_AP_THRESHOLD_PARAM], rem) {
@@ -3139,7 +3152,10 @@ static int __wlan_hdd_cfg80211_extscan_set_significant_change(
     pReqMsg->sessionId = pAdapter->sessionId;
     hddLog(LOG1, FL("Number of AP %d Session Id %d"), pReqMsg->numAp,
            pReqMsg->sessionId);
-
+    if (!tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_AP_THRESHOLD_PARAM]) {
+        hddLog(LOGE, FL("attr ap threshold failed"));
+        goto fail;
+    }
     i = 0;
     nla_for_each_nested(apTh,
                 tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_AP_THRESHOLD_PARAM], rem) {
@@ -3531,8 +3547,9 @@ static int hdd_extscan_start_fill_bucket_channel_spec(
 		}
 
 		if (nla_parse(bucket,
-			QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
-			nla_data(buckets), nla_len(buckets), NULL)) {
+			      QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
+			      nla_data(buckets), nla_len(buckets),
+			      wlan_hdd_extscan_config_policy)) {
 			hddLog(LOGE, FL("nla_parse failed"));
 			return -EINVAL;
 		}
@@ -4524,6 +4541,10 @@ static int hdd_extscan_epno_fill_network_list(
 
 	expected_networks = req_msg->num_networks;
 	index = 0;
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PNO_SET_LIST_PARAM_EPNO_NETWORKS_LIST]) {
+		hddLog(LOGE, FL("attr networks list failed"));
+		return -EINVAL;
+	}
 	nla_for_each_nested(networks,
 			    tb[QCA_WLAN_VENDOR_ATTR_PNO_SET_LIST_PARAM_EPNO_NETWORKS_LIST],
 			    rem1) {
@@ -6750,16 +6771,18 @@ static int put_wifi_channel_cca_info(struct sir_wifi_chan_cca_stats *cca,
 static int put_wifi_signal_info(struct sir_wifi_peer_signal_stats *peer_signal,
 				struct sk_buff *skb)
 {
-	uint32_t i;
+	uint32_t i, chain_count;
 	struct nlattr *chains, *att;
 
 	/* There might be no signal info for a peer */
 	if (peer_signal == NULL)
 		return 0;
 
+	chain_count = peer_signal->num_chain < WIFI_MAX_CHAINS ?
+		      peer_signal->num_chain : WIFI_MAX_CHAINS;
 	if (nla_put_u32(skb,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_ANT_NUM,
-			WIFI_MAX_CHAINS)) {
+			chain_count)) {
 		hddLog(LOGE, FL("QCA_WLAN_VENDOR_ATTR put fail"));
 		return -EINVAL;
 	}
@@ -6771,7 +6794,7 @@ static int put_wifi_signal_info(struct sir_wifi_peer_signal_stats *peer_signal,
 		return -EINVAL;
 	}
 
-	for (i = 0; i < WIFI_MAX_CHAINS; i++) {
+	for (i = 0; i < chain_count; i++) {
 		chains = nla_nest_start(skb, i);
 
 		if (chains == NULL) {
@@ -6779,12 +6802,24 @@ static int put_wifi_signal_info(struct sir_wifi_peer_signal_stats *peer_signal,
 			return -EINVAL;
 		}
 
+		hddLog(LOG2,
+		       FL("SNR=%d, NF=%d, RX=%d, TX=%d"),
+		       peer_signal->per_ant_snr[i],
+		       peer_signal->nf[i],
+		       peer_signal->per_ant_rx_mpdus[i],
+		       peer_signal->per_ant_tx_mpdus[i]);
 		if (nla_put_u32(skb,
 				QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_ANT_SNR,
 				peer_signal->per_ant_snr[i]) ||
 		    nla_put_u32(skb,
 				QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_ANT_NF,
-				peer_signal->nf[i])) {
+				peer_signal->nf[i]) ||
+		    nla_put_u32(skb,
+				QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_RX_MPDU,
+				peer_signal->per_ant_rx_mpdus[i]) ||
+		    nla_put_u32(skb,
+				QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_TX_MPDU,
+				peer_signal->per_ant_tx_mpdus[i])) {
 			hddLog(VOS_TRACE_LEVEL_ERROR,
 			       FL("QCA_WLAN_VENDOR_ATTR put fail"));
 			return -EINVAL;
@@ -13694,6 +13729,11 @@ static int wlan_hdd_cfg80211_fast_roaming(struct wiphy *wiphy,
 	return ret;
 }
 
+static const struct nla_policy
+txpower_scale_policy[QCA_WLAN_VENDOR_ATTR_TXPOWER_SCALE_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_TXPOWER_SCALE] = { .type = NLA_U8 },
+};
+
 /**
  * __wlan_hdd_cfg80211_txpower_scale () - txpower scaling
  * @wiphy: Pointer to wireless phy
@@ -13725,7 +13765,7 @@ static int __wlan_hdd_cfg80211_txpower_scale(struct wiphy *wiphy,
 	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 
 	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_TXPOWER_SCALE_MAX,
-		      data, data_len, NULL)) {
+		      data, data_len, txpower_scale_policy)) {
 		hddLog(LOGE, "Invalid ATTR");
 		return -EINVAL;
 	}
@@ -13863,18 +13903,29 @@ static int wlan_hdd_cfg80211_txpower_scale_decr_db(struct wiphy *wiphy,
 static int hdd_post_get_chain_rssi_rsp(hdd_context_t *hdd_ctx)
 {
 	struct sk_buff *skb = NULL;
-	int data_len = sizeof(hdd_ctx->chain_rssi_context.result);
+	struct chain_rssi_result *result =
+			&hdd_ctx->chain_rssi_context.result;
 
 	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
-		data_len+NLMSG_HDRLEN);
+			(sizeof(result->chain_rssi) + NLA_HDRLEN) +
+			(sizeof(result->ant_id) + NLA_HDRLEN) +
+			NLMSG_HDRLEN);
 
 	if (!skb) {
 		hddLog(LOGE, FL("cfg80211_vendor_event_alloc failed"));
 		return -ENOMEM;
 	}
 
-	if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_CHAIN_RSSI, data_len,
-			&hdd_ctx->chain_rssi_context.result)) {
+	if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_CHAIN_RSSI,
+			sizeof(result->chain_rssi),
+			result->chain_rssi)) {
+		hddLog(LOGE, FL("put fail"));
+		goto nla_put_failure;
+	}
+
+	if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_ANTENNA_INFO,
+			sizeof(result->ant_id),
+			result->ant_id)) {
 		hddLog(LOGE, FL("put fail"));
 		goto nla_put_failure;
 	}
@@ -13906,8 +13957,10 @@ static int __wlan_hdd_cfg80211_get_chain_rssi(struct wiphy *wiphy,
 	struct hdd_chain_rssi_context *context;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_MAX + 1];
 	eHalStatus status;
-	int retval = 0;
+	int retval;
 	unsigned long rc;
+	const int mac_len = sizeof(req_msg.peer_macaddr);
+	int msg_len;
 
 	ENTER();
 
@@ -13915,9 +13968,11 @@ static int __wlan_hdd_cfg80211_get_chain_rssi(struct wiphy *wiphy,
 	if (0 != retval)
 		return retval;
 
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_MAX, data, data_len, NULL)) {
+	/* nla validation doesn't do exact lengths, do the validation later */
+	retval = nla_parse(tb, QCA_WLAN_VENDOR_ATTR_MAX, data, data_len, NULL);
+	if (retval) {
 		hddLog(LOGE, FL("Invalid ATTR"));
-		return -EINVAL;
+		return retval;
 	}
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_MAC_ADDR]) {
@@ -13925,9 +13980,15 @@ static int __wlan_hdd_cfg80211_get_chain_rssi(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
+	msg_len = nla_len(tb[QCA_WLAN_VENDOR_ATTR_MAC_ADDR]);
+	if (msg_len != mac_len) {
+		hddLog(LOGE, FL("Invalid mac address length: %d, expected %d"),
+			msg_len, mac_len);
+		return -ERANGE;
+	}
+
 	memcpy(&req_msg.peer_macaddr,
-		nla_data(tb[QCA_WLAN_VENDOR_ATTR_MAC_ADDR]),
-		sizeof(req_msg.peer_macaddr));
+		nla_data(tb[QCA_WLAN_VENDOR_ATTR_MAC_ADDR]), mac_len);
 
 	spin_lock(&hdd_context_lock);
 	context = &hdd_ctx->chain_rssi_context;
@@ -15483,7 +15544,7 @@ static void wlan_hdd_add_hostapd_conf_vsie(hdd_adapter_t* pHostapdAdapter,
         elem_id  = ptr[0];
         elem_len = ptr[1];
         left -= 2;
-        if (elem_len > left)
+        if (elem_len > left || elem_len < WPS_OUI_TYPE_SIZE)
         {
             hddLog( VOS_TRACE_LEVEL_ERROR,
                     "****Invalid IEs eid = %d elem_len=%d left=%d*****",
@@ -16357,6 +16418,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
     int ret;
     ENTER();
 
+    wlan_hdd_tdls_disable_offchan_and_teardown_links(pHddCtx);
     iniConfig = pHddCtx->cfg_ini;
     pHostapdState = WLAN_HDD_GET_HOSTAP_STATE_PTR(pHostapdAdapter);
 
@@ -18795,9 +18857,15 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
             StaParams.supported_oper_classes_len  =
                                              params->supported_oper_classes_len;
 
+            if (params->ext_capab_len > sizeof(StaParams.extn_capability)) {
+                VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                          "received extn capabilities:%d, resetting it to max supported",
+                          params->ext_capab_len);
+                params->ext_capab_len = sizeof(StaParams.extn_capability);
+            }
             if (0 != params->ext_capab_len)
                 vos_mem_copy(StaParams.extn_capability, params->ext_capab,
-                             sizeof(StaParams.extn_capability));
+                             params->ext_capab_len);
 
             if (NULL != params->ht_capa) {
                 StaParams.htcap_present = 1;
@@ -21617,6 +21685,8 @@ int wlan_hdd_cfg80211_connect_start( hdd_adapter_t  *pAdapter,
         return -EINVAL;
     }
 
+    wlan_hdd_tdls_disable_offchan_and_teardown_links(pHddCtx);
+
     pRoamProfile = &pWextState->roamProfile;
 
     if (pRoamProfile)
@@ -22105,6 +22175,13 @@ int wlan_hdd_cfg80211_set_ie(hdd_adapter_t *pAdapter,
         eLen  = *genie++;
         remLen -= 2;
 
+        /* Sanity check on eLen */
+        if (eLen > remLen) {
+            hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Invalid IE length[%d] for IE[0x%X]",
+                    __func__, eLen, elementId);
+            VOS_ASSERT(0);
+            return -EINVAL;
+        }
         hddLog(VOS_TRACE_LEVEL_INFO, "%s: IE[0x%X], LEN[%d]",
             __func__, elementId, eLen);
 
@@ -22141,6 +22218,13 @@ int wlan_hdd_cfg80211_set_ie(hdd_adapter_t *pAdapter,
                 }
                 else if (0 == memcmp(&genie[0], "\x00\x50\xf2", 3))
                 {
+                    if (eLen > (MAX_WPA_RSN_IE_LEN - 2)) {
+                        hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Invalid WPA RSN IE length[%d], exceeds %d bytes",
+                                __func__, eLen, MAX_WPA_RSN_IE_LEN - 2);
+                        VOS_ASSERT(0);
+                        return -EINVAL;
+                    }
+
                     hddLog (VOS_TRACE_LEVEL_INFO, "%s Set WPA IE (len %d)",__func__, eLen + 2);
                     memset( pWextState->WPARSNIE, 0, MAX_WPA_RSN_IE_LEN );
                     memcpy( pWextState->WPARSNIE, genie - 2, (eLen + 2) /*ie_len*/);
@@ -26324,7 +26408,6 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
      * that the wlan wakelock which was held in the wlan_hdd_cfg80211_scan
      * function.
      */
-    sme_ScanFlushResult(hHal, pAdapter->sessionId);
     if (TRUE == pScanInfo->mScanPending)
     {
         ret = wlan_hdd_scan_abort(pAdapter);
@@ -30365,8 +30448,7 @@ void wlan_hdd_cfg80211_chainrssi_callback(void *ctx, void *pmsg)
 		return;
 	}
 
-	memcpy(&context->result, data->chain_rssi,
-		sizeof(data->chain_rssi));
+	memcpy(&context->result, data, sizeof(*data));
 
 	complete(&context->response_event);
 	spin_unlock(&hdd_context_lock);

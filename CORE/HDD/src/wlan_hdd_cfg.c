@@ -4364,6 +4364,15 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_SET_TSF_GPIO_PIN_DEFAULT,
                 CFG_SET_TSF_GPIO_PIN_MIN,
                 CFG_SET_TSF_GPIO_PIN_MAX),
+
+#ifdef WLAN_FEATURE_TSF_PLUS
+      REG_VARIABLE(CFG_SET_TSF_PTP_OPT_NAME, WLAN_PARAM_HexInteger,
+                hdd_config_t, tsf_ptp_options,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_SET_TSF_PTP_OPT_DEFAULT,
+                CFG_SET_TSF_PTP_OPT_MIN,
+                CFG_SET_TSF_PTP_OPT_MAX),
+#endif /* WLAN_FEATURE_TSF_PLUS */
 #endif
    REG_VARIABLE(CFG_FINE_TIME_MEAS_CAPABILITY, WLAN_PARAM_HexInteger,
                 hdd_config_t, fine_time_meas_cap,
@@ -5028,6 +5037,20 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_SAP_PROBE_RESP_OFFLOAD_DEFAULT,
                 CFG_SAP_PROBE_RESP_OFFLOAD_MIN,
                 CFG_SAP_PROBE_RESP_OFFLOAD_MAX),
+
+   REG_VARIABLE( CFG_STA_AUTH_RETRIES_FOR_CODE17_NAME, WLAN_PARAM_Integer,
+                hdd_config_t, sta_auth_retries_for_code17,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_STA_AUTH_RETRIES_FOR_CODE17_DEFAULT,
+                CFG_STA_AUTH_RETRIES_FOR_CODE17_MIN,
+                CFG_STA_AUTH_RETRIES_FOR_CODE17_MAX ),
+
+  REG_VARIABLE(CFG_SKIP_MAC_CONFIG, WLAN_PARAM_Integer,
+               hdd_config_t, skip_mac_config,
+               VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+               CFG_SKIP_MAC_CONFIG_DEFAULT,
+               CFG_SKIP_MAC_CONFIG_MIN,
+               CFG_SKIP_MAC_CONFIG_MAX),
 };
 
 
@@ -5106,8 +5129,8 @@ static char *i_trim(char *str)
 
    /* Find the first non white-space*/
    for (ptr = str; i_isspace(*ptr); ptr++);
-      if (*ptr == '\0')
-         return str;
+   if (*ptr == '\0')
+        return str;
 
    /* This is the new start of the string*/
    str = ptr;
@@ -5115,8 +5138,8 @@ static char *i_trim(char *str)
    /* Find the last non white-space */
    ptr += strlen(ptr) - 1;
    for (; ptr != str && i_isspace(*ptr); ptr--);
-      /* Null terminate the following character */
-      ptr[1] = '\0';
+   /* Null terminate the following character */
+   ptr[1] = '\0';
 
    return str;
 }
@@ -5770,6 +5793,10 @@ void print_hdd_cfg(hdd_context_t *pHddCtx)
             "Name = [gEnableDumpCollect] Value = [%u]",
                      pHddCtx->cfg_ini->is_ramdump_enabled);
 
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+        "Name = [sta_auth_retries_for_code17] Value = [%u] ",
+         pHddCtx->cfg_ini->sta_auth_retries_for_code17);
+
   hddLog(LOG2, "Name = [gP2PListenDeferInterval] Value = [%u]",
                    pHddCtx->cfg_ini->p2p_listen_defer_interval);
 
@@ -6028,7 +6055,6 @@ static VOS_STATUS hdd_cfg_get_config(REG_TABLE_ENTRY *reg_table,
 #else
       printk(KERN_INFO "%s", configStr);
 #endif // RETURN_IN_BUFFER
-
 }
 
 #ifndef RETURN_IN_BUFFER
@@ -6594,6 +6620,15 @@ uint8_t hdd_cfg_get_sub20_channel_config(hdd_context_t *hdd_ctx_ptr)
 }
 #endif
 
+#ifdef WLAN_FEATURE_TSF_PLUS
+bool hdd_cfg_is_ptp_opt_enable(hdd_context_t *hdd_ctx_ptr)
+{
+	hdd_config_t *config_ptr = hdd_ctx_ptr->cfg_ini;
+
+	return (config_ptr->tsf_ptp_options != 0);
+}
+#endif
+
 static void hdd_set_power_save_config(hdd_context_t *pHddCtx, tSmeConfigParams *smeConfig)
 {
    hdd_config_t *pConfig = pHddCtx->cfg_ini;
@@ -7114,6 +7149,11 @@ v_BOOL_t hdd_update_config_dat( hdd_context_t *pHddCtx )
 #if defined WLAN_FEATURE_VOWIFI
     if (ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_MCAST_BCAST_FILTER_SETTING, pConfig->mcastBcastFilterSetting,
                      NULL, eANI_BOOLEAN_FALSE)==eHAL_STATUS_FAILURE)
+     {
+        fStatus = FALSE;
+        hddLog(LOGE,
+		"Could not pass on WNI_CFG_MCAST_BCAST_FILTER_SETTING to CCM");
+     }
 #endif
 
      if (ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_SINGLE_TID_RC, pConfig->bSingleTidRc,
@@ -7994,6 +8034,9 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
    smeConfig->sub20_dynamic_channelwidth =
               hdd_cfg_get_sub20_dyn_capabilities(pHddCtx);
 
+   smeConfig->csrConfig.sta_auth_retries_for_code17 =
+                        pHddCtx->cfg_ini->sta_auth_retries_for_code17;
+
    halStatus = sme_UpdateConfig( pHddCtx->hHal, smeConfig);
    if ( !HAL_STATUS_SUCCESS( halStatus ) )
    {
@@ -8004,7 +8047,6 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
    vos_mem_free(smeConfig);
    return status;
 }
-
 
 /**---------------------------------------------------------------------------
 

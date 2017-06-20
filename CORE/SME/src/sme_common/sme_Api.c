@@ -1890,6 +1890,9 @@ eHalStatus sme_UpdateConfig(tHalHandle hHal, tpSmeConfigParams pSmeConfigParams)
    pMac->sub20_dynamic_channelwidth =
        pSmeConfigParams->sub20_dynamic_channelwidth;
 
+   pMac->sta_auth_retries_for_code17 =
+         pSmeConfigParams->csrConfig.sta_auth_retries_for_code17;
+
    return status;
 }
 
@@ -3303,7 +3306,8 @@ eHalStatus sme_ProcessMsg(tHalHandle hHal, vos_msg_t* pMsg)
                 roam_info = vos_mem_malloc(sizeof(*roam_info));
                 if (roam_info) {
                     vos_mem_zero(roam_info, sizeof(*roam_info));
-                    roam_info->pBssDesc = &result->bss_description;
+		    roam_info->pBssDesc = (tSirBssDescription *)(
+		    (uint8_t *)&result->bss_description+result->ap.ieLength);
                     csrRoamCallCallback(pMac, 0, roam_info, 0,
                         eCSR_ROAM_UPDATE_SCAN_RESULT, eCSR_ROAM_RESULT_NONE);
                     vos_mem_free(roam_info);
@@ -10638,6 +10642,17 @@ eHalStatus sme_UpdateIsFastRoamIniFeatureEnabled
              isFastRoamIniFeatureEnabled);
         return eHAL_STATUS_SUCCESS;
     }
+
+  if (smeNeighborMiddleOfRoaming(hHal, sessionId))
+  {
+      VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                "%s: In middle of roaming isFastRoamIniFeatureEnabled %d",
+                __func__, isFastRoamIniFeatureEnabled);
+      if (!isFastRoamIniFeatureEnabled)
+          pMac->roam.pending_roam_disable = TRUE;
+
+      return eHAL_STATUS_SUCCESS;
+  }
 
   VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
                      "%s: FastRoamEnabled is changed from %d to %d", __func__,

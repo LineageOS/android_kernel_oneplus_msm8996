@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -512,8 +512,10 @@ typedef struct sPESession           // Added to Support BT-AMP
     uint8_t access_policy;
     uint8_t sap_sub20_channelwidth;
     uint8_t sub20_channelwidth;
+    uint8_t vht_channel_width;
     /* Number of STAs that do not support ECSA capability */
     uint8_t lim_non_ecsa_cap_num;
+    uint32_t sta_auth_retries_for_code17;
 } tPESession, *tpPESession;
 
 /*-------------------------------------------------------------------------
