@@ -129,6 +129,12 @@
        24 1F 08 09 05 03 04 a0
        24 1F 08 09 05 03 04 a0
        24 1B 08 09 05 03 04 a0];
+	qcom,cont-splash-enabled;
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
+	qcom,esd-check-enabled;
+	qcom,mdss-dsi-panel-status-check-mode = "te_signal_check";
+	qcom,mdss-dsi-lp11-init;
+	qcom,mdss-dsi-init-delay-us = <10000>;
 };
 
 &dsi_samsung_s6e3fa5_1080p_cmd {
@@ -138,4 +144,10 @@
        24 1F 08 09 05 03 04 a0
        24 1F 08 09 05 03 04 a0
        24 1B 08 09 05 03 04 a0];
+	qcom,cont-splash-enabled;
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
+	qcom,esd-check-enabled;
+	qcom,mdss-dsi-panel-status-check-mode = "te_signal_check";
+	qcom,mdss-dsi-lp11-init;
+	qcom,mdss-dsi-init-delay-us = <10000>;
 };
