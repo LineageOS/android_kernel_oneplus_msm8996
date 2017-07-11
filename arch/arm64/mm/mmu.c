@@ -52,7 +52,7 @@ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
 unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_bss;
 EXPORT_SYMBOL(empty_zero_page);
 
-static bool __init dma_overlap(phys_addr_t start, phys_addr_t end);
+static bool dma_overlap(phys_addr_t start, phys_addr_t end);
 
 #ifdef CONFIG_STRICT_MEMORY_RWX
 static struct {
@@ -412,9 +412,9 @@ struct dma_contig_early_reserve {
 	unsigned long size;
 };
 
-static struct dma_contig_early_reserve dma_mmu_remap[MAX_CMA_AREAS] __initdata;
+static struct dma_contig_early_reserve dma_mmu_remap[MAX_CMA_AREAS];
 
-static int dma_mmu_remap_num __initdata;
+static int dma_mmu_remap_num;
 
 void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size)
 {
@@ -423,7 +423,7 @@ void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size)
 	dma_mmu_remap_num++;
 }
 
-static bool __init dma_overlap(phys_addr_t start, phys_addr_t end)
+static bool dma_overlap(phys_addr_t start, phys_addr_t end)
 {
 	int i;
 
