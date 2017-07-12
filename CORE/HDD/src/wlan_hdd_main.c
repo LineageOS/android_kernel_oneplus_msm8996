@@ -10567,6 +10567,18 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
       hddLog(VOS_TRACE_LEVEL_ERROR, "failed to get vdev type");
       goto error_sme_open;
    }
+
+   ret_val = process_wma_set_command((int)pAdapter->sessionId,
+                         (int)WMI_PDEV_PARAM_BURST_ENABLE,
+                         (int)pHddCtx->cfg_ini->enableSifsBurst,
+                         PDEV_CMD);
+
+   if (0 != ret_val) {
+       hddLog(VOS_TRACE_LEVEL_ERROR,
+                   "%s: WMI_PDEV_PARAM_BURST_ENABLE set failed %d",
+                   __func__, ret_val);
+   }
+
    //Open a SME session for future operation
    halStatus = sme_OpenSession( pHddCtx->hHal, hdd_smeRoamCallback, pAdapter,
          (tANI_U8 *)&pAdapter->macAddressCurrent, &pAdapter->sessionId,
@@ -10630,17 +10642,6 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    }
 
    set_bit(WMM_INIT_DONE, &pAdapter->event_flags);
-
-   ret_val = process_wma_set_command((int)pAdapter->sessionId,
-                         (int)WMI_PDEV_PARAM_BURST_ENABLE,
-                         (int)pHddCtx->cfg_ini->enableSifsBurst,
-                         PDEV_CMD);
-
-   if (0 != ret_val) {
-       hddLog(VOS_TRACE_LEVEL_ERROR,
-                   "%s: WMI_PDEV_PARAM_BURST_ENABLE set failed %d",
-                   __func__, ret_val);
-   }
 
    status = hdd_check_and_init_tdls(pAdapter, type);
    if (status != VOS_STATUS_SUCCESS)
@@ -13518,6 +13519,11 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
    {
       vos_timer_stop(&pHddCtx->bus_bw_timer);
       hdd_rst_tcp_delack(pHddCtx);
+
+      if (pHddCtx->hbw_requested) {
+          vos_remove_pm_qos();
+          pHddCtx->hbw_requested = false;
+      }
    }
 
    if (!VOS_IS_STATUS_SUCCESS(vos_timer_destroy(
@@ -18241,6 +18247,10 @@ void hdd_stop_bus_bw_compute_timer(hdd_adapter_t *pAdapter)
 
     if (can_stop == VOS_TRUE) {
         vos_timer_stop(&pHddCtx->bus_bw_timer);
+        if (pHddCtx->hbw_requested) {
+            vos_remove_pm_qos();
+            pHddCtx->hbw_requested = false;
+        }
         /* reset the ipa perf level */
         hdd_ipa_set_perf_level(pHddCtx, 0, 0);
         hdd_rst_tcp_delack(pHddCtx);
