@@ -618,7 +618,6 @@ static ssize_t mdss_fb_force_panel_dead(struct device *dev,
 		pr_err("no panel connected!\n");
 		return len;
 	}
-	mdss_fb_report_panel_dead(mfd);
 
 	if (kstrtouint(buf, 0, &pdata->panel_info.panel_force_dead))
 		pr_err("kstrtouint buf error!\n");
@@ -1819,11 +1818,6 @@ static int mdss_fb_blank_unblank(struct msm_fb_data_type *mfd)
 	}
 
 error:
-	{
-		struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
-		if (!ctl->panel_data->panel_info.cont_splash_enabled)
-		mfd->first_frame = 1;
-	}
 	return ret;
 }
 
@@ -3525,14 +3519,8 @@ static int __mdss_fb_perform_commit(struct msm_fb_data_type *mfd)
 			pr_err("pan display failed %x on fb%d\n", ret,
 					mfd->index);
 	}
-	
-	skip_commit:
-		
-	if(mfd->first_frame)
-		{
-			mfd->first_frame = 0;
-			mdss_fb_send_panel_event(mfd, MDSS_EVENT_POST_PANEL_ON, NULL);
-		}
+
+skip_commit:
 	if (!ret)
 		mdss_fb_update_backlight(mfd);
 
