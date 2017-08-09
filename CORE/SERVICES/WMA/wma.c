@@ -291,6 +291,12 @@ enum extscan_report_events_type {
 
 #define WMA_EXTSCAN_CYCLE_WAKE_LOCK_DURATION    (5 * 1000) /* in msec */
 
+/*
+ * Maximum number of entires that could be present in the
+ * WMI_EXTSCAN_HOTLIST_MATCH_EVENT buffer from the firmware
+ */
+#define WMA_EXTSCAN_MAX_HOTLIST_ENTRIES 10
+
 #endif
 
 /* Data rate 100KBPS based on IE Index */
@@ -4242,7 +4248,8 @@ static int wma_extscan_hotlist_match_event_handler(void *handle,
 	struct extscan_hotlist_match  *dest_hotlist;
 	tSirWifiScanResult      *dest_ap;
 	wmi_extscan_wlan_descriptor    *src_hotlist;
-	int numap, j, ap_found = 0;
+	uint32_t numap;
+	int j, ap_found = 0;
 
 	tpAniSirGlobal pMac = (tpAniSirGlobal )vos_get_context(
 					VOS_MODULE_ID_PE, wma->vos_context);
@@ -4267,6 +4274,11 @@ static int wma_extscan_hotlist_match_event_handler(void *handle,
 	if (!src_hotlist || !numap) {
 		WMA_LOGE("%s: Hotlist AP's list invalid", __func__);
 		return -EINVAL;
+	}
+	if (numap > WMA_EXTSCAN_MAX_HOTLIST_ENTRIES) {
+		WMA_LOGE("%s: Total Entries %u greater than max",
+			  __func__, numap);
+		numap = WMA_EXTSCAN_MAX_HOTLIST_ENTRIES;
 	}
 	dest_hotlist = vos_mem_malloc(sizeof(*dest_hotlist) +
 					sizeof(*dest_ap) * numap);
@@ -17103,6 +17115,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 		case WMI_PDEV_PARAM_FORCE_CHAIN_ANT:
 		case WMI_PDEV_PARAM_ANT_DIV_SELFTEST:
 		case WMI_PDEV_PARAM_ANT_DIV_SELFTEST_INTVL:
+		case WMI_PDEV_PARAM_RADIO_CHAN_STATS_ENABLE:
 			break;
 		default:
 			WMA_LOGE("Invalid wda_cli_set pdev command/Not"
@@ -18272,8 +18285,9 @@ static void wma_add_bss_sta_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 send_bss_resp:
 		ol_txrx_find_peer_by_addr(pdev, add_bss->bssId,
 					  &add_bss->staContext.staIdx);
-		add_bss->status = (add_bss->staContext.staIdx < 0) ?
-				VOS_STATUS_E_FAILURE : VOS_STATUS_SUCCESS;
+		add_bss->status =
+			(add_bss->staContext.staIdx == HAL_STA_INVALID_IDX) ?
+			VOS_STATUS_E_FAILURE : VOS_STATUS_SUCCESS;
 		add_bss->bssIdx = add_bss->staContext.smesessionId;
 		vos_mem_copy(add_bss->staContext.staMac, add_bss->bssId,
 				 sizeof(add_bss->staContext.staMac));
@@ -25061,8 +25075,12 @@ static VOS_STATUS wma_feed_allowed_action_frame_patterns(tp_wma_handle wma)
 	wmi_buf_t buf;
 	int ret;
 	int i;
+	uint8_t *buf_ptr;
+	uint32_t *cmd_args;
 
-	len = sizeof(WMI_WOW_SET_ACTION_WAKE_UP_CMD_fixed_param);
+	len = sizeof(WMI_WOW_SET_ACTION_WAKE_UP_CMD_fixed_param) +
+		WMI_TLV_HDR_SIZE + (MAX_SUPPORTED_ACTION_CATEGORY *
+		sizeof(A_UINT32));
 	buf = wmi_buf_alloc(wma->wmi_handle, len);
 	if (!buf) {
 		WMA_LOGE("%s: Failed to allocate buf for wow action frame map",
@@ -25071,6 +25089,7 @@ static VOS_STATUS wma_feed_allowed_action_frame_patterns(tp_wma_handle wma)
 	}
 
 	cmd = (WMI_WOW_SET_ACTION_WAKE_UP_CMD_fixed_param *) wmi_buf_data(buf);
+	buf_ptr = (uint8_t *)cmd;
 	WMITLV_SET_HDR(&cmd->tlv_header,
 		       WMITLV_TAG_STRUC_wmi_wow_set_action_wake_up_cmd_fixed_param,
 		       WMITLV_GET_STRUCT_TLVLEN(
@@ -25088,6 +25107,14 @@ static VOS_STATUS wma_feed_allowed_action_frame_patterns(tp_wma_handle wma)
 		WMA_LOGD("%s: %d action Wakeup pattern 0x%x in fw",
 			__func__, i, cmd->action_category_map[i]);
 	}
+
+	buf_ptr += sizeof(WMI_WOW_SET_ACTION_WAKE_UP_CMD_fixed_param);
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
+			(MAX_SUPPORTED_ACTION_CATEGORY * sizeof(A_UINT32)));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	cmd_args = (uint32_t *) buf_ptr;
+	for (i = 0; i < MAX_SUPPORTED_ACTION_CATEGORY; i++)
+		cmd_args[i] = wma->allowed_action_frames.action_per_category[i];
 
 	ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
 				   WMI_WOW_SET_ACTION_WAKE_UP_CMDID);
@@ -32583,6 +32610,14 @@ void wma_process_set_allowed_action_frames_ind(tp_wma_handle wma_handle,
 			i, allowed_action_frames->action_category_map[i]);
 	}
 
+	for (i = 0; i < SIR_MAC_ACTION_MAX; i++) {
+		wma_handle->allowed_action_frames.action_per_category[i] =
+				allowed_action_frames->action_per_category[i];
+	}
+
+	WMA_LOGD("Spectrum mgmt action frames drop pattern 0x%x",
+			wma_handle->allowed_action_frames.
+			action_per_category[SIR_MAC_ACTION_SPECTRUM_MGMT]);
 	return;
 }
 
@@ -33811,6 +33846,11 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			vos_mem_free(msg->bodyptr);
 			break;
 #endif /* WLAN_FEATURE_APFIND */
+		case WDA_DSRC_RADIO_CHAN_STATS_REQ:
+			wma_process_radio_chan_stats_req(wma_handle,
+				(struct radio_chan_stats_req *)msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
 		case WDA_OCB_SET_CONFIG_CMD:
 			wma_ocb_set_config_req(wma_handle,
 				(struct sir_ocb_config *)msg->bodyptr);

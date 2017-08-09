@@ -2973,7 +2973,8 @@ sap_OpenSession (tHalHandle hHal, ptSapContext sapContext,
         return VOS_STATUS_E_FAILURE;
     }
 
-    sme_set_allowed_action_frames(hHal, ALLOWED_ACTION_FRAMES_BITMAP0_SAP);
+    sme_set_allowed_action_frames(hHal,
+		ALLOWED_ACTION_FRAMES_BITMAP0_SAP, false);
     status = vos_wait_single_event(
             &sapContext->sap_session_opened_evt,
             SAP_OPEN_SESSION_TIMEOUT);
@@ -3240,7 +3241,6 @@ sapSignalHDDevent
     /* Format the Start BSS Complete event to return... */
     if (NULL == sapContext->pfnSapEventCallback)
     {
-        VOS_ASSERT(0);
         return VOS_STATUS_E_FAILURE;
     }
     if (NULL == hHal)
@@ -3728,7 +3728,7 @@ eHalStatus sap_CloseSession(tHalHandle hHal,
          * to FW
          */
         sme_set_allowed_action_frames(hHal,
-                           ALLOWED_ACTION_FRAMES_BITMAP0_STA);
+			ALLOWED_ACTION_FRAMES_BITMAP0_STA, true);
     }
 
     return halstatus;
@@ -4121,6 +4121,7 @@ sapFsm
                                         &sapContext->vht_channel_width,
                                         sapContext->ch_width_orig);
 
+                 cbMode = sme_GetCBPhyStateFromCBIniValue(cbMode);
 #ifdef WLAN_ENABLE_CHNL_MATRIX_RESTRICTION
                  temp_chan = sapContext->channel;
                  pNol = pMac->sap.SapDfsInfo.sapDfsChannelNolList;

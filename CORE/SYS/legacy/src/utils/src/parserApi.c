@@ -51,6 +51,8 @@
 #endif
 
 #include "regdomain_common.h"
+#include "qdf_crypto.h"
+#include "lim_process_fils.h"
 
 #define DOT11F_RSN_VERSION 1    /* current supported version */
 #define DOT11F_RSN_OUI_SIZE 4
@@ -2314,7 +2316,57 @@ tSirRetStatus sirvalidateandrectifyies(tpAniSirGlobal pMac,
     return eHAL_STATUS_SUCCESS;
 }
 
+/**
+ * sir_copy_hs20_ie() - Update HS 2.0 Information Element.
+ * @dest: dest HS IE buffer to be updated
+ * @src: src HS IE buffer
+ *
+ * Update HS2.0 IE info from src to dest
+ *
+ * Return: void
+ */
+void sir_copy_hs20_ie(tDot11fIEhs20vendor_ie *dest, tDot11fIEhs20vendor_ie *src)
+{
+	if (src->present) {
+		adf_os_mem_copy(dest,
+				src,
+				sizeof(tDot11fIEhs20vendor_ie) -
+					sizeof(src->hs_id));
+
+		if (src->hs_id_present)
+			adf_os_mem_copy(&dest->hs_id,
+					&src->hs_id,
+					sizeof(src->hs_id));
+	}
+}
+
 #ifdef WLAN_FEATURE_FILS_SK
+void populate_dot11f_fils_params(tpAniSirGlobal mac_ctx,
+        tDot11fAssocRequest *frm,
+        tpPESession pe_session)
+{
+    struct pe_fils_session *fils_info = pe_session->fils_info;
+
+    /* Populate RSN IE with FILS AKM */
+    PopulateDot11fRSNOpaque(mac_ctx, &(pe_session->pLimJoinReq->rsnIE),
+                                &frm->RSNOpaque);
+
+    /* Populate FILS session IE */
+    frm->fils_session.present = true;
+    vos_mem_copy(frm->fils_session.session,
+             fils_info->fils_session, FILS_SESSION_LENGTH);
+
+    /* Populate FILS Key confirmation IE */
+    if (fils_info->key_auth_len) {
+        frm->fils_key_confirmation.present = true;
+        frm->fils_key_confirmation.num_key_auth =
+                        fils_info->key_auth_len;
+
+        vos_mem_copy(frm->fils_key_confirmation.key_auth,
+                 fils_info->key_auth, fils_info->key_auth_len);
+    }
+}
+
 /**
  * update_fils_data: update fils params from beacon/probe response
  * @fils_ind: pointer to sir_fils_indication
@@ -2381,11 +2433,6 @@ sir_convert_fils_data_to_probersp_struct(tpSirProbeRespBeacon probe_resp,
         tDot11fProbeResponse *pr)
 {
 }
-static inline void populate_dot11f_fils_params(tpAniSirGlobal mac_ctx,
-                 tDot11fAssocRequest *frm,
-                 tpPESession pe_session)
-{
-}
 #endif
 tSirRetStatus sirConvertProbeFrame2Struct(tpAniSirGlobal       pMac,
                                           tANI_U8             *pFrame,
@@ -2421,13 +2468,6 @@ tSirRetStatus sirConvertProbeFrame2Struct(tpAniSirGlobal       pMac,
         PELOG2(sirDumpBuf(pMac, SIR_DBG_MODULE_ID, LOG2, pFrame, nFrame);)
         vos_mem_free(pr);
         return eSIR_FAILURE;
-    }
-    else if ( DOT11F_WARNED( status ) )
-    {
-      limLog(pMac, LOGW,
-             FL("Warnings while unpacking a Probe Response(0x%08x, %d bytes):"),
-             status, nFrame);
-        PELOG2(sirDumpBuf(pMac, SIR_DBG_MODULE_ID, LOG2, pFrame, nFrame);)
     }
 
     // & "transliterate" from a 'tDot11fProbeResponse' to a 'tSirProbeRespBeacon'...
@@ -2678,6 +2718,9 @@ tSirRetStatus sirConvertProbeFrame2Struct(tpAniSirGlobal       pMac,
 #ifdef WLAN_FEATURE_FILS_SK
     sir_convert_fils_data_to_probersp_struct(pProbeResp, pr);
 #endif
+
+    sir_copy_hs20_ie(&pProbeResp->hs20vendor_ie, &pr->hs20vendor_ie);
+
     vos_mem_free(pr);
     return eSIR_SUCCESS;
 
@@ -2918,8 +2961,57 @@ sirConvertAssocReqFrame2Struct(tpAniSirGlobal pMac,
 
 } // End sirConvertAssocReqFrame2Struct.
 
+#ifdef WLAN_FEATURE_FILS_SK
+/**
+ * fils_convert_assoc_rsp_frame2_struct() - Copy FILS IE's to Assoc rsp struct
+ * @ar: frame parser Assoc response struct
+ * @pAssocRsp: LIM Assoc response
+ *
+ * Return: None
+ */
+static void fils_convert_assoc_rsp_frame2_struct(tpAniSirGlobal pMac,
+                         tDot11fAssocResponse *ar,
+                         tpSirAssocRsp pAssocRsp)
+{
+    if (ar->fils_session.present) {
+        limLog(pMac, LOG1, FL("fils session IE present"));
+        pAssocRsp->fils_session.present = true;
+        vos_mem_copy(pAssocRsp->fils_session.session,
+                ar->fils_session.session,
+                DOT11F_IE_FILS_SESSION_MAX_LEN);
+    }
+
+    if (ar->fils_key_confirmation.present) {
+        limLog(pMac, LOG1, FL("fils key conf IE present"));
+        pAssocRsp->fils_key_auth.num_key_auth =
+            ar->fils_key_confirmation.num_key_auth;
+        vos_mem_copy(pAssocRsp->fils_key_auth.key_auth,
+                ar->fils_key_confirmation.key_auth,
+                pAssocRsp->fils_key_auth.num_key_auth);
+    }
+
+    if (ar->fils_kde.present) {
+        limLog(pMac, LOG1,
+                  FL("fils kde IE present %d"),ar->fils_kde.num_kde_list);
+        pAssocRsp->fils_kde.num_kde_list =
+            ar->fils_kde.num_kde_list;
+        vos_mem_copy(pAssocRsp->fils_kde.key_rsc,
+                ar->fils_kde.key_rsc, KEY_RSC_LEN);
+        vos_mem_copy(&pAssocRsp->fils_kde.kde_list,
+                &ar->fils_kde.kde_list,
+                pAssocRsp->fils_kde.num_kde_list);
+    }
+}
+#else
+static inline void fils_convert_assoc_rsp_frame2_struct(tpAniSirGlobal pMac,
+                                 tDot11fAssocResponse *ar,
+                                 tpSirAssocRsp pAssocRsp)
+{ }
+#endif
+
 tSirRetStatus
 sirConvertAssocRespFrame2Struct(tpAniSirGlobal pMac,
+                                tpPESession psessionEntry,
                                 tANI_U8            *pFrame,
                                 tANI_U32            nFrame,
                                 tpSirAssocRsp  pAssocRsp)
@@ -2931,6 +3023,18 @@ sirConvertAssocRespFrame2Struct(tpAniSirGlobal pMac,
     // Zero-init our [out] parameter,
     vos_mem_set( ( tANI_U8* )pAssocRsp, sizeof(tSirAssocRsp), 0 );
 
+#ifdef WLAN_FEATURE_FILS_SK
+    /* decrypt the cipher text using AEAD decryption */
+    if (lim_is_fils_connection(psessionEntry)) {
+        status = aead_decrypt_assoc_rsp(pMac, psessionEntry,
+                        &ar, pFrame, &nFrame);
+        if (!VOS_IS_STATUS_SUCCESS(status)) {
+            limLog(pMac, LOGE,
+                  FL("FILS assoc rsp AEAD decrypt fails"));
+            return eSIR_FAILURE;
+        }
+    }
+#endif
     // delegate to the framesc-generated code,
     status = dot11fUnpackAssocResponse( pMac, pFrame, nFrame, &ar);
     if ( DOT11F_FAILED( status ) )
@@ -3054,7 +3158,7 @@ sirConvertAssocRespFrame2Struct(tpAniSirGlobal pMac,
 #endif
 
 #ifdef WLAN_FEATURE_VOWIFI_11R
-    if (ar.num_RICDataDesc <= 2) {
+    if (ar.num_RICDataDesc && ar.num_RICDataDesc <= 2) {
         for (cnt=0; cnt < ar.num_RICDataDesc; cnt++) {
             if (ar.RICDataDesc[cnt].present) {
                 vos_mem_copy( &pAssocRsp->RICData[cnt], &ar.RICDataDesc[cnt],
@@ -3146,6 +3250,7 @@ sirConvertAssocRespFrame2Struct(tpAniSirGlobal pMac,
             pAssocRsp->vendor_sub20_capability =
              ar.QComVendorIE.Sub20Info.capability;
 
+    fils_convert_assoc_rsp_frame2_struct(pMac, &ar, pAssocRsp);
     return eSIR_SUCCESS;
 
 } // End sirConvertAssocRespFrame2Struct.
@@ -3975,6 +4080,9 @@ sirParseBeaconIE(tpAniSirGlobal        pMac,
 #ifdef WLAN_FEATURE_FILS_SK
     sir_parse_fils_beacon_ie(pBeaconStruct, pBies);
 #endif
+
+    sir_copy_hs20_ie(&pBeaconStruct->hs20vendor_ie, &pBies->hs20vendor_ie);
+
     vos_mem_free(pBies);
     return eSIR_SUCCESS;
 } // End sirParseBeaconIE.
@@ -4051,13 +4159,6 @@ sirConvertBeaconFrame2Struct(tpAniSirGlobal       pMac,
         PELOG2(sirDumpBuf(pMac, SIR_DBG_MODULE_ID, LOG2, pPayload, nPayload);)
         vos_mem_free(pBeacon);
         return eSIR_FAILURE;
-    }
-    else if ( DOT11F_WARNED( status ) )
-    {
-      limLog(pMac, LOGW,
-                 FL("There were warnings while unpacking Beacon IEs (0x%08x, %d bytes):"),
-                 status, nPayload);
-        PELOG2(sirDumpBuf(pMac, SIR_DBG_MODULE_ID, LOG2, pPayload, nPayload);)
     }
 
     // & "transliterate" from a 'tDot11fBeacon' to a 'tSirProbeRespBeacon'...
@@ -4374,10 +4475,58 @@ sirConvertBeaconFrame2Struct(tpAniSirGlobal       pMac,
 #ifdef WLAN_FEATURE_FILS_SK
     sir_convert_fils_data_to_beacon_struct(pBeaconStruct, pBeacon);
 #endif
+
+    sir_copy_hs20_ie(&pBeaconStruct->hs20vendor_ie, &pBeacon->hs20vendor_ie);
+
     vos_mem_free(pBeacon);
     return eSIR_SUCCESS;
 
 } // End sirConvertBeaconFrame2Struct.
+
+#ifdef WLAN_FEATURE_FILS_SK
+/* sir_update_auth_frame2_struct_fils_conf: API to update fils info from auth
+ * packet type 2
+ * @auth: auth packet pointer received from AP
+ * @auth_frame: data structure needs to be updated
+ *
+ * Return: None
+ */
+static void sir_update_auth_frame2_struct_fils_conf(tDot11fAuthentication *auth,
+                tpSirMacAuthFrameBody auth_frame)
+{
+    if (auth->AuthAlgo.algo != eSIR_FILS_SK_WITHOUT_PFS)
+        return;
+
+    if (auth->fils_assoc_delay_info.present)
+        auth_frame->assoc_delay_info =
+            auth->fils_assoc_delay_info.assoc_delay_info;
+
+    if (auth->fils_session.present)
+        vos_mem_copy(auth_frame->session, auth->fils_session.session,
+            SIR_FILS_SESSION_LENGTH);
+
+    if (auth->fils_nonce.present)
+        vos_mem_copy(auth_frame->nonce, auth->fils_nonce.nonce,
+            SIR_FILS_NONCE_LENGTH);
+
+    if (auth->fils_wrapped_data.present) {
+        vos_mem_copy(auth_frame->wrapped_data,
+            auth->fils_wrapped_data.wrapped_data,
+            auth->fils_wrapped_data.num_wrapped_data);
+        auth_frame->wrapped_data_len =
+            auth->fils_wrapped_data.num_wrapped_data;
+    }
+    if (auth->RSNOpaque.present) {
+        vos_mem_copy(auth_frame->rsn_ie.info, auth->RSNOpaque.data,
+            auth->RSNOpaque.num_data);
+        auth_frame->rsn_ie.length = auth->RSNOpaque.num_data;
+    }
+}
+#else
+static void sir_update_auth_frame2_struct_fils_conf(tDot11fAuthentication *auth,
+                tpSirMacAuthFrameBody auth_frame)
+{ }
+#endif
 
 tSirRetStatus
 sirConvertAuthFrame2Struct(tpAniSirGlobal        pMac,
@@ -4419,6 +4568,7 @@ sirConvertAuthFrame2Struct(tpAniSirGlobal        pMac,
         pAuth->length = auth.ChallengeText.num_text;
         vos_mem_copy( pAuth->challengeText, auth.ChallengeText.text, auth.ChallengeText.num_text );
     }
+    sir_update_auth_frame2_struct_fils_conf(&auth, pAuth);
 
     return eSIR_SUCCESS;
 

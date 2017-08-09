@@ -35,6 +35,9 @@
 #ifndef CSRAPI_H__
 #define CSRAPI_H__
 
+#ifdef WLAN_FEATURE_FILS_SK
+#include "lim_fils_defs.h"
+#endif
 #include "sirApi.h"
 #include "sirMacProtDef.h"
 #include "csrLinkList.h"
@@ -249,7 +252,8 @@ typedef enum
 #ifdef FEATURE_WLAN_ESE
 #define CSR_KRK_KEY_LEN 16
 #endif
-
+/* Cache ID length */
+#define CACHE_ID_LEN 2
 
 typedef struct tagCsrChannelInfo
 {
@@ -442,6 +446,10 @@ typedef struct tagCsrScanResultFilter
      */
     uint8_t scan_filter_for_roam;
     tCsrBssid bssid_hint;
+#ifdef WLAN_FEATURE_FILS_SK
+    bool realm_check;
+    uint8_t fils_realm[2];
+#endif
 }tCsrScanResultFilter;
 
 
@@ -1044,6 +1052,10 @@ typedef struct tagCsrRoamProfile
     tSirMacRateSet  extended_rates;
     uint8_t sub20_channelwidth;
     tCsrBssid bssid_hint;
+#ifdef WLAN_FEATURE_FILS_SK
+    bool fils_connection;
+    struct cds_fils_connection_info *fils_con_info;
+#endif
 }tCsrRoamProfile;
 
 
@@ -1384,6 +1396,9 @@ typedef struct tagCsrConfigParam
     uint32_t edca_be_aifs;
     struct csr_sta_roam_policy_params sta_roam_policy_params;
     uint32_t sta_auth_retries_for_code17;
+#ifdef WLAN_FEATURE_FILS_SK
+    uint8_t fils_max_chan_guard_time;
+#endif
 }tCsrConfigParam;
 
 //Tush
@@ -1511,7 +1526,12 @@ typedef struct tagCsrRoamInfo
         struct ndi_delete_rsp ndi_delete_params;
     } ndp;
 #endif
-
+    tDot11fIEHTCaps ht_caps;
+    tDot11fIEVHTCaps vht_caps;
+    tDot11fIEhs20vendor_ie hs20vendor_ie;
+    tDot11fIEVHTOperation vht_operation;
+    tDot11fIEHTInfo ht_operation;
+    bool reassoc;
     /* Extended capabilities of STA */
     uint8_t ecsa_capable;
     bool                 ampdu;
@@ -1525,6 +1545,11 @@ typedef struct tagCsrRoamInfo
     uint8_t              max_mcs_idx;
     uint8_t              rx_mcs_map;
     uint8_t              tx_mcs_map;
+#ifdef WLAN_FEATURE_FILS_SK
+    bool is_fils_connection;
+    uint16_t fils_seq_num;
+    struct fils_join_rsp_params *fils_join_rsp;
+#endif
 }tCsrRoamInfo;
 
 

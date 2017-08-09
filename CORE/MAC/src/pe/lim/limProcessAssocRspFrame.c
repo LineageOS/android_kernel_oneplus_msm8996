@@ -55,6 +55,7 @@
 #if defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD)
 #include "eseApi.h"
 #endif
+#include "lim_process_fils.h"
 
 extern tSirRetStatus schBeaconEdcaProcess(tpAniSirGlobal pMac, tSirMacEdcaParamSetIE *edca, tpPESession psessionEntry);
 
@@ -514,9 +515,8 @@ limProcessAssocRspFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tANI_U8 sub
 #endif
     pBody = WDA_GET_RX_MPDU_DATA(pRxPacketInfo);
 
-    // parse Re/Association Response frame.
     if (sirConvertAssocRespFrame2Struct(
-                        pMac, pBody, frameLen, pAssocRsp) == eSIR_FAILURE)
+                        pMac, psessionEntry, pBody, frameLen, pAssocRsp) == eSIR_FAILURE)
     {
         vos_mem_free(pAssocRsp);
         PELOGE(limLog(pMac, LOGE, FL("Parse error Assoc resp subtype %d,"
@@ -544,16 +544,18 @@ limProcessAssocRspFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tANI_U8 sub
         psessionEntry->assocRspLen = 0;
     }
 
-    psessionEntry->assocRsp = vos_mem_malloc(frameLen);
-    if (NULL == psessionEntry->assocRsp)
-    {
-        PELOGE(limLog(pMac, LOGE, FL("Unable to allocate memory to store assoc response, len = %d"), frameLen);)
-    }
-    else
-    {
-        //Store the Assoc response. This is sent to csr/hdd in join cnf response.
-        vos_mem_copy(psessionEntry->assocRsp, pBody, frameLen);
-        psessionEntry->assocRspLen = frameLen;
+    if (frameLen) {
+        psessionEntry->assocRsp = vos_mem_malloc(frameLen);
+        if (NULL == psessionEntry->assocRsp)
+        {
+            PELOGE(limLog(pMac, LOGE, FL("Unable to allocate memory to store assoc response, len = %d"), frameLen);)
+        }
+        else
+        {
+            //Store the Assoc response. This is sent to csr/hdd in join cnf response.
+            vos_mem_copy(psessionEntry->assocRsp, pBody, frameLen);
+            psessionEntry->assocRspLen = frameLen;
+        }
     }
 
 #ifdef WLAN_FEATURE_VOWIFI_11R
@@ -722,6 +724,20 @@ limProcessAssocRspFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tANI_U8 sub
         limSendDisassocMgmtFrame(pMac, eSIR_MAC_UNSPEC_FAILURE_REASON,
                                  pHdr->sa, psessionEntry, FALSE);
 
+        goto assocReject;
+    }
+
+    if (!lim_verify_fils_params_assoc_rsp(pMac, psessionEntry,
+                                       pAssocRsp, &mlmAssocCnf))
+    {
+        /* Log error */
+        PELOGW(limLog(pMac, LOGE, "FILS params doesnot match");)
+        mlmAssocCnf.resultCode = eSIR_SME_INVALID_ASSOC_RSP_RXED;
+        mlmAssocCnf.protStatusCode = eSIR_MAC_UNSPEC_FAILURE_STATUS;
+
+        /* Send advisory Disassociation frame to AP */
+        limSendDisassocMgmtFrame(pMac, eSIR_MAC_UNSPEC_FAILURE_REASON,
+                                 pHdr->sa, psessionEntry, FALSE);
         goto assocReject;
     }
     // Association Response received with success code
@@ -991,6 +1007,17 @@ limProcessAssocRspFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tANI_U8 sub
       (tANI_U8 *) psessionEntry->pLimJoinReq->bssDescription.ieFields,
       GET_IE_LEN_IN_BSS(psessionEntry->pLimJoinReq->bssDescription.length),
       pBeaconStruct);
+
+    if (pBeaconStruct->VHTCaps.present)
+        psessionEntry->vht_caps = pBeaconStruct->VHTCaps;
+    if (pBeaconStruct->HTCaps.present)
+        psessionEntry->ht_caps = pBeaconStruct->HTCaps;
+    if (pBeaconStruct->hs20vendor_ie.present)
+        psessionEntry->hs20vendor_ie = pBeaconStruct->hs20vendor_ie;
+    if (pBeaconStruct->HTInfo.present)
+        psessionEntry->ht_operation = pBeaconStruct->HTInfo;
+    if (pBeaconStruct->VHTOperation.present)
+        psessionEntry->vht_operation = pBeaconStruct->VHTOperation;
 
     if(pMac->lim.gLimProtectionControl != WNI_CFG_FORCE_POLICY_PROTECTION_DISABLE)
         limDecideStaProtectionOnAssoc(pMac, pBeaconStruct, psessionEntry);

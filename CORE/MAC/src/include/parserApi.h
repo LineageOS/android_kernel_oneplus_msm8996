@@ -273,6 +273,7 @@ typedef struct sSirProbeRespBeacon
     tANI_U8                   Vendor1IEPresent;
     tDot11fIEvendor2_ie       vendor2_ie;
     tANI_U8                   Vendor3IEPresent;
+    tDot11fIEhs20vendor_ie    hs20vendor_ie;
     tDot11fIEIBSSParams       IBSSParams;
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
@@ -361,6 +362,7 @@ typedef struct sSirAssocReq
     tDot11fIEExtCap           ExtCap;
     tDot11fIEvendor2_ie       vendor2_ie;
     uint8_t                   vendor_sub20_capability;
+    tDot11fIEhs20vendor_ie    hs20vendor_ie;
 } tSirAssocReq, *tpSirAssocReq;
 
 
@@ -419,6 +421,11 @@ typedef struct sSirAssocRsp
 #endif
     tDot11fIEvendor2_ie       vendor2_ie;
     uint8_t                   vendor_sub20_capability;
+#ifdef WLAN_FEATURE_FILS_SK
+    tDot11fIEfils_session fils_session;
+    tDot11fIEfils_key_confirmation fils_key_auth;
+    tDot11fIEfils_kde fils_kde;
+#endif
 } tSirAssocRsp, *tpSirAssocRsp;
 
 #if defined(FEATURE_WLAN_ESE_UPLOAD)
@@ -594,6 +601,7 @@ sirConvertAssocReqFrame2Struct(struct sAniSirGlobal *pMac,
 
 tSirRetStatus
 sirConvertAssocRespFrame2Struct(struct sAniSirGlobal *pMac,
+                                tpPESession psessionEntry,
                                 tANI_U8 * frame,
                                 tANI_U32 len,
                                 tpSirAssocRsp assoc);
@@ -1085,7 +1093,6 @@ void PopulateDot11fAssocRspRates ( tpAniSirGlobal pMac, tDot11fIESuppRates *pSup
 int FindIELocation( tpAniSirGlobal pMac,
                            tpSirRSNie pRsnIe,
                            tANI_U8 EID);
-#endif
 
 #ifdef WLAN_FEATURE_11AC
 tSirRetStatus
@@ -1132,3 +1139,38 @@ tSirRetStatus sirvalidateandrectifyies(tpAniSirGlobal pMac,
                                        tANI_U8 *pMgmtFrame,
                                        tANI_U32 nFrameBytes,
                                        tANI_U32 *nMissingRsnBytes);
+
+/**
+ * sir_copy_hs20_ie() - Update HS 2.0 Information Element.
+ * @dest: dest HS IE buffer to be updated
+ * @src: src HS IE buffer
+ *
+ * Update HS2.0 IE info from src to dest
+ *
+ * Return: void
+ */
+void sir_copy_hs20_ie(tDot11fIEhs20vendor_ie *dest,
+                      tDot11fIEhs20vendor_ie *src);
+
+#ifdef WLAN_FEATURE_FILS_SK
+/**
+ * populate_dot11f_fils_params() - Populate FILS IE to frame
+ * @mac_ctx: global mac context
+ * @frm: Assoc request frame
+ * @pe_session: PE session
+ *
+ * This API is used to populate FILS IE to Association request
+ *
+ * Return: None
+ */
+void populate_dot11f_fils_params(tpAniSirGlobal mac_ctx,
+                 tDot11fAssocRequest *frm,
+                 tpPESession pe_session);
+#else
+static inline void populate_dot11f_fils_params(tpAniSirGlobal mac_ctx,
+                 tDot11fAssocRequest *frm,
+                 tpPESession pe_session)
+{}
+#endif
+
+#endif  /* __PARSE_H__ */

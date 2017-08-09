@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -290,6 +290,12 @@ limGetBssDescription( tpAniSirGlobal pMac, tSirBssDescription *pBssDescription,
     pBssDescription->tsf_delta = limGetU32(pBuf);
     pBuf += sizeof(tANI_U32);
     len  -= sizeof(tANI_U32);
+
+#ifdef WLAN_FEATURE_FILS_SK
+    vos_mem_copy(&pBssDescription->fils_info_element, pBuf, sizeof(struct fils_ind_elements));
+    pBuf += sizeof(struct fils_ind_elements);
+    len -= sizeof(struct fils_ind_elements);
+#endif
 
     if (len > 0)
     {
@@ -1338,6 +1344,17 @@ limJoinReqSerDes(tpAniSirGlobal pMac, tpSirSmeJoinReq pJoinReq, tANI_U8 *pBuf)
             pJoinReq->powerCap.maxTxPower,
             pJoinReq->supportedChannels.numChnl);)
 
+    if (pJoinReq->messageType == eWNI_SME_JOIN_REQ)
+    {
+        pJoinReq->sub20_channelwidth = *pBuf++;
+        len--;
+    }
+#ifdef WLAN_FEATURE_FILS_SK
+    vos_mem_copy(&pJoinReq->fils_con_info, pBuf, sizeof(struct cds_fils_connection_info));
+    pBuf += sizeof(struct cds_fils_connection_info);
+    len -= sizeof(struct cds_fils_connection_info);
+#endif
+
     // Extract uapsdPerAcBitmask
     pJoinReq->uapsdPerAcBitmask = *pBuf++;
     len--;
@@ -1363,9 +1380,6 @@ limJoinReqSerDes(tpAniSirGlobal pMac, tpSirSmeJoinReq pJoinReq, tANI_U8 *pBuf)
                        pJoinReq->bssDescription.length + 2);)
     pBuf += lenUsed;
     len -= lenUsed;
-
-    pJoinReq->sub20_channelwidth = *pBuf++;
-    len--;
 
     return eSIR_SUCCESS;
 } /*** end limJoinReqSerDes() ***/

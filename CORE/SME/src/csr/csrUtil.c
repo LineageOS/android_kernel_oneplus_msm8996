@@ -3590,6 +3590,71 @@ tANI_BOOLEAN csrLookupPMKID( tpAniSirGlobal pMac, tANI_U32 sessionId, tPmkidCach
     return fRC;
 }
 
+#ifdef WLAN_FEATURE_FILS_SK
+/*
+ * csr_update_pmksa_for_cache_id: update tPmkidCacheInfo to lookup using
+ * ssid and cache id
+ * @bss_desc: bss description
+ * @profile: csr roam profile
+ * @pmkid_cache: pmksa cache
+ *
+ * Return: true if cache identifier present else false
+ */
+static bool csr_update_pmksa_for_cache_id(tSirBssDescription *bss_desc,
+                tCsrRoamProfile *profile,
+                tPmkidCacheInfo *pmkid_cache)
+{
+    if (!bss_desc->fils_info_element.is_cache_id_present)
+        return false;
+
+    pmkid_cache->ssid_len =
+        profile->SSIDs.SSIDList[0].SSID.length;
+    vos_mem_copy(pmkid_cache->ssid,
+        profile->SSIDs.SSIDList[0].SSID.ssId,
+        profile->SSIDs.SSIDList[0].SSID.length);
+    vos_mem_copy(pmkid_cache->cache_id,
+        bss_desc->fils_info_element.cache_id,
+        CACHE_ID_LEN);
+    vos_mem_copy(pmkid_cache->BSSID,
+        bss_desc->bssId, VOS_MAC_ADDR_SIZE);
+
+    return true;
+}
+
+/*
+ * csr_update_pmksa_to_profile: update pmk and pmkid to profile which will be
+ * used in case of fils session
+ * @profile: profile
+ * @pmkid_cache: pmksa cache
+ *
+ * Return: None
+ */
+static inline void csr_update_pmksa_to_profile(tCsrRoamProfile *profile,
+        tPmkidCacheInfo *pmkid_cache)
+{
+    if (!profile->fils_con_info)
+        return;
+
+    profile->fils_con_info->pmk_len = pmkid_cache->pmk_len;
+    vos_mem_copy(profile->fils_con_info->pmk,
+            pmkid_cache->pmk, pmkid_cache->pmk_len);
+    vos_mem_copy(profile->fils_con_info->pmkid,
+        pmkid_cache->PMKID, CSR_RSN_PMKID_SIZE);
+
+}
+#else
+static inline bool csr_update_pmksa_for_cache_id(tSirBssDescription *bss_desc,
+                tCsrRoamProfile *profile,
+                tPmkidCacheInfo *pmkid_cache)
+{
+    return false;
+}
+
+static inline void csr_update_pmksa_to_profile(tCsrRoamProfile *profile,
+        tPmkidCacheInfo *pmkid_cache)
+{
+}
+#endif
 
 tANI_U8 csrConstructRSNIe( tHalHandle hHal, tANI_U32 sessionId, tCsrRoamProfile *pProfile,
                             tSirBssDescription *pSirBssDesc, tDot11fBeaconIEs *pIes, tCsrRSNIe *pRSNIe )
@@ -3664,7 +3729,8 @@ tANI_U8 csrConstructRSNIe( tHalHandle hHal, tANI_U32 sessionId, tCsrRoamProfile 
         *(tANI_U16 *)( &pAuthSuite->AuthOui[ 1 ] ) = *((tANI_U16 *)(&RSNCapabilities));
 
         pPMK = (tCsrRSNPMKIe *)( ((tANI_U8 *)(&pAuthSuite->AuthOui[ 1 ])) + sizeof(tANI_U16) );
-        vos_mem_copy((v_MACADDR_t *)pmkid_cache.BSSID,
+        if (!csr_update_pmksa_for_cache_id(pSirBssDesc, pProfile, &pmkid_cache))
+            vos_mem_copy((v_MACADDR_t *)pmkid_cache.BSSID,
                         (v_MACADDR_t *)pSirBssDesc->bssId,
                          VOS_MAC_ADDR_SIZE);
         // Don't include the PMK SA IDs for CCKM associations.
@@ -3679,6 +3745,7 @@ tANI_U8 csrConstructRSNIe( tHalHandle hHal, tANI_U32 sessionId, tCsrRoamProfile 
             vos_mem_copy(pPMK->PMKIDList[0].PMKID, 
                          pmkid_cache.PMKID,
                          CSR_RSN_PMKID_SIZE);
+            csr_update_pmksa_to_profile(pProfile, &pmkid_cache);
         }
         else
         {
@@ -5362,6 +5429,40 @@ static tANI_BOOLEAN csrIsRateSetMatch( tpAniSirGlobal pMac,
 
 }
 
+#ifdef WLAN_FEATURE_FILS_SK
+/*
+ * csr_is_fils_realm_match: API to check whether realm in scan filter is
+ * matching with realm in bss info
+ * @bss_descr: bss description
+ * @filter: scan filter
+ *
+ * Return: true if success else false
+ */
+static bool csr_is_fils_realm_match(tSirBssDescription *bss_descr,
+                        tCsrScanResultFilter *filter)
+{
+    int i;
+    bool is_match = true;
+
+    if (filter->realm_check) {
+        is_match = false;
+        for (i = 0; i < bss_descr->fils_info_element.realm_cnt; i++) {
+            if (!adf_os_mem_cmp(filter->fils_realm,
+                    bss_descr->fils_info_element.realm[i],
+                    SIR_REALM_LEN)) {
+                    return true;
+            }
+        }
+    }
+    return is_match;
+}
+#else
+static bool csr_is_fils_realm_match(tSirBssDescription *bss_descr,
+                                    tCsrScanResultFilter *filter)
+{
+    return true;
+}
+#endif
 
 //ppIes can be NULL. If caller want to get the *ppIes allocated by this function, pass in *ppIes = NULL
 tANI_BOOLEAN csrMatchBSS( tHalHandle hHal, tSirBssDescription *pBssDesc, tCsrScanResultFilter *pFilter,
@@ -5502,6 +5603,8 @@ tANI_BOOLEAN csrMatchBSS( tHalHandle hHal, tSirBssDescription *pBssDesc, tCsrSca
         }
 #endif
         fRC = eANI_BOOLEAN_TRUE;
+        if (fRC)
+            fRC = csr_is_fils_realm_match(pBssDesc, pFilter);
 
     } while( 0 );
     if( ppIes )
@@ -5810,6 +5913,19 @@ tANI_U16 csrRatesFindBestRate( tSirMacRateSet *pSuppRates, tSirMacRateSet *pExtR
     return nBest;
 }
 
+#ifdef WLAN_FEATURE_FILS_SK
+static inline void csr_free_fils_profile_info(tCsrRoamProfile *profile)
+{
+    if (profile->fils_con_info) {
+        vos_mem_free(profile->fils_con_info);
+        profile->fils_con_info = NULL;
+    }
+}
+#else
+static inline void csr_free_fils_profile_info(tCsrRoamProfile *profile)
+{ }
+#endif
+
 
 void csrReleaseProfile(tpAniSirGlobal pMac, tCsrRoamProfile *pProfile)
 {
@@ -5859,6 +5975,7 @@ void csrReleaseProfile(tpAniSirGlobal pMac, tCsrRoamProfile *pProfile)
             vos_mem_free(pProfile->ChannelInfo.ChannelList);
             pProfile->ChannelInfo.ChannelList = NULL;
         }
+        csr_free_fils_profile_info(pProfile);
         vos_mem_set(pProfile, sizeof(tCsrRoamProfile), 0);
     }
 }

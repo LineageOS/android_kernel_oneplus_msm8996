@@ -3966,6 +3966,14 @@ eHalStatus sme_dcc_update_ndl(tHalHandle hHal, void* context,
 
 eHalStatus sme_register_for_dcc_stats_event(tHalHandle hHal, void* context,
                                             ocb_callback callback);
+
+eHalStatus sme_register_radio_chan_stats_cb(tHalHandle hHal, void *context,
+					    ocb_callback callback);
+
+eHalStatus sme_unregister_radio_chan_stats_cb(tHalHandle hHal);
+
+eHalStatus sme_request_radio_chan_stats(tHalHandle hHal,
+					struct radio_chan_stats_req *req);
 #else
 static inline void sme_set_dot11p_config(tHalHandle hal, bool enable_dot11p)
 {
@@ -4037,6 +4045,22 @@ static inline eHalStatus sme_register_for_dcc_stats_event(tHalHandle hHal,
 	return eHAL_STATUS_SUCCESS;
 }
 
+static inline eHalStatus sme_register_radio_chan_stats_cb(tHalHandle hHal,
+		void *context, ocb_callback callback)
+{
+	return eHAL_STATUS_SUCCESS;
+}
+
+static inline eHalStatus sme_unregister_radio_chan_stats_cb(tHalHandle hHal)
+{
+	return eHAL_STATUS_SUCCESS;
+}
+
+static inline eHalStatus sme_request_radio_chan_stats(tHalHandle hHal,
+		struct radio_chan_stats_req *req)
+{
+	return eHAL_STATUS_SUCCESS;
+}
 #endif
 
 /* ---------------------------------------------------------------------------
@@ -4576,6 +4600,10 @@ VOS_STATUS sme_set_btc_bt_wlan_interval_inquiry_p2p_sta(uint32_t bt_interval,
 
 VOS_STATUS sme_set_btc_wlan_coex_tx_power(uint32_t coex_tx_power);
 
+#ifdef FEATURE_COEX_PTA_CONFIG_ENABLE
+VOS_STATUS sme_configure_pta_coex(uint8_t coex_pta_config_enable, uint32_t coex_pta_config_param);
+#endif
+
 uint8_t    sme_is_any_session_in_connected_state(tHalHandle h_hal);
 
 typedef void ( *tSmeSetThermalLevelCallback)(void *pContext, u_int8_t level);
@@ -4700,7 +4728,8 @@ eHalStatus sme_update_sta_roam_policy(tHalHandle hal_handle,
 eHalStatus sme_register_p2p_ack_ind_callback(tHalHandle hal,
 					sir_p2p_ack_ind_callback callback);
 
-void sme_set_allowed_action_frames(tHalHandle hal, uint32_t bitmap0);
+void sme_set_allowed_action_frames(tHalHandle hal,
+					uint32_t bitmap0, bool is_sta);
 
 eHalStatus sme_update_access_policy_vendor_ie(tHalHandle hal,
 		uint8_t session_id, uint8_t *vendor_ie, int access_policy);

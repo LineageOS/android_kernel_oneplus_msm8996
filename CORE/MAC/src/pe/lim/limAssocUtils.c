@@ -880,15 +880,15 @@ limSendDelStaCnf(tpAniSirGlobal pMac, tSirMacAddr staDsAddr,
                                     mlmStaContext.resultCode,
                                     mlmStaContext.protStatusCode,
                                     psessionEntry->peSessionId);
+
+            limSendSmeJoinReassocRsp(pMac, eWNI_SME_REASSOC_RSP,
+                               mlmStaContext.resultCode, mlmStaContext.protStatusCode, psessionEntry,
+                               smesessionId, smetransactionId);
             if(mlmStaContext.resultCode != eSIR_SME_SUCCESS )
             {
                 peDeleteSession(pMac, psessionEntry);
                 psessionEntry = NULL;
             }
-
-            limSendSmeJoinReassocRsp(pMac, eWNI_SME_REASSOC_RSP,
-                               mlmStaContext.resultCode, mlmStaContext.protStatusCode, psessionEntry,
-                               smesessionId, smetransactionId);
         }
         else
         {
@@ -902,17 +902,17 @@ limSendDelStaCnf(tpAniSirGlobal pMac, tSirMacAddr staDsAddr,
                                     mlmStaContext.protStatusCode,
                                     psessionEntry->peSessionId);
 
-            if(mlmStaContext.resultCode != eSIR_SME_SUCCESS)
-            {
-                peDeleteSession(pMac,psessionEntry);
-                psessionEntry = NULL;
-            }
 
             limSendSmeJoinReassocRsp(pMac, eWNI_SME_JOIN_RSP,
                                      mlmStaContext.resultCode,
                                      mlmStaContext.protStatusCode,
                                      psessionEntry, smesessionId,
                                      smetransactionId);
+            if(mlmStaContext.resultCode != eSIR_SME_SUCCESS)
+            {
+                peDeleteSession(pMac,psessionEntry);
+                psessionEntry = NULL;
+            }
         }
 
     }
@@ -3362,8 +3362,6 @@ limDeleteDphHashEntry(tpAniSirGlobal pMac, tSirMacAddr staAddr, tANI_U16 staId,t
     }
 }
 
-
-
 /**
  * limCheckAndAnnounceJoinSuccess()
  *
@@ -3512,6 +3510,8 @@ limCheckAndAnnounceJoinSuccess(tpAniSirGlobal pMac,
                     "VHT caps are present in vendor specific IE"));
     }
 
+    /* Update HS 2.0 Information Element */
+    sir_copy_hs20_ie(&psessionEntry->hs20vendor_ie, &pBPR->hs20vendor_ie);
 }
 
 /**
