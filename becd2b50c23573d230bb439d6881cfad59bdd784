@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "19155a88_7e89afd2",
+        "filename": "drivers/video/msm/mdss/mdss_livedisplay.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 633,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2017-08-12T11:58:11Z",
+      "side": 1,
+      "message": "The check is redundant.",
+      "range": {
+        "startLine": 632,
+        "startChar": 1,
+        "endLine": 633,
+        "endChar": 44
+      },
+      "revId": "becd2b50c23573d230bb439d6881cfad59bdd784",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5e865056_591766ad",
+        "filename": "drivers/video/msm/mdss/mdss_livedisplay.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 635,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2017-08-12T11:58:11Z",
+      "side": 1,
+      "message": "Use cm,mdss-livedisplay-foobar instead",
+      "range": {
+        "startLine": 635,
+        "startChar": 5,
+        "endLine": 635,
+        "endChar": 42
+      },
+      "revId": "becd2b50c23573d230bb439d6881cfad59bdd784",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
