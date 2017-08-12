@@ -164,6 +164,13 @@ int mdss_livedisplay_update(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 	if ((mlc->caps & MODE_SRGB) && (types & MODE_SRGB))
 		len += mlc->srgb_enabled ? mlc->srgb_on_cmds_len : mlc->srgb_off_cmds_len;
 
+	if((mlc->caps & MODE_DCI_P3) && (types & MODE_DCI_P3))
+		len += mlc->dci_p3_enabled ? mlc->dci_p3_on_cmds_len : mlc->dci_p3_off_cmds_len;
+
+	if((mlc->caps & MODE_ADOBE_RGB) && (types & MODE_ADOBE_RGB))
+		len += mlc->adobe_rgb_enabled ? mlc->adobe_rgb_on_cmds_len : mlc->adobe_rgb_off_cmds_len;
+
+
 	if (is_cabc_cmd(types) && is_cabc_cmd(mlc->caps)) {
 
 		// The CABC command on most modern panels is also responsible for
@@ -241,6 +248,29 @@ int mdss_livedisplay_update(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 			dlen += mlc->srgb_off_cmds_len;
 		}
 	}
+
+	// DCI-P3 mode
+	if ((mlc->caps & MODE_DCI_P3) && (types & MODE_DCI_P3)) {
+		if (mlc->dci_p3_enabled) {
+			memcpy(cmd_buf + dlen, mlc->dci_p3_on_cmds, mlc->dci_p3_on_cmds_len);
+			dlen += mlc->dci_p3_on_cmds_len;
+		} else {
+			memcpy(cmd_buf + dlen, mlc->dci_p3_off_cmds, mlc->dci_p3_off_cmds_len);
+			dlen += mlc->dci_p3_off_cmds_len;
+		}
+	}
+
+	// Adobe_RGB mode
+	if ((mlc->caps & MODE_ADOBE_RGB) && (types & MODE_ADOBE_RGB)) {
+		if (mlc->adobe_rgb_enabled) {
+			memcpy(cmd_buf + dlen, mlc->adobe_rgb_on_cmds, mlc->adobe_rgb_on_cmds_len);
+			dlen += mlc->adobe_rgb_on_cmds_len;
+		} else {
+			memcpy(cmd_buf + dlen, mlc->adobe_rgb_off_cmds, mlc->adobe_rgb_off_cmds_len);
+			dlen += mlc->adobe_rgb_off_cmds_len;
+		}
+	}
+
 
 	// CABC/SRE/ACO features
 	if (is_cabc_cmd(types) && mlc->cabc_cmds_len) {
@@ -408,6 +438,64 @@ static ssize_t mdss_livedisplay_set_srgb(struct device *dev,
 	return count;
 }
 
+static ssize_t mdss_livedisplay_get_dci_p3(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
+
+	return sprintf(buf, "%d\n", mlc->dci_p3_enabled);
+}
+
+static ssize_t mdss_livedisplay_set_dci_p3(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	int value = 0;
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
+
+	sscanf(buf, "%du", &value);
+	if ((value == 0 || value == 1)
+			&& value != mlc->dci_p3_enabled) {
+		mlc->dci_p3_enabled = value;
+		mdss_livedisplay_event(mfd, MODE_DCI_P3);
+	}
+
+	return count;
+}
+
+static ssize_t mdss_livedisplay_get_adobe_rgb(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
+
+	return sprintf(buf, "%d\n", mlc->adobe_rgb_enabled);
+}
+
+static ssize_t mdss_livedisplay_set_adobe_rgb(struct device *dev,
+							   struct device_attribute *attr,
+							   const char *buf, size_t count)
+{
+	int value = 0;
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
+
+	sscanf(buf, "%du", &value);
+	if ((value == 0 || value == 1)
+			&& value != mlc->adobe_rgb_enabled) {
+		mlc->adobe_rgb_enabled = value;
+		mdss_livedisplay_event(mfd, MODE_ADOBE_RGB);
+	}
+
+	return count;
+}
+
 static ssize_t mdss_livedisplay_get_color_enhance(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -513,6 +601,8 @@ static DEVICE_ATTR(preset, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_pre
 static DEVICE_ATTR(num_presets, S_IRUGO, mdss_livedisplay_get_num_presets, NULL);
 static DEVICE_ATTR(hbm, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_hbm, mdss_livedisplay_set_hbm);
 static DEVICE_ATTR(srgb, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_srgb, mdss_livedisplay_set_srgb);
+static DEVICE_ATTR(dci_p3, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_dci_p3, mdss_livedisplay_set_dci_p3);
+static DEVICE_ATTR(adobe_rgb, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_adobe_rgb, mdss_livedisplay_set_adobe_rgb);
 
 int mdss_livedisplay_parse_dt(struct device_node *np, struct mdss_panel_info *pinfo)
 {
@@ -579,6 +669,25 @@ int mdss_livedisplay_parse_dt(struct device_node *np, struct mdss_panel_info *pi
 				"cm,mdss-livedisplay-srgb-off-cmd", &mlc->srgb_off_cmds_len);
 		if (mlc->srgb_off_cmds_len)
 			mlc->caps |= MODE_SRGB;
+	}
+
+	mlc->dci_p3_on_cmds = of_get_property(np,
+			"cm,mdss-livedisplay-dci-p3-on-command", &mlc->dci_p3_on_cmds_len);
+	if(mlc->dci_p3_on_cmds_len) {
+		mlc->dci_p3_off_cmds = of_get_property(np,
+			"cm,mdss-livedisplay-dci-p3-off-command", &mlc->dci_p3_off_cmds_len);
+		if (mlc->dci_p3_off_cmds_len)
+			mlc->caps |= MODE_DCI_P3;
+	}
+	printk(KERN_INFO "DCI_P3 commands read\n");
+
+	mlc->adobe_rgb_on_cmds = of_get_property(np,
+		"cm,mdss-livedisplay-Adobe-rgb-on-cmd", &mlc->adobe_rgb_on_cmds_len);
+	if (mlc->adobe_rgb_on_cmds_len) {
+		mlc->adobe_rgb_off_cmds = of_get_property(np,
+				"cm,mdss-livedisplay-Adobe-rgb-off-cmd", &mlc->adobe_rgb_off_cmds_len);
+		if (mlc->adobe_rgb_off_cmds_len)
+			mlc->caps |= MODE_ADOBE_RGB;
 	}
 
 	mlc->ce_on_cmds = of_get_property(np,
@@ -649,6 +758,18 @@ int mdss_livedisplay_create_sysfs(struct msm_fb_data_type *mfd)
 
 	if (mlc->caps & MODE_SRGB) {
 		rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_srgb.attr);
+		if (rc)
+			goto sysfs_err;
+	}
+
+	if (mlc->caps & MODE_DCI_P3) {
+		rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_dci_p3.attr);
+		if (rc)
+			goto sysfs_err;
+	}
+
+	if (mlc->caps & MODE_ADOBE_RGB) {
+		rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_adobe_rgb.attr);
 		if (rc)
 			goto sysfs_err;
 	}
