@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "809be417_5d1d1f74",
+        "filename": "drivers/video/msm/mdss/mdss_livedisplay.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 106,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2017-08-15T11:06:11Z",
+      "side": 1,
+      "message": "0x80",
+      "range": {
+        "startLine": 105,
+        "startChar": 19,
+        "endLine": 106,
+        "endChar": 32
+      },
+      "revId": "cb553982be563d2a407b58ecf54cc5fe464b1bb1",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
