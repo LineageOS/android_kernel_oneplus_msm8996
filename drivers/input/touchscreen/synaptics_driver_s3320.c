@@ -459,6 +459,7 @@ struct synaptics_ts_data {
 	uint32_t pre_finger_state;
 	uint32_t pre_btn_state;
 	struct delayed_work  base_work;
+	struct work_struct base_work_intr;
 	struct delayed_work speed_up_work;
 	struct input_dev *input_dev;
 	struct hrtimer timer;
@@ -1295,7 +1296,7 @@ static char prlog_count = 0;
 #ifdef REPORT_2D_PRESSURE
 static unsigned char pres_value = 1;
 #endif
-void int_touch(void)
+uint8_t int_touch(void)
 {
 	int ret = -1,i = 0;
 	uint8_t buf[90];
@@ -1435,12 +1436,6 @@ void int_touch(void)
 	}
 	input_sync(ts->input_dev);
 
-	if ((finger_num == 0) && (get_tp_base == 0)){//all finger up do get base once
-		get_tp_base = 1;
-		TPD_ERR("start get base data:%d\n",get_tp_base);
-		tp_baseline_get(ts, false);
-	}
-
 #ifdef SUPPORT_GESTURE
 	if (ts->in_gesture_mode == 1 && ts->is_suspended == 1) {
 		gesture_judge(ts);
@@ -1448,6 +1443,7 @@ void int_touch(void)
 #endif
     INT_TOUCH_END:
 	mutex_unlock(&ts->mutexreport);
+	return finger_num;
 }
 
 static int synaptics_rmi4_free_fingers(struct synaptics_ts_data *ts)
@@ -1524,10 +1520,17 @@ static void synaptics_ts_work_func(void)
 		}
     }
 
-	if( inte & 0x04 ) {
+	if (inte & 0x04) {
+		uint8_t finger_num = int_touch();
 
-		int_touch();
+		/* All fingers up; do get base once */
+		if (!get_tp_base && !finger_num) {
+			get_tp_base = 1;
+			TPD_ERR("start get base data: 1\n");
+			schedule_work(&ts->base_work_intr);
+		}
 	}
+
 END:
 	//ret = set_changer_bit(ts);
 	touch_enable(ts);
@@ -3006,6 +3009,13 @@ static void tp_baseline_get_work(struct work_struct *work)
 	tp_baseline_get(ts, true);//get the delta data
 }
 
+static void tp_baseline_get_in_intr(struct work_struct *work)
+{
+	struct synaptics_ts_data *ts = ts_g;
+
+	tp_baseline_get(ts, false);
+}
+
 static ssize_t touch_press_status_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
 	int ret = 0;
@@ -4083,6 +4093,7 @@ static int synaptics_ts_probe(struct i2c_client *client, const struct i2c_device
 		goto exit_createworkqueue_failed;
 	}
 	INIT_DELAYED_WORK(&ts->base_work,tp_baseline_get_work);
+	INIT_WORK(&ts->base_work_intr, tp_baseline_get_in_intr);
 
 	ret = synaptics_init_panel(ts); /* will also switch back to page 0x04 */
 	if (ret < 0) {
