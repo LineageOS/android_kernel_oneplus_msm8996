@@ -3235,14 +3235,17 @@ static int wma_stats_event_handler(void *handle, u_int8_t *cmd_param_info,
 		}
 		rssi_event =
 			(wmi_per_chain_rssi_stats *) param_buf->chain_stats;
-		if (rssi_event && (rssi_event->num_per_chain_rssi_stats >
-		    ((WMA_SVC_MSG_MAX_SIZE - sizeof(*event)) /
-		    sizeof(wmi_rssi_stats)))) {
-			excess_data = true;
-			break;
-		} else {
-			buf_len += rssi_event->num_per_chain_rssi_stats *
+		if (rssi_event) {
+			if ((rssi_event->num_per_chain_rssi_stats >
+			    ((WMA_SVC_MSG_MAX_SIZE - sizeof(*event)) /
+			    sizeof(wmi_rssi_stats)))) {
+				excess_data = true;
+				break;
+			} else {
+				buf_len +=
+					rssi_event->num_per_chain_rssi_stats *
 					sizeof(wmi_rssi_stats);
+			}
 		}
 	} while (0);
 
@@ -26488,8 +26491,12 @@ static void wma_process_update_rx_nss(tp_wma_handle wma_handle,
 		&wma_handle->interfaces[update_rx_nss->smesessionId];
 	int rxNss = update_rx_nss->rxNss;
 
-	if (wma_handle->per_band_chainmask_supp)
-		wma_update_txrx_chainmask(intr->nss, &rxNss);
+	if (wma_handle->per_band_chainmask_supp) {
+		if (intr->mhz < WMA_2_4_GHZ_MAX_FREQ)
+			wma_update_txrx_chainmask(intr->nss_2g, &rxNss);
+		else
+			wma_update_txrx_chainmask(intr->nss_5g, &rxNss);
+	}
 	else
 		wma_update_txrx_chainmask(wma_handle->num_rf_chains, &rxNss);
 	intr->nss = (tANI_U8) rxNss;
