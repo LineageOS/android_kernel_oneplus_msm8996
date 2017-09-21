@@ -1533,13 +1533,15 @@ int sanity_check_ckpt(struct f2fs_sb_info *sbi)
 
 	for (i = 0; i < NR_CURSEG_NODE_TYPE; i++) {
 		if (le32_to_cpu(ckpt->cur_node_segno[i]) >= main_segs ||
-			le16_to_cpu(ckpt->cur_node_blkoff[i]) >= blocks_per_seg)
+		    le16_to_cpu(ckpt->cur_node_blkoff[i]) >= blocks_per_seg) {
 			return 1;
+		}
 	}
 	for (i = 0; i < NR_CURSEG_DATA_TYPE; i++) {
 		if (le32_to_cpu(ckpt->cur_data_segno[i]) >= main_segs ||
-			le16_to_cpu(ckpt->cur_data_blkoff[i]) >= blocks_per_seg)
+		    le16_to_cpu(ckpt->cur_data_blkoff[i]) >= blocks_per_seg) {
 			return 1;
+		}
 	}
 
 	if (unlikely(f2fs_cp_error(sbi))) {
