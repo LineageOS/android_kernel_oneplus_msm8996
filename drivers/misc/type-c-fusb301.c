@@ -908,6 +908,7 @@ static int fusb301_remove(struct i2c_client *client)
         disable_irq_wake(client->irq);
         free_irq(client->irq, info);
     }
+    wake_lock_destroy(&info->otg_wl);
     device_remove_file(info->dev_t, &dev_attr_type);
     device_destroy(info->fusb_class, 0);
     class_destroy(info->fusb_class);
