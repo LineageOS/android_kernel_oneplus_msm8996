@@ -1197,6 +1197,8 @@ static int dash_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	return 0;
 
 err_read_dt:
+	wake_lock_destroy(&di->fastchg_wake_lock);
+	wake_lock_destroy(&di->fastchg_update_fireware_lock);
 	kfree(di);
 err_check_functionality_failed:
 	pr_err("dash_probe fail\n");
@@ -1216,6 +1218,9 @@ static int dash_remove(struct i2c_client *client)
 		gpio_free(di->ap_clk);
 	if (gpio_is_valid(di->ap_data))
 		gpio_free(di->ap_data);
+
+	wake_lock_destroy(&di->fastchg_wake_lock);
+	wake_lock_destroy(&di->fastchg_update_fireware_lock);
 
 	return 0;
 }
