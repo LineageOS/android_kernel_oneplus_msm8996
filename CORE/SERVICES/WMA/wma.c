@@ -1147,7 +1147,7 @@ static void wma_vdev_start_rsp(tp_wma_handle wma,
 		 wma->interfaces[resp_event->vdev_id].type,
 		 wma->interfaces[resp_event->vdev_id].sub_type);
 
-	WMA_LOGD("%s: Allocated beacon struct %p, template memory %p",
+	WMA_LOGD("%s: Allocated beacon struct %pK, template memory %pK",
 		__func__, bcn, bcn->buf);
 	}
 	add_bss->status = VOS_STATUS_SUCCESS;
@@ -2296,8 +2296,8 @@ static int wma_vdev_stop_ind(tp_wma_handle wma, u_int8_t *buf)
 		bcn = wma->interfaces[resp_event->vdev_id].beacon;
 
 		if (bcn) {
-			WMA_LOGD("%s: Freeing beacon struct %p, "
-				 "template memory %p", __func__,
+			WMA_LOGD("%s: Freeing beacon struct %pK, "
+				 "template memory %pK", __func__,
 				 bcn, bcn->buf);
 			if (bcn->dma_mapped)
 				adf_nbuf_unmap_single(pdev->osdev, bcn->buf,
@@ -7895,8 +7895,15 @@ static int wma_unified_dfs_radar_rx_event_handler(void *handle,
 	event->re_full_ts = (((uint64_t)radar_event->upload_fullts_high) << 32)
 			| radar_event->upload_fullts_low;
 
-	/* Index of peak magnitude */
-	event->sidx = radar_event->peak_sidx;
+	/**
+	 * Index of peak magnitude
+	 * To do
+	 * Need change interface of WMI_DFS_RADAR_EVENTID to get delta_diff and
+	 * delta_peak when DFS Phyerr filtering offload is enabled.
+	 */
+	event->sidx = radar_event->peak_sidx & 0x0000ffff;
+	event->re_delta_diff = 0;
+	event->re_delta_peak = 0;
 	event->re_flags = 0;
 
 	/*
@@ -8746,7 +8753,7 @@ static int wma_antenna_isolation_event_handler(void *handle,
     WMI_COEX_REPORT_ANTENNA_ISOLATION_EVENTID_param_tlvs *param_buf;
     struct sir_isolation_resp isolation;
     tpAniSirGlobal mac = NULL;
-    WMA_LOGE("%s: handle %p param %p len %d", __func__, handle, param, len);
+    WMA_LOGE("%s: handle %pK param %pK len %d", __func__, handle, param, len);
 
     if(wma != NULL && wma->vos_context != NULL) {
         mac = (tpAniSirGlobal)vos_get_context(
@@ -9841,7 +9848,7 @@ void wma_vdev_detach_callback(void *ctx)
 			      vos_get_global_context(VOS_MODULE_ID_WDA, NULL));
 
 	if (!wma || !iface->del_staself_req) {
-		WMA_LOGP("%s: wma %p iface %p", __func__, wma,
+		WMA_LOGP("%s: wma %pK iface %pK", __func__, wma,
 			 iface->del_staself_req);
 		return;
 	}
@@ -9944,7 +9951,7 @@ static VOS_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
         }
 
 
-        WMA_LOGD("vdev_id:%hu vdev_hdl:%p", vdev_id, iface->handle);
+        WMA_LOGD("vdev_id:%hu vdev_hdl:%pK", vdev_id, iface->handle);
         if (!generateRsp) {
                 WMA_LOGE("Call txrx detach w/o callback for vdev %d", vdev_id);
                 ol_txrx_vdev_detach(iface->handle, NULL, NULL);
@@ -10120,8 +10127,8 @@ static void wma_set_sta_keep_alive(tp_wma_handle wma, u_int8_t vdev_id,
 		if ((NULL == hostv4addr) ||
 			(NULL == destv4addr) ||
 			(NULL == destmac)) {
-			WMA_LOGE("%s: received null pointer, hostv4addr:%p "
-			   "destv4addr:%p destmac:%p ", __func__,
+			WMA_LOGE("%s: received null pointer, hostv4addr:%pK "
+			   "destv4addr:%pK destmac:%pK ", __func__,
 			   hostv4addr, destv4addr, destmac);
 			wmi_buf_free(buf);
 			return;
@@ -10683,7 +10690,7 @@ static ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 						txrx_vdev_type);
 	wma_handle->interfaces[self_sta_req->sessionId].pause_bitmap = 0;
 
-	WMA_LOGD("vdev_id %hu, txrx_vdev_handle = %p", self_sta_req->sessionId,
+	WMA_LOGD("vdev_id %hu, txrx_vdev_handle = %pK", self_sta_req->sessionId,
 			txrx_vdev_handle);
 
 	if (NULL == txrx_vdev_handle) {
@@ -14872,8 +14879,8 @@ void wma_vdev_resp_timer(void *data)
 		bcn = wma->interfaces[tgt_req->vdev_id].beacon;
 
 		if (bcn) {
-			WMA_LOGD("%s: Freeing beacon struct %p, "
-				 "template memory %p", __func__,
+			WMA_LOGD("%s: Freeing beacon struct %pK, "
+				 "template memory %pK", __func__,
 				 bcn, bcn->buf);
 			if (bcn->dma_mapped)
 				adf_nbuf_unmap_single(pdev->osdev, bcn->buf,
@@ -15262,7 +15269,7 @@ void wma_roam_preauth_ind(tp_wma_handle wma_handle, u_int8_t *buf) {
 
 	vdev_id = wmi_event->vdev_id;
 	if (vdev_id >= wma_handle->max_bssid) {
-		WMA_LOGE("%s: Invalid vdev_id %d wmi_event %p", __func__,
+		WMA_LOGE("%s: Invalid vdev_id %d wmi_event %pK", __func__,
 			vdev_id, wmi_event);
 		return;
 	}
@@ -17350,6 +17357,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 		case WMI_PDEV_PARAM_ANT_DIV_SELFTEST:
 		case WMI_PDEV_PARAM_ANT_DIV_SELFTEST_INTVL:
 		case WMI_PDEV_PARAM_RADIO_CHAN_STATS_ENABLE:
+		case WMI_PDEV_PARAM_RADIO_DIAGNOSIS_ENABLE:
 			break;
 		default:
 			WMA_LOGE("Invalid wda_cli_set pdev command/Not"
@@ -21128,7 +21136,7 @@ static void wma_send_beacon(tp_wma_handle wma, tpSendbeaconParams bcn_info)
 
 	    if (bcn_info->p2pIeOffset) {
 		    p2p_ie = bcn_info->beacon + bcn_info->p2pIeOffset;
-		    WMA_LOGI(" %s: p2pIe is present - vdev_id %hu, p2p_ie = %p, p2p ie len = %hu",
+		    WMA_LOGI(" %s: p2pIe is present - vdev_id %hu, p2p_ie = %pK, p2p ie len = %hu",
 				    __func__, vdev_id, p2p_ie, p2p_ie[1]);
 		    if (wma_p2p_go_set_beacon_ie(wma, vdev_id, p2p_ie) < 0) {
 			    WMA_LOGE("%s : wmi_unified_bcn_tmpl_send Failed ", __func__);
@@ -35379,7 +35387,7 @@ static int wma_ibss_peer_info_event_handler(void *handle, u_int8_t *data,
     /*sanity check*/
     if ((num_peers > 32) || (NULL == peer_info))
     {
-       WMA_LOGE("%s: Invalid event data from target num_peers %d peer_info %p",
+       WMA_LOGE("%s: Invalid event data from target num_peers %d peer_info %pK",
            __func__, num_peers, peer_info);
         status = 1;
         goto send_response;
@@ -35453,7 +35461,7 @@ static int wma_fast_tx_fail_event_handler(void *handle, u_int8_t *data,
     }
     else
     {
-       WMA_LOGE("%s: HDD callback is %p", __func__, wma->hddTxFailCb);
+       WMA_LOGE("%s: HDD callback is %pK", __func__, wma->hddTxFailCb);
     }
 
     return 0;
@@ -39755,7 +39763,7 @@ void WDA_TxAbort(v_U8_t vdev_id)
 
 	iface = &wma->interfaces[vdev_id];
 	if (!iface->handle) {
-		WMA_LOGE("%s: Failed to get iface handle: %p",
+		WMA_LOGE("%s: Failed to get iface handle: %pK",
 			 __func__, iface->handle);
 		return;
 	}

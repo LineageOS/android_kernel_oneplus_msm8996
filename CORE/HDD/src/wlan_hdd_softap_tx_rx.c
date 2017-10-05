@@ -146,7 +146,7 @@ void hdd_softap_tx_resume_timer_expired_handler(void *adapter_context)
 
    hddLog(LOG1, FL("Enabling queues"));
    wlan_hdd_netif_queue_control(pAdapter, WLAN_WAKE_ALL_NETIF_QUEUE,
-                 WLAN_CONTROL_PATH);
+                 WLAN_DATA_FLOW_CONTROL);
    return;
 }
 
@@ -291,9 +291,10 @@ int __hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 */
 #ifdef QCA_LL_TX_FLOW_CT
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3,19,0))
-       if (pAdapter->tx_flow_low_watermark > 0) {
+        //remove if condition for improving SCC TCP TX KPI
+       //if (pAdapter->tx_flow_low_watermark > 0) {
            skb_orphan(skb);
-       }
+       //}
 #endif
 #else
       /*

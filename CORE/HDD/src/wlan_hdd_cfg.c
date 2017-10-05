@@ -573,6 +573,13 @@ REG_TABLE_ENTRY g_registry_table[] =
                  CFG_CHANNEL_BONDING_MODE_MIN,
                  CFG_CHANNEL_BONDING_MODE_MAX),
 
+   REG_VARIABLE(CFG_OVERRIDE_HT40_20_24GHZ_NAME, WLAN_PARAM_Integer,
+                hdd_config_t, override_ht20_40_24g,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_OVERRIDE_HT40_20_24GHZ_DEFAULT,
+                CFG_OVERRIDE_HT40_20_24GHZ_MIN,
+                CFG_OVERRIDE_HT40_20_24GHZ_MAX),
+
    REG_VARIABLE( CFG_CHANNEL_BONDING_MODE_5GHZ_NAME, WLAN_PARAM_Integer,
                  hdd_config_t, nChannelBondingMode5GHz,
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
@@ -5442,6 +5449,8 @@ void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE (VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gACSBandSwitchThreshold] value = [%u]", pHddCtx->cfg_ini->acsBandSwitchThreshold);
 
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [ChannelBondingMode] Value = [%u]",pHddCtx->cfg_ini->nChannelBondingMode24GHz);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [%s] Value = [%u] ",
+            CFG_OVERRIDE_HT40_20_24GHZ_NAME, pHddCtx->cfg_ini->override_ht20_40_24g);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [ChannelBondingMode] Value = [%u]",pHddCtx->cfg_ini->nChannelBondingMode5GHz);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [dot11Mode] Value = [%u]",pHddCtx->cfg_ini->dot11Mode);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [WmmMode] Value = [%u] ",pHddCtx->cfg_ini->WmmMode);
@@ -6807,7 +6816,7 @@ VOS_STATUS hdd_set_idle_ps_config(hdd_context_t *pHddCtx, v_U32_t val)
    hdd_config_t *pConfig = pHddCtx->cfg_ini;
    VOS_STATUS status = VOS_STATUS_SUCCESS;
 
-   hddLog(LOG1, "hdd_set_idle_ps_config: Enter Val %d pconfig %p ",
+   hddLog(LOG1, "hdd_set_idle_ps_config: Enter Val %d pconfig %pK ",
                  val, pConfig);
 
    if(pConfig && pConfig->fIsImpsEnabled)
@@ -6958,7 +6967,7 @@ VOS_STATUS hdd_hex_string_to_u16_array(char *str,
 		return VOS_STATUS_E_INVAL;
 
 	hddLog(VOS_TRACE_LEVEL_ERROR,
-		FL("str %p intArray %p intArrayMaxLen %d"),
+		FL("str %pK intArray %pK intArrayMaxLen %d"),
 		s, int_array, int_array_max_len);
 
 	*len = 0;
@@ -6971,7 +6980,7 @@ VOS_STATUS hdd_hex_string_to_u16_array(char *str,
 		if (sscanf(s, "%x", &val) == 1) {
 			int_array[*len] = (uint16_t) val;
 			hddLog(VOS_TRACE_LEVEL_DEBUG,
-				FL("s %p val %x intArray[%d]=0x%x"),
+				FL("s %pK val %x intArray[%d]=0x%x"),
 				s, val, *len, int_array[*len]);
 			*len += 1;
 		}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014, 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014, 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -72,7 +72,7 @@ ol_tx_desc_alloc(struct ol_txrx_pdev_t *pdev, struct ol_txrx_vdev_t *vdev)
 #endif
            ) {
             TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
-                       "%s Potential tx_desc corruption pkt_type:0x%x pdev:0x%p",
+                       "%s Potential tx_desc corruption pkt_type:0x%x pdev:0x%pK",
                          __func__, tx_desc->pkt_type, pdev);
 #ifdef QCA_COMPUTE_TX_DELAY
             TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "%s Timestamp:0x%x\n",
@@ -111,6 +111,30 @@ ol_tx_desc_alloc_hl(struct ol_txrx_pdev_t *pdev, struct ol_txrx_vdev_t *vdev)
     return tx_desc;
 }
 
+#ifdef WLAN_FEATURE_DSRC
+static inline void
+__ol_tx_desc_free(struct ol_txrx_pdev_t *pdev, struct ol_tx_desc_t *tx_desc)
+{
+	((union ol_tx_desc_list_elem_t *)tx_desc)->next = NULL;
+	if (pdev->tx_desc.freelist) {
+		pdev->tx_desc.last->next =
+			(union ol_tx_desc_list_elem_t *)tx_desc;
+	} else {
+		pdev->tx_desc.freelist =
+			(union ol_tx_desc_list_elem_t *)tx_desc;
+	}
+	pdev->tx_desc.last = (union ol_tx_desc_list_elem_t *)tx_desc;
+}
+#else
+static inline void
+__ol_tx_desc_free(struct ol_txrx_pdev_t *pdev, struct ol_tx_desc_t *tx_desc)
+{
+	((union ol_tx_desc_list_elem_t *)tx_desc)->next =
+		pdev->tx_desc.freelist;
+	pdev->tx_desc.freelist = (union ol_tx_desc_list_elem_t *)tx_desc;
+}
+#endif /* WLAN_FEATURE_DSRC */
+
 void
 ol_tx_desc_free(struct ol_txrx_pdev_t *pdev, struct ol_tx_desc_t *tx_desc)
 {
@@ -121,9 +145,8 @@ ol_tx_desc_free(struct ol_txrx_pdev_t *pdev, struct ol_tx_desc_t *tx_desc)
     tx_desc->entry_timestamp_ticks = 0xffffffff;
 #endif
 #endif
-    ((union ol_tx_desc_list_elem_t *)tx_desc)->next =
-        pdev->tx_desc.freelist;
-    pdev->tx_desc.freelist = (union ol_tx_desc_list_elem_t *) tx_desc;
+
+    __ol_tx_desc_free(pdev, tx_desc);
     pdev->tx_desc.num_free++;
 
 #if defined(CONFIG_PER_VDEV_TX_DESC_POOL)
@@ -141,7 +164,7 @@ ol_tx_desc_free(struct ol_txrx_pdev_t *pdev, struct ol_tx_desc_t *tx_desc)
         adf_os_atomic_dec(&tx_desc->vdev->tx_desc_count);
     } else {
         TXRX_PRINT(TXRX_PRINT_LEVEL_INFO2,
-               "%s warning: the vdev is referred by tx_desc (%p) "
+               "%s warning: the vdev is referred by tx_desc (%pK) "
                "has been detached.\n",
                  __func__, tx_desc);
     }

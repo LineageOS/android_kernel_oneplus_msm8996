@@ -61,11 +61,13 @@
 
 #define AR9888_DEVICE_ID (0x003c)
 #define AR6320_DEVICE_ID (0x003e)
+#define QCA9379_DEVICE_ID (0x0042)
 #define AR6320_FW_1_1  (0x11)
 #define AR6320_FW_1_3  (0x13)
 #define AR6320_FW_2_0  (0x20)
 #define AR6320_FW_3_0  (0x30)
 #define AR6320_FW_3_2  (0x32)
+#define QCA9379_FW_3_2  (0x31)
 
 #ifdef CONFIG_SLUB_DEBUG_ON
 #define MAX_NUM_OF_RECEIVES 400 /* Maximum number of Rx buf to process before*
@@ -127,6 +129,7 @@ static void print_config_soc_reg(struct hif_pci_softc *sc)
 static struct pci_device_id hif_pci_id_table[] = {
 	{ 0x168c, 0x003c, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0x168c, 0x003e, PCI_ANY_ID, PCI_ANY_ID },
+	{ 0x168c, 0x0042, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0 }
 };
 
@@ -1699,6 +1702,7 @@ again:
         break;
 
     case AR6320_DEVICE_ID:
+    case QCA9379_DEVICE_ID:
         switch(revision_id) {
         case AR6320_FW_1_1:
         case AR6320_FW_1_3:
@@ -1709,6 +1713,7 @@ again:
         case AR6320_FW_2_0:
         case AR6320_FW_3_0:
         case AR6320_FW_3_2:
+        case QCA9379_FW_3_2:
             hif_type = HIF_TYPE_AR6320V2;
             target_type = TARGET_TYPE_AR6320V2;
             break;
@@ -2037,6 +2042,7 @@ again:
         break;
 
     case AR6320_DEVICE_ID:
+    case QCA9379_DEVICE_ID:
         switch(revision_id) {
         case AR6320_FW_1_1:
         case AR6320_FW_1_3:
@@ -2047,6 +2053,7 @@ again:
         case AR6320_FW_2_0:
         case AR6320_FW_3_0:
         case AR6320_FW_3_2:
+        case QCA9379_FW_3_2:
             hif_type = HIF_TYPE_AR6320V2;
             target_type = TARGET_TYPE_AR6320V2;
             break;
@@ -2673,8 +2680,8 @@ static void hif_dump_crash_debug_info(struct hif_pci_softc *sc)
 
 	/*
 	 * When kernel panic happen, if WiFi FW is still active,
-	 * it may cause NOC errors/memory corruption, to avoid
-	 * this, inject a fw crash first.
+	 * it may cause NOC errors/memory corruption when dumping
+	 * target DRAM/IRAM, to avoid this, inject a fw crash first.
 	 * send crash_inject to FW directly, because we are now
 	 * in an atomic context, and preempt has been disabled,
 	 * MCThread won't be scheduled at the moment, at the same
@@ -2682,15 +2689,15 @@ static void hif_dump_crash_debug_info(struct hif_pci_softc *sc)
 	 * crash due to the same reason
 	 */
 	ret = wma_crash_inject(wma_handle, 1, 0);
-	if (ret) {
-		pr_err("%s: failed to send crash inject - %d\n",
-				__func__, ret);
-		return;
-	}
 
 	adf_os_spin_lock_irqsave(&hif_state->suspend_lock);
 	hif_irq_record(HIF_CRASH, sc);
 	hif_dump_soc_and_ce_registers(sc);
+	if (ret) {
+		pr_err("%s: failed to send crash inject - %d\n",
+				__func__, ret);
+		goto out;
+	}
 
 	ret = ol_copy_ramdump(scn);
 
