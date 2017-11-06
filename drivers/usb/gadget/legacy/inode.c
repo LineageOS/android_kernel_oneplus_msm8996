@@ -1032,7 +1032,8 @@ ep0_read (struct file *fd, char __user *buf, size_t len, loff_t *ptr)
 					power = dev->hs_config->bMaxPower;
 				else
 					power = dev->config->bMaxPower;
-				usb_gadget_vbus_draw(dev->gadget, 2 * power);
+				// user mode expected to disable endpoints
+				// usb_gadget_vbus_draw(dev->gadget, 2 * power);
 			}
 
 		} else {			/* collect OUT data */
