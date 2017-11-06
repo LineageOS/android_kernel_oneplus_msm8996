@@ -461,6 +461,20 @@ static int msm_gpio_get(struct gpio_chip *chip, unsigned offset)
 	return !!(val & BIT(g->in_bit));
 }
 
+static int msm_gpio_get_dash(struct gpio_chip *chip, unsigned offset)
+{
+	const struct msm_pingroup *g;
+	struct msm_pinctrl *pctrl = container_of(chip,
+		struct msm_pinctrl, chip);
+	u32 val;
+
+	/*pr_err("%s enter\n", __func__);*/
+	g = &pctrl->soc->groups[offset];
+
+	val = readl_dash(pctrl->regs + g->io_reg);
+	/*pr_err("pctrl->regs + g->io_reg=%p,g->in_bit=%d\n",pctrl->regs + g->io_reg,g->in_bit);*/
+	return !!(val & BIT(g->in_bit));
+}
 static void msm_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 {
 	const struct msm_pingroup *g;
@@ -492,6 +506,26 @@ static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
 {
 	int gpio = chip->base + offset;
 	return pinctrl_free_gpio(gpio);
+}
+static void msm_gpio_set_dash(struct gpio_chip *chip,
+			unsigned offset, int value)
+{
+	const struct msm_pingroup *g;
+	struct msm_pinctrl *pctrl = container_of(chip,
+						struct msm_pinctrl, chip);
+	u32 val;
+
+	//pr_err("%s enter\n", __func__);
+	g = &pctrl->soc->groups[offset];
+
+	/*spin_lock_irqsave(&pctrl->lock, flags);*/
+	if (value)
+		val = BIT(g->out_bit);
+	else
+		val = ~BIT(g->out_bit);
+	writel_dash(val, pctrl->regs + g->io_reg);
+
+	/*spin_unlock_irqrestore(&pctrl->lock, flags);*/
 }
 
 #ifdef CONFIG_DEBUG_FS
@@ -537,6 +571,8 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
 	unsigned i;
 
 	for (i = 0; i < chip->ngpio; i++, gpio++) {
+        if(gpio == 81 || gpio == 82 || gpio == 83 || gpio == 84)
+            continue;
 		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
 		seq_puts(s, "\n");
 	}
@@ -550,7 +586,9 @@ static struct gpio_chip msm_gpio_template = {
 	.direction_input  = msm_gpio_direction_input,
 	.direction_output = msm_gpio_direction_output,
 	.get              = msm_gpio_get,
+	.get_dash	  = msm_gpio_get_dash,
 	.set              = msm_gpio_set,
+	.set_dash	  = msm_gpio_set_dash,
 	.request          = msm_gpio_request,
 	.free             = msm_gpio_free,
 	.dbg_show         = msm_gpio_dbg_show,
