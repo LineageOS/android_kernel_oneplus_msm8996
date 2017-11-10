@@ -939,6 +939,13 @@
 	aliases {
 		i2c3 = &i2c_3;
 	};
+
+	reserved-memory {
+		ramoops_mem: ramoops_mem@ac000000 {
+				reg = <0 0xAC000000 0 0x00200000>;
+				label = "ramoops_mem";
+		};
+	};
 };
 
 &firmware {
@@ -1015,6 +1022,11 @@
 			pinctrl-0 = <&quat_mi2s_active  &quat_mi2s_sd0_active &quat_mi2s_sd1_active >;
 			pinctrl-1 = <&quat_mi2s_sleep  &quat_mi2s_sd0_sleep &quat_mi2s_sd1_sleep >;
 		};
+	};
+
+	ramoops {
+		compatible = "ramoops";
+		linux,contiguous-region = <&ramoops_mem>;
 	};
 };
 
