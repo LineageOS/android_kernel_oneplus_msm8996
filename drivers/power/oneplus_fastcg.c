@@ -262,12 +262,14 @@ static void reset_mcu_and_requst_irq(struct fastchg_device_info *di)
 	di->irq = gpio_to_irq(di->ap_data);
 
 	/* 0x01:rising edge, 0x02:falling edge */
-	ret = request_irq(di->irq, irq_rx_handler,
-			IRQF_TRIGGER_RISING, "mcu_data", di);
-	if (ret < 0)
-		pr_err("request ap rx irq failed.\n");
-	else
-		di->irq_enabled = true;
+	if (!di->irq_enabled) {
+		ret = request_irq(di->irq, irq_rx_handler,
+				IRQF_TRIGGER_RISING, "mcu_data", di);
+		if (ret < 0)
+			pr_err("request ap rx irq failed.\n");
+		else
+			di->irq_enabled = true;
+	}
 }
 
 
