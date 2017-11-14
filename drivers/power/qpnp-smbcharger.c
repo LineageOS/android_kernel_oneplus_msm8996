@@ -1320,18 +1320,6 @@ static int get_prop_batt_charge_count(struct smbchg_chip *chip)
 	}
 	return count;
 }
-int get_prop_fast_adapter_update(struct smbchg_chip *chg)
-{
-	int update_status;
-
-	if (fast_charger && fast_charger->get_adapter_update)
-		update_status = fast_charger->get_adapter_update();
-	else {
-		pr_err("no fast_charger register found\n");
-		update_status = ADAPTER_FW_UPDATE_NONE;
-	}
-	return update_status;
-}
 
 static int get_prop_batt_health(struct smbchg_chip *chip)
 {
@@ -4362,10 +4350,6 @@ static int get_prop_charger_voltage_now(struct smbchg_chip *chip)
 
 static bool get_prop_fast_chg_started(struct smbchg_chip *chip)
 {
-	if(get_prop_fast_adapter_update(chip)
-		== ADAPTER_FW_NEED_UPDATE)
-	return true;
-
 	if (fast_charger && fast_charger->fast_chg_started) {
 		return fast_charger->fast_chg_started();
 	} else {
@@ -4414,31 +4398,17 @@ static bool set_prop_fast_switch_to_normal_false(struct smbchg_chip *chip)
 	}
 }
 
-static bool get_fastchg_firmware_updated_status(struct smbchg_chip *chip)
-{
-	if (fast_charger && fast_charger->get_fastchg_firmware_already_updated)
-		return fast_charger->get_fastchg_firmware_already_updated();
-	else {
-		pr_err("no batt gauge assuming false\n");
-		return false;
-	}
-}
-
 bool is_fastchg_allowed(struct smbchg_chip *chip)
 {
 	int temp;
 	static int pre_temp = 0;
-	bool low_temp_full, switch_to_normal, fw_updated;
+	bool low_temp_full, switch_to_normal;
 	enum power_supply_type usb_supply_type;
 	char *usb_type_name = "null";
 
 	temp = get_prop_batt_temp(chip);
 	low_temp_full = qpnp_get_fast_low_temp_full(chip);
-	fw_updated = get_fastchg_firmware_updated_status(chip);
 	read_usb_type(chip, &usb_type_name, &usb_supply_type);
-
-	if (!fw_updated)
-		return false;
 
 	if (temp < 165 || temp > 430) {
 		if (temp != pre_temp) {

@@ -18,12 +18,6 @@
 #include <linux/interrupt.h>
 #include "oem_external_fg.h"
 
-#include <soc/qcom/clock-rpm.h>
-#include <dt-bindings/clock/msm-clocks-8996.h>
-#include <dt-bindings/clock/msm-clocks-hwio-8996.h>
-#include <linux/clk.h>
-#include <linux/clk/msm-clk-provider.h>
-#include <linux/clk/msm-clk.h>
 #define BYTE_OFFSET			2
 #define BYTES_TO_WRITE		16
 #define ERASE_COUNT   		384	/* 0x8800-0x9FFF */
@@ -68,13 +62,11 @@ struct fastchg_device_info {
 	struct wake_lock fastchg_update_fireware_lock;
 
 	struct delayed_work		update_firmware;
-	struct delayed_work adapter_update_work;
 };
 
 struct fastchg_device_info *fastchg_di;
 
 static unsigned char *dashchg_firmware_data;
-static struct clk *snoc_clk, *cnoc_clk;
 static struct i2c_client *mcu_client;
 
 //for mcu_data irq delay issue 2017.10.14@Infi
@@ -111,7 +103,6 @@ void mcu_en_gpio_set(int value)
 		}
 	}
 }
-#define ADAPTER_UPDATE_DELAY              1400
 
 void usb_sw_gpio_set(int value)
 {
@@ -435,13 +426,6 @@ static bool get_fastchg_firmware_already_updated(void)
 	return false;
 }
 
-int dash_get_adapter_update_status(void)
-{
-	if (!fastchg_di)
-		return ADAPTER_FW_UPDATE_NONE;
-	else
-		return fastchg_di->adapter_update_report;
-}
 static struct external_battery_gauge fastcharge_information  = {
 	.fast_chg_started 						= bq27541_fast_chg_started,
 	.get_fast_low_temp_full					= bq27541_get_fast_low_temp_full,
@@ -451,7 +435,6 @@ static struct external_battery_gauge fastcharge_information  = {
 	.get_fast_chg_allow						= bq27541_get_fast_chg_allow,
 	.set_switch_to_noraml_false				= bq27541_set_switch_to_noraml_false,
 	.get_fastchg_firmware_already_updated	= get_fastchg_firmware_already_updated,
-	.get_adapter_update = dash_get_adapter_update_status,
 };
 
 static struct notify_dash_event *notify_event = NULL;
@@ -553,7 +536,6 @@ static void switch_mode_to_normal(void)
 {
 	usb_sw_gpio_set(0);
 	mcu_en_gpio_set(1);
-	msm_cpuidle_set_sleep_disable(false);
 }
 
 static void update_fast_chg_started(void)
@@ -570,19 +552,14 @@ static void request_mcu_irq(struct fastchg_device_info *di)
 	gpio_set_value(di->ap_clk, 0);
 	usleep_range(10000, 10000);
 	gpio_set_value(di->ap_clk, 1);
-	if (di->adapter_update_real
-		!= ADAPTER_FW_NEED_UPDATE) {
-		pr_info("%s\n", __func__);
-		if (!di->irq_enabled) {
-			retval = request_irq(di->irq, irq_rx_handler,
-					IRQF_TRIGGER_RISING, "mcu_data", di);
-			if (retval < 0)
-				pr_err("request ap rx irq failed.\n");
-			else
-				di->irq_enabled = true;
-		}
-	} else {
-		di->irq_enabled = true;
+	pr_info("%s\n", __func__);
+	if (!di->irq_enabled) {
+		retval = request_irq(di->irq, irq_rx_handler,
+				IRQF_TRIGGER_RISING, "mcu_data", di);
+		if (retval < 0)
+			pr_err("request ap rx irq failed.\n");
+		else
+			di->irq_enabled = true;
 	}
 }
 static void fastcg_work_func(struct work_struct *work)
@@ -703,88 +680,6 @@ fail:
 	mutex_unlock(&di->read_mutex);
 	return ret;
 }
-static struct op_adapter_chip *g_adapter_chip;
-
-static void adapter_update_work_func(struct work_struct *work)
-{
-	struct delayed_work *dwork = to_delayed_work(work);
-	struct fastchg_device_info *chip =
-		container_of(dwork,
-		struct fastchg_device_info, adapter_update_work);
-	bool update_result = false;
-	int i = 0;
-
-	if (!g_adapter_chip) {
-		pr_info("%s g_adapter_chip NULL\n", __func__);
-		return;
-	}
-	pr_info("%s begin\n", __func__);
-	opchg_set_data_active(chip);
-	if (snoc_clk) {
-		clk_set_rate(snoc_clk, 200000000);
-		clk_prepare_enable(snoc_clk);
-	}
-	if (cnoc_clk) {
-		clk_set_rate(cnoc_clk, 75000000);
-		clk_prepare_enable(cnoc_clk);
-	}
-	msm_cpuidle_set_sleep_disable(true);
-	msleep(1000);
-	for (i = 0; i < 3; i++) {
-		update_result =
-			g_adapter_chip->vops->adapter_update(g_adapter_chip,
-			chip->ap_clk, chip->ap_data);
-		if (update_result == true)
-			break;
-		if (i < 1)
-			msleep(1650);
-	}
-	msleep(2000);
-	if (update_result) {
-		chip->adapter_update_real = ADAPTER_FW_UPDATE_SUCCESS;
-	} else {
-		chip->adapter_update_real = ADAPTER_FW_UPDATE_FAIL;
-		chip->adapter_update_report = chip->adapter_update_real;
-	}
-	msleep(20);
-	mcu_en_gpio_set(1);
-	chip->fast_chg_started = false;
-	chip->fast_chg_allow = false;
-	chip->fast_chg_ing = false;
-	msleep(1000);
-	reset_mcu_and_requst_irq(chip);
-	if (update_result) {
-		msleep(2000);
-		chip->adapter_update_report = ADAPTER_FW_UPDATE_SUCCESS;
-	}
-	oneplus_notify_dash_charger_present(false);
-	oneplus_notify_pmic_check_charger_present();
-	if (update_result)
-		set_property_on_smbcharger(POWER_SUPPLY_PROP_SWITCH_DASH, true);
-	msm_cpuidle_set_sleep_disable(false);
-	clk_disable_unprepare(snoc_clk);
-	clk_disable_unprepare(cnoc_clk);
-
-	pr_info("%s end update_result:%d\n",
-		__func__, update_result);
-	wake_unlock(&chip->fastchg_wake_lock);
-
-}
-
-static void dash_adapter_update(struct fastchg_device_info *chip)
-{
-	pr_err("%s\n", __func__);
-	/*schedule_delayed_work_on(4,*/
-	/*&chip->adapter_update_work,*/
-	/*round_jiffies_relative(*/
-	/*msecs_to_jiffies(ADAPTER_UPDATE_DELAY)));*/
-	schedule_delayed_work(&chip->adapter_update_work,
-			msecs_to_jiffies(ADAPTER_UPDATE_DELAY));
-}
-void op_adapter_init(struct op_adapter_chip *chip)
-{
-	g_adapter_chip = chip;
-}
 
 #define DASH_IOC_MAGIC					0xff
 #define DASH_NOTIFY_FIRMWARE_UPDATE		_IO(DASH_IOC_MAGIC, 1)
@@ -831,7 +726,6 @@ static long  dash_dev_ioctl(struct file *filp, unsigned int cmd,
 				dash_write(di,REJECT_DATA);
 			} else if (arg == DASH_NOTIFY_FAST_PRESENT+3) {
 				dash_write(di,ALLOW_DATA);
-				msm_cpuidle_set_sleep_disable(true);
 			}
 			break;
 		case DASH_NOTIFY_FAST_ABSENT:
@@ -909,21 +803,6 @@ static long  dash_dev_ioctl(struct file *filp, unsigned int cmd,
 				oneplus_notify_pmic_check_charger_present();
 				oneplus_notify_dash_charger_present(false);
 				wake_unlock(&di->fastchg_wake_lock);
-			}
-			break;
-		case DASH_NOTIFY_ADAPTER_FW_UPDATE:
-			if (arg == DASH_NOTIFY_ADAPTER_FW_UPDATE + 1) {
-				di->adapter_update_real
-					= ADAPTER_FW_NEED_UPDATE;
-				di->adapter_update_report
-					= di->adapter_update_real;
-			} else if (arg == DASH_NOTIFY_ADAPTER_FW_UPDATE + 2) {
-				bq27541_data->set_alow_reading(true);
-				di->fast_chg_started = false;
-				oneplus_notify_dash_charger_present(true);
-				dash_write(di, ALLOW_DATA);
-				wake_lock(&di->fastchg_wake_lock);
-				dash_adapter_update(di);
 			}
 			break;
 		case DASH_NOTIFY_UNDEFINED_CMD:
@@ -1158,7 +1037,6 @@ static int dash_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	INIT_WORK(&di->fastcg_work, fastcg_work_func);
 	INIT_WORK(&di->charger_present_status_work, update_charger_present_status);
 	INIT_DELAYED_WORK(&di->update_firmware, dashchg_fw_update);
-	INIT_DELAYED_WORK(&di->adapter_update_work, adapter_update_work_func);
 
 	init_timer(&di->watchdog);
 	di->watchdog.data = (unsigned long)di;
@@ -1177,8 +1055,6 @@ static int dash_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	mcu_init(di);
 
 	fastcharge_information_register(&fastcharge_information);
-	snoc_clk = clk_get(&client->dev, "snoc");
-	cnoc_clk = clk_get(&client->dev, "cnoc");
 	pr_info("dash_probe success\n");
 
 	return 0;
