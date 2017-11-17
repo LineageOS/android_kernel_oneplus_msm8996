@@ -679,6 +679,7 @@ struct master_slave_resource_info {
 
 struct msm_vfe_common_dev_data {
 	spinlock_t common_dev_data_lock;
+	spinlock_t common_dev_axi_lock;
 	struct dual_vfe_resource *dual_vfe_res;
 	struct master_slave_resource_info ms_resource;
 };
@@ -778,6 +779,7 @@ struct vfe_device {
 	/* before halt irq info */
 	uint32_t recovery_irq0_mask;
 	uint32_t recovery_irq1_mask;
+	uint32_t ms_frame_id;
 };
 
 struct vfe_parent_device {

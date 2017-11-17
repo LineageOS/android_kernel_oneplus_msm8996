@@ -1118,7 +1118,6 @@ static int msm_fd_hw_try_enable(struct msm_fd_device *fd,
 	int enabled = 0;
 
 	if (state == fd->state) {
-
 		fd->state = MSM_FD_DEVICE_RUNNING;
 		atomic_set(&buffer->active, 1);
 
