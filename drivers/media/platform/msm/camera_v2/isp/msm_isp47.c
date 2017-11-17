@@ -705,6 +705,12 @@ void msm_vfe47_reg_update(struct vfe_device *vfe_dev,
 		vfe_dev->reg_update_requested;
 	if ((vfe_dev->is_split && vfe_dev->pdev->id == ISP_VFE1) &&
 		((frame_src == VFE_PIX_0) || (frame_src == VFE_SRC_MAX))) {
+		if (!vfe_dev->common_data->dual_vfe_res->vfe_base[ISP_VFE0]) {
+			pr_err("%s vfe_base for ISP_VFE0 is NULL\n", __func__);
+			spin_unlock_irqrestore(&vfe_dev->reg_update_lock,
+				flags);
+			return;
+		}
 		msm_camera_io_w_mb(update_mask,
 			vfe_dev->common_data->dual_vfe_res->
 			vfe_base[ISP_VFE0] + 0x4AC);
@@ -1527,6 +1533,7 @@ void msm_vfe47_update_camif_state(struct vfe_device *vfe_dev,
 		msm_camera_io_w_mb((update_state == DISABLE_CAMIF ? 0x0 : 0x6),
 				vfe_dev->vfe_base + 0x478);
 		vfe_dev->axi_data.src_info[VFE_PIX_0].active = 0;
+		vfe_dev->axi_data.src_info[VFE_PIX_0].flag = 0;
 		/* testgen OFF*/
 		if (vfe_dev->axi_data.src_info[VFE_PIX_0].input_mux == TESTGEN)
 			msm_camera_io_w(1 << 1, vfe_dev->vfe_base + 0xC58);
@@ -1698,8 +1705,6 @@ void msm_vfe47_cfg_axi_ub_equal_default(
 	uint32_t wm_ub_size;
 	uint64_t delta;
 	uint32_t rdi_ub_offset;
-	int plane;
-	struct msm_vfe_axi_stream *stream_info;
 
 	if (frame_src == VFE_PIX_0) {
 		for (i = 0; i < axi_data->hw_info->num_wm; i++) {
@@ -1726,7 +1731,7 @@ void msm_vfe47_cfg_axi_ub_equal_default(
 				vfe_dev->hw_info->vfe_ops.axi_ops.
 					ub_reg_offset(vfe_dev, i));
 		}
-		if (frame_src != SRC_TO_INTF(
+		if (!axi_data->free_wm[i] || frame_src != SRC_TO_INTF(
 				HANDLE_TO_IDX(axi_data->free_wm[i])))
 			continue;
 
@@ -1743,17 +1748,9 @@ void msm_vfe47_cfg_axi_ub_equal_default(
 			ub_offset += wm_ub_size;
 		} else {
 
-			stream_info =  &axi_data->stream_info[
-				HANDLE_TO_IDX(axi_data->free_wm[i])];
-			for (plane = 0; plane < stream_info->num_planes;
-					plane++)
-				if (stream_info->wm[plane] ==
-					axi_data->free_wm[i])
-					break;
-
-			rdi_ub_offset = ((SRC_TO_INTF(
+			rdi_ub_offset = (SRC_TO_INTF(
 					HANDLE_TO_IDX(axi_data->free_wm[i])) -
-					VFE_RAW_0 * 2) + plane) *
+					VFE_RAW_0) * 2 *
 					axi_data->hw_info->min_wm_ub;
 			wm_ub_size = axi_data->hw_info->min_wm_ub * 2;
 			msm_camera_io_w((rdi_ub_offset << 16 |
