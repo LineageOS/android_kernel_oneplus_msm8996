@@ -926,6 +926,14 @@
 	aliases {
 		i2c3 = &i2c_3;
 	};
+
+	reserved-memory {
+		ramoops_mem: ramoops_region@ac000000 {
+			compatible = "removed-dma-pool";
+			no-map;
+			reg = <0 0xAC000000 0 0x200000>;
+		};
+	};
 };
 
 &firmware {
@@ -1007,6 +1015,14 @@
 			pinctrl-0 = <&quat_mi2s_active  &quat_mi2s_sd0_active &quat_mi2s_sd1_active >;
 			pinctrl-1 = <&quat_mi2s_sleep  &quat_mi2s_sd0_sleep &quat_mi2s_sd1_sleep >;
 		};
+	};
+
+	ramoops {
+		compatible = "ramoops";
+		memory-region = <&ramoops_mem>;
+		record-size = <0x0 0x20000>;
+		console-size = <0x0 0x100000>;
+		pmsg-size = <0x0 0x80000>;
 	};
 };
 
