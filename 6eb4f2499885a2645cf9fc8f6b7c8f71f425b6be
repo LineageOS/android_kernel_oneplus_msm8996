@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "404a5c6d_058bb524",
+        "filename": "drivers/input/misc/fpc1020_tee.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 397,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2017-11-22T07:29:30Z",
+      "side": 1,
+      "message": "This could be replaced with\n```\nif(!memcmp(p-\u003ecomm, \"fps_work\", 9) || !memcmp(p-\u003ecomm, \"fingerprintmsg\", 15))\n```",
+      "range": {
+        "startLine": 397,
+        "startChar": 2,
+        "endLine": 397,
+        "endChar": 45
+      },
+      "revId": "6eb4f2499885a2645cf9fc8f6b7c8f71f425b6be",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
