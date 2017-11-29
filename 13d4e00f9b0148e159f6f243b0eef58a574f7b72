@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "f1073a03_e00290a3",
+        "filename": "drivers/input/misc/fpc1020_tee.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 397,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2017-11-29T08:04:07Z",
+      "side": 1,
+      "message": "This is OEM debug service which we don\u0027t have on lineage",
+      "range": {
+        "startLine": 397,
+        "startChar": 36,
+        "endLine": 397,
+        "endChar": 78
+      },
+      "revId": "13d4e00f9b0148e159f6f243b0eef58a574f7b72",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
