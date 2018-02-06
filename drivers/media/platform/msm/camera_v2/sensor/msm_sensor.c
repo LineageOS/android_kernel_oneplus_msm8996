@@ -116,7 +116,6 @@ int msm_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 	enum msm_camera_device_type_t sensor_device_type;
 	struct msm_camera_i2c_client *sensor_i2c_client;
 
-	pr_info ("E\n");
 	if (!s_ctrl) {
 		pr_err("%s:%d failed: s_ctrl %pK\n",
 			__func__, __LINE__, s_ctrl);
@@ -147,7 +146,6 @@ int msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 	struct msm_camera_slave_info *slave_info;
 	const char *sensor_name;
 	uint32_t retry = 0;
-	pr_info ("E\n");
 
 	if (!s_ctrl) {
 		pr_err("%s:%d failed: %pK\n",
