@@ -1804,13 +1804,15 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 			pr_err("failed rc %d\n", rc);
 			goto memdata_free;
 		}
-    if (strcmp(eb_info->eeprom_name, "sony_imx298") == 0) {
-        msm_eeprom_imx298_read_vendorInfo(e_ctrl);
-        msm_eeprom_proc_init();
-    }
-    if (strcmp(eb_info->eeprom_name, "s5k3p8sp_m24c64s") == 0) {
-        msm_eeprom_s5k3p8sp_read_sensorInfo(e_ctrl);
-    }
+
+		if (strcmp(eb_info->eeprom_name, "sony_imx298") == 0) {
+			msm_eeprom_imx298_read_vendorInfo(e_ctrl);
+			msm_eeprom_proc_init();
+		}
+		if (strcmp(eb_info->eeprom_name, "s5k3p8sp_m24c64s") == 0) {
+			msm_eeprom_s5k3p8sp_read_sensorInfo(e_ctrl);
+		}
+
 		rc = read_eeprom_memory(e_ctrl, &e_ctrl->cal_data);
 		if (rc < 0) {
 			pr_err("%s read_eeprom_memory failed\n", __func__);

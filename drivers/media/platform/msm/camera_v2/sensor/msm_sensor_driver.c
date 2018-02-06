@@ -1101,9 +1101,9 @@ static int32_t msm_sensor_driver_get_dt_data(struct msm_sensor_ctrl_t *s_ctrl)
 		s_ctrl->set_mclk_23880000);
 
     if (BACK_CAMERA_B == sensordata->sensor_info->position) {
-      if (0 > of_property_read_u32(of_node, "qcom,pdaf-support", &is_pdaf_supported)) {
-		CDBG("%s:%d Invalid pdaf supported\n", __func__, __LINE__);
-	  }
+		if (0 > of_property_read_u32(of_node, "qcom,pdaf-support", &is_pdaf_supported)) {
+			CDBG("%s:%d Invalid pdaf supported\n", __func__, __LINE__);
+		}
 	}
 
 	return rc;
@@ -1216,7 +1216,6 @@ static int msm_sensor_driver_pdaf_proc_init(void)
 	}
 	return ret;
 }
-
 
 static int32_t msm_sensor_driver_platform_probe(struct platform_device *pdev)
 {
