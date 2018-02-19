@@ -116,6 +116,11 @@ config SDFAT_DBG_WARNON
 	depends on SDFAT_FS && SDFAT_DEBUG
 	default n
 
+config SDFAT_DBG_WARNON
+	bool "Enable strict WARN_ON() for debugging"
+	depends on SDFAT_FS && SDFAT_DEBUG
+	default n
+
 config SDFAT_STATISTICS
 	bool "enable statistics for bigdata"
 	depends on SDFAT_FS
