@@ -4428,6 +4428,8 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
                 ts->is_suspended = 0;
 				if (ts->gesture_enable)
 					synaptics_enable_interrupt_for_gesture(ts, false);
+				else
+					synaptics_mode_change(0x00);/*change getbase data*/
 				atomic_set(&ts->is_stop, 0);
 				touch_enable(ts);
 				synaptics_ts_resume(&ts->client->dev);
