@@ -104,8 +104,6 @@
 	       // qcom,mdss-tear-check-start-pos= <1920>; /* Height */
 	       // qcom,mdss-tear-check-rd-ptr-trigger-intr= <1921>; /* Height + 1 */
 
-		qcom,partial-update-enabled;
-		qcom,panel-roi-alignment = <360 64 360 64 360 64>;
 		qcom,ulps-enabled;
 		qcom,panel-allow-phy-poweroff;
 
