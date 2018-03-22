@@ -1782,7 +1782,7 @@ bool vos_is_channel_support_sub20(uint16_t operation_channel,
 	eNVChannelEnabledType channel_state;
 
 	if (VOS_IS_CHANNEL_5GHZ(operation_channel)) {
-		const struct bonded_chan *bonded_chan_ptr;
+		const struct bonded_chan *bonded_chan_ptr = NULL;
 
 		channel_state =
 		    vos_search_5g_bonded_channel(operation_channel,
