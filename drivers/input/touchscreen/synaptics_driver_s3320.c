@@ -1680,6 +1680,7 @@ static ssize_t gesture_switch_write_func(struct file *file, const char __user *p
 		TPD_ERR("%s: read proc input error.\n", __func__);
 		return count;
 	}
+	mutex_lock(&ts->mutex);
 	ret = sscanf(buf,"%d",&write_flag);
 	gesture_switch = write_flag;
 	TPD_ERR("gesture_switch:%d,suspend:%d,gesture:%d\n",gesture_switch,ts->is_suspended,ts->gesture_enable);
@@ -1698,6 +1699,7 @@ static ssize_t gesture_switch_write_func(struct file *file, const char __user *p
 			synaptics_enable_interrupt_for_gesture(ts, 0);
 		}
 	}
+	mutex_unlock(&ts->mutex);
 
 	return count;
 }
@@ -4437,6 +4439,7 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
 
 		if ((*blank == FB_BLANK_UNBLANK)
 		 && (event == FB_EARLY_EVENT_BLANK)) {
+			mutex_lock(&ts->mutex);
 			if (gesture_flag == 1) {
 				ts->gesture_enable = 0;
 				double_tap_enable = 0;
@@ -4453,8 +4456,9 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
 				queue_delayed_work(get_base_report,
 				&ts->base_work, msecs_to_jiffies(80));
 				synaptics_ts_resume(&ts->client->dev);
-                TPD_DEBUG("%s going TP resume end\n", __func__);
-            }
+				TPD_DEBUG("%s going TP resume end\n", __func__);
+			}
+			mutex_unlock(&ts->mutex);
 		} else if (*blank == FB_BLANK_NORMAL) {
 			if (ts->gesture_enable == 0) {
 				double_tap_enable = 1;
