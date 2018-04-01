@@ -32,13 +32,13 @@
 #include <linux/regulator/machine.h>
 #include <linux/err.h>
 #include <linux/rtc.h>
+#include <linux/power/oem_external_fg.h>
 
 #ifdef CONFIG_OF
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #endif
 #include <linux/wakelock.h>
-#include "oem_external_fg.h"
 
 
 #define DRIVER_VERSION			"1.1.0"

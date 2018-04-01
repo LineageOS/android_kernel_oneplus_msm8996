@@ -3,8 +3,8 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/time.h>
+#include <linux/power/oem_external_fg.h>
 #include "op_dash_adapter.h"
-#include "oem_external_fg.h"
 
 static struct op_adapter_chip *the_chip;
 

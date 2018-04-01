@@ -39,7 +39,7 @@
 #include <linux/msm_bcl.h>
 #include <linux/ktime.h>
 #include <linux/pmic-voter.h>
-#include "oem_external_fg.h"
+#include <linux/power/oem_external_fg.h>
 #include <linux/type-c_notifier.h>
 #include <linux/wakelock.h>
 #include <linux/proc_fs.h>

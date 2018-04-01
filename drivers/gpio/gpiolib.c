@@ -20,7 +20,7 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/gpio.h>
-#include <../power/oem_external_fg.h>
+#include <linux/power/oem_external_fg.h>
 
 /* Implementation infrastructure for GPIO interfaces.
  *

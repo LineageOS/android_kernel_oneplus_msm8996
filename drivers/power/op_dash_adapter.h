@@ -54,7 +54,7 @@
 #define Boot_Over_Cmd_Count			2000		//physical test:34
 #define Other_Cmd_count				2000
 
-#include "oem_external_fg.h"
+#include <linux/power/oem_external_fg.h>
 extern void op_adapter_init(struct op_adapter_chip *chip);
 //fw_ver must be 0x0b/0x0c/0x0d/0x0e/0x0f because of pic1508/stm8s
 

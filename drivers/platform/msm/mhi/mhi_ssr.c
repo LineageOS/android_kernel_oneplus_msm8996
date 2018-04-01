@@ -11,11 +11,11 @@
  */
 
 #include <linux/pm_runtime.h>
-#include <mhi_sys.h>
-#include <mhi.h>
 #include <soc/qcom/subsystem_restart.h>
 #include <soc/qcom/subsystem_notif.h>
 #include <linux/esoc_client.h>
+#include "mhi_sys.h"
+#include "mhi.h"
 
 static int mhi_ssr_notify_cb(struct notifier_block *nb,
 			unsigned long action, void *data)

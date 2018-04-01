@@ -35,7 +35,7 @@
 #include <linux/string_helpers.h>
 #include <linux/alarmtimer.h>
 #include <linux/qpnp/qpnp-revid.h>
-#include "oem_external_fg.h"
+#include <linux/power/oem_external_fg.h>
 
 /* Register offsets */
 

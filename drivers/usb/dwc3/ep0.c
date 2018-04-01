@@ -31,12 +31,13 @@
 #include <linux/usb/gadget.h>
 #include <linux/usb/composite.h>
 
+#include <linux/power/oem_external_fg.h>
+
 #include "core.h"
 #include "debug.h"
 #include "gadget.h"
 #include "io.h"
 #include "debug.h"
-#include "../../power/oem_external_fg.h"
 
 
 static bool enable_dwc3_u1u2;
