@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,25 +11,13 @@
  * GNU General Public License for more details.
  */
 
-&external_image_mem {
-	reg = <0x0 0x87a00000 0x0 0x0600000>;
-};
+/dts-v1/;
 
-&modem_adsp_mem {
-	reg = <0x0 0x88000000 0x0 0x01e00000>;
-};
+#include "apq8009-dragon.dtsi"
 
-&peripheral_mem {
-	reg = <0x0 0x89e00000 0x0 0x0700000>;
-};
-
-&reserved_mem {
-	linux,cma {
-		compatible = "shared-dma-pool";
-		alloc-ranges = <0 0x00000000 0 0xa0000000>;
-		reusable;
-		alignment = <0 0x400000>;
-		size = <0 0x1000000>;
-		linux,cma-default;
-	};
+/ {
+	model = "Qualcomm Technologies, Inc. APQ8009 + Ext Codec Dragon Board";
+	compatible = "qcom,apq8009-mtp", "qcom,apq8009", "qcom,mtp";
+	qcom,msm-id = <265 2>;
+	qcom,board-id= <0x00010120 0>;
 };
