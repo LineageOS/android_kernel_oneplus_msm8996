@@ -3150,6 +3150,14 @@ hdd_parse_set_roam_scan_channels_v2(hdd_adapter_t *pAdapter,
 
    for (i = 0; i < num_chan; i++) {
       channel = *value++;
+      if (!channel) {
+         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                   "%s: Channels end at index %d, expected %d",
+                   __func__, i, num_chan);
+         ret = -EINVAL;
+         goto exit;
+      }
+
       if (channel > WNI_CFG_CURRENT_CHANNEL_STAMAX) {
          VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                    "%s: index %d invalid channel %d", __func__, i, channel);
@@ -8742,6 +8750,12 @@ static void hdd_update_tgt_services(hdd_context_t *hdd_ctx,
     cfg_ini->enable_sap_auth_offload &= cfg->sap_auth_offload_service;
 #endif
     cfg_ini->sap_get_peer_info &= cfg->get_peer_info_enabled;
+    if (cfg_ini->wowEnable && (!cfg->wow_support)) {
+        hdd_ctx->prevent_suspend = true;
+        cfg_ini->wowEnable = 0;
+    } else {
+        hdd_ctx->prevent_suspend = false;
+    }
 }
 
 /**
@@ -12757,6 +12771,13 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
 #ifdef WLAN_NS_OFFLOAD
          cancel_work_sync(&pAdapter->ipv6NotifierWorkQueue);
 #endif
+#ifdef FEATURE_WLAN_DISABLE_CHANNEL_SWITCH
+         /*
+          * If Do_Not_Break_Stream was enabled clear avoid channel list.
+          */
+         if (pHddCtx->restrict_offchan_flag)
+             wlan_hdd_send_avoid_freq_for_dnbs(pHddCtx, 0);
+#endif
          if (bCloseSession)
              hdd_wait_for_sme_close_sesion(pHddCtx, pAdapter);
          break;
@@ -16001,17 +16022,21 @@ static int wlan_hdd_set_wow_pulse(hdd_context_t *phddctx, bool enable)
 				pcfg_ini->wow_pulse_interval_low;
 		wow_pulse_set_info.wow_pulse_interval_high=
 				pcfg_ini->wow_pulse_interval_high;
+		wow_pulse_set_info.wow_pulse_repeat_count=
+				pcfg_ini->wow_pulse_repeat_count;
 	} else {
 		wow_pulse_set_info.wow_pulse_enable = false;
 		wow_pulse_set_info.wow_pulse_pin = 0;
 		wow_pulse_set_info.wow_pulse_interval_low = 0;
 		wow_pulse_set_info.wow_pulse_interval_high= 0;
+		wow_pulse_set_info.wow_pulse_repeat_count= 0;
 	}
-	hddLog(LOG1,"%s: enable %d pin %d low %d high %d",
+	hddLog(LOG1,"%s: enable %d pin %d low %d high %d count = %d",
 		__func__, wow_pulse_set_info.wow_pulse_enable,
 		wow_pulse_set_info.wow_pulse_pin,
 		wow_pulse_set_info.wow_pulse_interval_low,
-		wow_pulse_set_info.wow_pulse_interval_high);
+		wow_pulse_set_info.wow_pulse_interval_high,
+		wow_pulse_set_info.wow_pulse_repeat_count);
 
 	status = sme_set_wow_pulse(&wow_pulse_set_info);
 	if (VOS_STATUS_E_FAILURE == status) {
@@ -16341,7 +16366,48 @@ static inline void hdd_get_thermal_shutdown_ini_param(tSmeThermalParams   *pther
 {
 	return;
 }
+#endif
 
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+VOS_STATUS hdd_mt_host_ev_cb(void *pcb_cxt, tSirMtEvent *pevent)
+{
+	hdd_context_t *hddctx;
+	hdd_adapter_t *adapter;
+	tHalHandle hHal;
+	int status;
+	tSirMotionDetEnable enable;
+
+	if (pcb_cxt == NULL || pevent == NULL) {
+		hddLog(VOS_TRACE_LEVEL_ERROR,
+			FL("HDD context is not valid"));
+			return VOS_STATUS_E_INVAL;
+	}
+
+	hddctx = (hdd_context_t *)pcb_cxt;
+	status = wlan_hdd_validate_context(hddctx);
+	if (0 != status)
+		return VOS_STATUS_E_INVAL;
+
+	adapter = hdd_get_adapter_by_vdev(hddctx, pevent->vdev_id);
+
+	hddLog(VOS_TRACE_LEVEL_INFO,
+		FL("hdd_mt_host_ev_cb vdev_id=%u, status=%u"),
+		pevent->vdev_id, pevent->status);
+
+	if (adapter->motion_detection_mode == 1) {
+	    hHal = WLAN_HDD_GET_HAL_CTX(adapter);
+
+	    enable.vdev_id = pevent->vdev_id;
+	    enable.enable = 1;
+
+	    hddLog(VOS_TRACE_LEVEL_INFO,
+		FL("hdd_mt_host_ev_cb enable mt again"));
+
+	    sme_MotionDetEnable(hHal, &enable);
+	}
+
+	return VOS_STATUS_SUCCESS;
+}
 #endif
 /**---------------------------------------------------------------------------
 
@@ -16488,6 +16554,11 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    if (status != 0) {
        goto err_free_hdd_context;
    }
+
+#ifdef FEATURE_WLAN_DISABLE_CHANNEL_SWITCH
+   spin_lock_init(&pHddCtx->restrict_offchan_lock);
+   mutex_init(&pHddCtx->avoid_freq_lock);
+#endif
 
    spin_lock_init(&pHddCtx->dfs_lock);
    spin_lock_init(&pHddCtx->sap_update_info_lock);
@@ -17399,6 +17470,10 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
     sme_set_rssi_threshold_breached_cb(pHddCtx->hHal, hdd_rssi_threshold_breached);
     wlan_hdd_cfg80211_link_layer_stats_init(pHddCtx);
     wlan_hdd_tsf_init(pHddCtx);
+
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+    sme_set_mt_host_ev_cb(pHddCtx->hHal, hdd_mt_host_ev_cb, pHddCtx);
+#endif
 
 #ifdef WLAN_FEATURE_LPSS
    wlan_hdd_send_all_scan_intf_info(pHddCtx);
@@ -19608,6 +19683,9 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
     hdd_ap_ctx_t *pHddApCtx;
     uint16_t intf_ch = 0, vht_channel_width = 0;
     eCsrBand orig_band, new_band;
+    uint16_t ch_width;
+    hdd_adapter_list_node_t *adapter_node = NULL, *next = NULL;
+    VOS_STATUS status;
 
    if ((pHddCtx->cfg_ini->WlanMccToSccSwitchMode == VOS_MCC_TO_SCC_SWITCH_DISABLE)
        || !(vos_concurrent_open_sessions_running()
@@ -19655,6 +19733,7 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
             }
         }
     }
+    ch_width = pHddApCtx->sapConfig.ch_width_orig;
 
     hddLog(VOS_TRACE_LEVEL_INFO,
         FL("SAP restarts due to MCC->SCC switch, orig chan: %d, new chan: %d"),
@@ -19676,14 +19755,28 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
         hdd_sta_state_sap_notify(pHddCtx, STA_NOTIFY_CONNECTED, csa_info);
     }else{
 #endif
-        pHddApCtx->bss_stop_reason = BSS_STOP_DUE_TO_MCC_SCC_SWITCH;
-        sme_SelectCBMode(hHal,
-                     pHddApCtx->sapConfig.SapHw_mode,
-                     pHddApCtx->sapConfig.channel,
-                     pHddApCtx->sapConfig.sec_ch,
-                     &vht_channel_width, pHddApCtx->sapConfig.ch_width_orig);
-        wlan_sap_set_vht_ch_width(pHddApCtx->sapContext, vht_channel_width);
-        wlan_hdd_restart_sap(ap_adapter);
+    status =  hdd_get_front_adapter (pHddCtx, &adapter_node);
+    while (NULL != adapter_node && VOS_STATUS_SUCCESS == status) {
+        ap_adapter = adapter_node->pAdapter;
+        if (ap_adapter && ap_adapter->device_mode == WLAN_HDD_SOFTAP) {
+            if (test_bit(SOFTAP_INIT_DONE, &ap_adapter->event_flags)) {
+                pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+                hHal = WLAN_HDD_GET_HAL_CTX(ap_adapter);
+                pHddApCtx->sapConfig.channel = intf_ch;
+                pHddApCtx->bss_stop_reason = BSS_STOP_DUE_TO_MCC_SCC_SWITCH;
+                sme_SelectCBMode(hHal,
+                             pHddApCtx->sapConfig.SapHw_mode,
+                             pHddApCtx->sapConfig.channel,
+                             pHddApCtx->sapConfig.sec_ch,
+                             &vht_channel_width, ch_width);
+                wlan_sap_set_vht_ch_width(pHddApCtx->sapContext, vht_channel_width);
+                hddLog(VOS_TRACE_LEVEL_INFO, FL("Restart prev SAP session "));
+                wlan_hdd_restart_sap(ap_adapter);
+            }
+        }
+        status = hdd_get_next_adapter (pHddCtx, adapter_node, &next);
+        adapter_node = next;
+    }
 #ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
     }
 #endif

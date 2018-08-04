@@ -191,6 +191,7 @@ int get_fw_files_for_non_qc_pci_target(struct non_qc_platform_pci_fw_files *pfw_
 			break;
 		case AR6320_REV3_VERSION:
 		case AR6320_REV3_2_VERSION:
+		case QCA9377_REV1_1_VERSION:
 		case QCA9379_REV1_VERSION:
 			memcpy(pfw_files, &FW_FILES_QCA6174_FW_3_0,
 						sizeof(*pfw_files));
@@ -1173,7 +1174,8 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 	if (ramdump_scn->enableFwSelfRecovery) {
 		vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, FALSE);
 #if defined(HIF_SDIO) && defined(WLAN_OPEN_SOURCE)
-		kobject_uevent(&ramdump_scn->adf_dev->dev->kobj, KOBJ_OFFLINE);
+		if (dev)
+			kobject_uevent(&dev->kobj, KOBJ_OFFLINE);
 #endif
 		goto out_fail;
 	}

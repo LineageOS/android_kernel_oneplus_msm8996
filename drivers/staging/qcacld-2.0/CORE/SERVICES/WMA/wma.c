@@ -407,6 +407,11 @@ static int wma_set_tdls_offchan_mode(WMA_HANDLE wma_handle,
                                      tTdlsChanSwitchParams *pChanSwitchParams);
 #endif
 
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+static int wma_motion_det_host_event_handler(void *handle, u_int8_t *event, u_int32_t len);
+static int wma_motion_det_base_line_host_event_handler(void *handle, u_int8_t *event, u_int32_t len);
+#endif
+
 static eHalStatus wma_set_smps_params(tp_wma_handle wma_handle,
                                  tANI_U8 vdev_id, int value);
 #if defined(QCA_WIFI_FTM)
@@ -454,7 +459,11 @@ void wma_process_roam_synch_fail(WMA_HANDLE handle,
 #endif
 
 static VOS_STATUS wma_set_thermal_mgmt(tp_wma_handle wma_handle,
-				t_thermal_cmd_params thermal_info);
+				t_thermal_cmd_params thermal_info,
+				A_UINT32 action);
+static VOS_STATUS wma_send_dc_to_fw(ol_txrx_pdev_handle pdev,
+				tp_wma_handle wma,
+				u_int8_t thermal_level);
 static VOS_STATUS wma_set_dpd_recal_mgmt(tp_wma_handle wma_handle,
                     t_dpd_recal_cmd_params recal_info);
 #ifdef FEATURE_WLAN_CH_AVOID
@@ -912,6 +921,11 @@ static void wma_lost_link_info_handler(tp_wma_handle wma, uint32_t vdev_id,
 	struct sir_lost_link_info *lost_link_info;
 	VOS_STATUS vos_status;
 	vos_msg_t sme_msg = {0};
+	if (vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: received invalid vdev_id %d",
+			 __func__, vdev_id);
+		return;
+	}
 	/* report lost link information only for STA mode */
 	if (wma->interfaces[vdev_id].vdev_up &&
 	    (WMI_VDEV_TYPE_STA == wma->interfaces[vdev_id].type) &&
@@ -2607,6 +2621,11 @@ static void wma_vdev_stats_lost_link_helper(tp_wma_handle wma,
 	uint8_t zero_mac[ETH_ALEN] = {0};
 	int8_t bcn_snr, dat_snr;
 
+	if (vdev_stats->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: Invalid vdev_id %hu",
+		 __func__, vdev_stats->vdev_id);
+		return;
+	}
 	node = &wma->interfaces[vdev_stats->vdev_id];
 	if (node->vdev_up &&
 	    vos_mem_compare(node->bssid, zero_mac, ETH_ALEN)) {
@@ -2651,6 +2670,11 @@ static void wma_update_vdev_stats(tp_wma_handle wma,
 	vos_msg_t sme_msg = {0};
 	int8_t bcn_snr, dat_snr;
 
+	if (vdev_stats->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: Invalid vdev_id %hu",
+		 __func__, vdev_stats->vdev_id);
+		return;
+	}
 	node = &wma->interfaces[vdev_stats->vdev_id];
 	stats_rsp_params = node->stats_rsp;
 	if (stats_rsp_params) {
@@ -2910,6 +2934,11 @@ static void wma_update_rssi_stats(tp_wma_handle wma,
 	uint32_t temp_mask;
 	uint8_t vdev_id;
 
+	if (rssi_stats->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: Invalid vdev_id %hu",
+		 __func__, rssi_stats->vdev_id);
+		return;
+	}
 	vdev_id = rssi_stats->vdev_id;
 	node = &wma->interfaces[vdev_id];
 	if (node->stats_rsp) {
@@ -9722,6 +9751,17 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
 	        wma_tdls_event_handler);
 #endif /* FEATURE_WLAN_TDLS */
 
+
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+	/* register for motion detection response event */
+	wmi_unified_register_event_handler(wma_handle->wmi_handle,
+			WMI_MOTION_DET_HOST_EVENTID,
+			wma_motion_det_host_event_handler);
+	wmi_unified_register_event_handler(wma_handle->wmi_handle,
+			WMI_MOTION_DET_BASE_LINE_HOST_EVENTID,
+			wma_motion_det_base_line_host_event_handler);
+#endif
+
     /* register for install key completion event */
     wmi_unified_register_event_handler(wma_handle->wmi_handle,
                                       WMI_VDEV_INSTALL_KEY_COMPLETE_EVENTID,
@@ -13933,6 +13973,261 @@ VOS_STATUS wma_process_roam_scan_req(tp_wma_handle wma_handle,
     return vos_status;
 }
 
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+static int wma_motion_det_host_event_handler(void *handle, u_int8_t *event, u_int32_t len)
+{
+	vos_msg_t vos_msg = {0};
+	wmi_motion_det_event *motion_det_event_hdr;
+	WMI_MOTION_DET_HOST_EVENTID_param_tlvs *param_buf =
+				(WMI_MOTION_DET_HOST_EVENTID_param_tlvs*)event;
+	tSirMtEvent* pevent;
+
+	if (!param_buf) {
+		WMA_LOGE("Invalid motion det host event buffer");
+		return -EINVAL;
+	}
+
+	motion_det_event_hdr = param_buf->fixed_param;
+	WMA_LOGD("motion host event received, vdev_id=%d, status=%d",
+		motion_det_event_hdr->vdev_id, motion_det_event_hdr->status);
+
+	pevent = vos_mem_malloc(sizeof(*pevent));
+	if (NULL == pevent) {
+		WMA_LOGE("%s: failed to allocate tSirMtEvent memory", __func__);
+		return -ENOMEM;
+	}
+	pevent->vdev_id = motion_det_event_hdr->vdev_id;
+	pevent->status = motion_det_event_hdr->status;
+
+	vos_msg.type = eWNI_SME_MOTION_DET_HOST_EVENT;
+	vos_msg.bodyptr = pevent;
+	vos_msg.bodyval = 0;
+
+	if (VOS_STATUS_SUCCESS !=
+		vos_mq_post_message(VOS_MQ_ID_SME, &vos_msg)) {
+		WMA_LOGP("%s: Failed to post eWNI_SME_MOTION_DET_HOST_EVENT", __func__);
+		vos_mem_free(pevent);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int wma_motion_det_base_line_host_event_handler(void *handle, u_int8_t *event, u_int32_t len)
+{
+	wmi_motion_det_base_line_event *motion_det_base_line_event_hdr;
+	WMI_MOTION_DET_BASE_LINE_HOST_EVENTID_param_tlvs *param_buf =
+				(WMI_MOTION_DET_BASE_LINE_HOST_EVENTID_param_tlvs *)event;
+
+
+	if (!param_buf) {
+		WMA_LOGE("Invalid motion det base line event buffer");
+		return -EINVAL;
+	}
+
+	motion_det_base_line_event_hdr = param_buf->fixed_param;
+	WMA_LOGD("motion host event received, vdev_id=%d, bl_baseline_value =%d "
+		"bl_max_corr_resv %d ,bl_min_corr_resv %d",
+		motion_det_base_line_event_hdr->vdev_id,
+		motion_det_base_line_event_hdr->bl_baseline_value,
+		motion_det_base_line_event_hdr->bl_max_corr_reserved,
+		motion_det_base_line_event_hdr->bl_min_corr_reserved);
+
+	return 0;
+}
+
+static eHalStatus wma_set_motion_det_config(WMA_HANDLE handle, tSirMotionDetConfig* pDetConfig)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	wmi_motion_det_config_params_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	int err;
+
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, sizeof(*cmd));
+	if (!buf) {
+		WMA_LOGE("Failed to allocate buffer to send "
+			"set_motion_det_config cmd");
+		return eHAL_STATUS_FAILED_ALLOC;
+	}
+
+	cmd = (wmi_motion_det_config_params_cmd_fixed_param*)wmi_buf_data(buf);
+	vos_mem_zero(cmd, sizeof(*cmd));
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_motion_det_config_params_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+			wmi_motion_det_config_params_cmd_fixed_param));
+	cmd->vdev_id = pDetConfig->vdev_id;
+	cmd->time_t1 = pDetConfig->time_t1;
+	cmd->time_t2 = pDetConfig->time_t2;
+	cmd->n1 = pDetConfig->n1;
+	cmd->n2 = pDetConfig->n2;
+	cmd->time_t1_gap = pDetConfig->time_t1_gap;
+	cmd->time_t2_gap = pDetConfig->time_t2_gap;
+	cmd->coarse_K = pDetConfig->coarse_K;
+	cmd->fine_K = pDetConfig->fine_K;
+	cmd->coarse_Q = pDetConfig->coarse_Q;
+	cmd->fine_Q = pDetConfig->fine_Q;
+	cmd->md_coarse_thr_high = pDetConfig->md_coarse_thr_high;
+	cmd->md_fine_thr_high = pDetConfig->md_fine_thr_high;
+	cmd->md_coarse_thr_low = pDetConfig->md_coarse_thr_low;
+	cmd->md_fine_thr_low = pDetConfig->md_fine_thr_low;
+
+	err = wmi_unified_cmd_send(wma_handle->wmi_handle, buf,
+			sizeof(*cmd), WMI_MOTION_DET_CONFIG_PARAM_CMDID);
+	if (err) {
+		WMA_LOGE("Failed to send set_motion_det_config cmd");
+		wmi_buf_free(buf);
+		return eHAL_STATUS_FAILURE;
+	}
+	WMA_LOGD("Set motion_det_config to vdevId %d\n"
+		"time_t1 %d\n"
+		"time_t2 %d\n"
+		"n1 %d\n"
+		"n2 %d\n"
+		"time_t1_gap %d\n"
+		"time_t2_gap %d\n"
+		"coarse_K %d\n"
+		"fine_K %d\n"
+		"coarse_Q %d\n"
+		"fine_Q %d\n"
+		"md_coarse_thr_high %d\n"
+		"md_fine_thr_high %d\n"
+		"md_coarse_thr_low %d\n"
+		"md_fine_thr_low %d\n",
+		pDetConfig->vdev_id,
+		pDetConfig->time_t1,
+		pDetConfig->time_t2,
+		pDetConfig->n1,
+		pDetConfig->n2,
+		pDetConfig->time_t1_gap,
+		pDetConfig->time_t2_gap,
+		pDetConfig->coarse_K,
+		pDetConfig->fine_K,
+		pDetConfig->coarse_Q,
+		pDetConfig->fine_Q,
+		pDetConfig->md_coarse_thr_high,
+		pDetConfig->md_fine_thr_high,
+		pDetConfig->md_coarse_thr_low,
+		pDetConfig->md_fine_thr_low);
+	return eHAL_STATUS_SUCCESS;
+}
+
+static eHalStatus wma_set_motion_det_enable(WMA_HANDLE handle, tSirMotionDetEnable* pDetEnable)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	wmi_motion_det_start_stop_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	int err;
+
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, sizeof(*cmd));
+	if (!buf) {
+		WMA_LOGE("Failed to allocate buffer to send "
+			"set_motion_det_enable cmd");
+		return eHAL_STATUS_FAILED_ALLOC;
+	}
+
+	cmd = (wmi_motion_det_start_stop_cmd_fixed_param*)wmi_buf_data(buf);
+	vos_mem_zero(cmd, sizeof(*cmd));
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_motion_det_start_stop_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+			wmi_motion_det_start_stop_cmd_fixed_param));
+	cmd->vdev_id = pDetEnable->vdev_id;
+	cmd->enable = pDetEnable->enable;
+
+	err = wmi_unified_cmd_send(wma_handle->wmi_handle, buf,
+			sizeof(*cmd), WMI_MOTION_DET_START_STOP_CMDID);
+	if (err) {
+		WMA_LOGE("Failed to send set_motion_det_enable cmd");
+		wmi_buf_free(buf);
+		return eHAL_STATUS_FAILURE;
+	}
+	WMA_LOGD("Set motion_det_enable to vdevId %d %d",
+		pDetEnable->vdev_id, pDetEnable->enable);
+	return eHAL_STATUS_SUCCESS;
+}
+
+static eHalStatus wma_set_motion_det_base_line_config(WMA_HANDLE handle, tSirMotionDetBaseLineConfig* pDetBaseLineConfig)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	wmi_motion_det_base_line_config_params_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	int err;
+
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, sizeof(*cmd));
+	if (!buf) {
+		WMA_LOGE("Failed to allocate buffer to send "
+			"set_motion_det_config cmd");
+		return eHAL_STATUS_FAILED_ALLOC;
+	}
+
+	cmd = (wmi_motion_det_base_line_config_params_cmd_fixed_param*)wmi_buf_data(buf);
+	vos_mem_zero(cmd, sizeof(*cmd));
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_motion_det_base_line_config_params_cmd_fixed_param ,
+		WMITLV_GET_STRUCT_TLVLEN(
+			wmi_motion_det_base_line_config_params_cmd_fixed_param));
+	cmd->vdev_id = pDetBaseLineConfig->vdev_id;
+	cmd->bl_time_t = pDetBaseLineConfig->bl_time_t;
+	cmd->bl_packet_gap = pDetBaseLineConfig->bl_packet_gap;
+	cmd->bl_n = pDetBaseLineConfig->bl_n;
+	cmd->bl_num_meas = pDetBaseLineConfig->bl_num_meas;
+
+	err = wmi_unified_cmd_send(wma_handle->wmi_handle, buf,
+			sizeof(*cmd), WMI_MOTION_DET_BASE_LINE_CONFIG_PARAM_CMDID);
+	if (err) {
+		WMA_LOGE("Failed to send set_motion_det_config cmd");
+		wmi_buf_free(buf);
+		return eHAL_STATUS_FAILURE;
+	}
+	WMA_LOGD("Set motion_det_baseline_config to vdevId %d bl_time_t %d "
+		"bl_packet_gap %d "
+		"bl_n %d, bl_num_meas %d",
+		pDetBaseLineConfig->vdev_id,pDetBaseLineConfig->bl_time_t,
+		pDetBaseLineConfig->bl_packet_gap, pDetBaseLineConfig->bl_n,
+		pDetBaseLineConfig->bl_num_meas);
+	return eHAL_STATUS_SUCCESS;
+}
+
+static eHalStatus wma_set_motion_det_base_line_enable(WMA_HANDLE handle, tSirMotionDetBaseLineEnable* pDetBaseLineEnable)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	wmi_motion_det_base_line_start_stop_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	int err;
+
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, sizeof(*cmd));
+	if (!buf) {
+		WMA_LOGE("Failed to allocate buffer to send "
+			"set_motion_det_config cmd");
+		return eHAL_STATUS_FAILED_ALLOC;
+	}
+
+	cmd = (wmi_motion_det_base_line_start_stop_cmd_fixed_param*)wmi_buf_data(buf);
+	vos_mem_zero(cmd, sizeof(*cmd));
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_motion_det_base_line_start_stop_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+			wmi_motion_det_base_line_start_stop_cmd_fixed_param));
+	cmd->vdev_id = pDetBaseLineEnable->vdev_id;
+	cmd->enable = pDetBaseLineEnable->enable;
+
+	err = wmi_unified_cmd_send(wma_handle->wmi_handle, buf,
+			sizeof(*cmd), WMI_MOTION_DET_BASE_LINE_START_STOP_CMDID);
+	if (err) {
+		WMA_LOGE("Failed to send motion_det_base_line_enable cmd");
+		wmi_buf_free(buf);
+		return eHAL_STATUS_FAILURE;
+	}
+	WMA_LOGD("Set motion_det_base_line_enable to vdevId %d enable %d",
+		pDetBaseLineEnable->vdev_id, pDetBaseLineEnable->enable);
+	return eHAL_STATUS_SUCCESS;
+}
+#endif
+
 #ifdef FEATURE_WLAN_LPHB
 /* function   : wma_lphb_conf_hbenable
  * Description : handles the enable command of LPHB configuration requests
@@ -17101,6 +17396,82 @@ static int32_t wma_send_pdev_monitor_mode_cmd(
 	}
 
 	return 0;
+}
+
+/**
+ * wma_send_thermal_mitigation_param_cmd_tlv() - configure thermal mitigation params
+ * @param wmi_handle : handle to WMI.
+ * @param param : pointer to hold thermal mitigation param
+ *
+ * @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ */
+static VOS_STATUS wma_send_thermal_mitigation_param_cmd_tlv(
+                  tp_wma_handle wma_handle,
+                  struct hal_thermal_mitigation_params *param)
+{
+	wmi_therm_throt_config_request_fixed_param *tt_conf = NULL;
+	wmi_therm_throt_level_config_info *lvl_conf = NULL;
+	wmi_buf_t buf = NULL;
+	uint8_t *buf_ptr = NULL;
+	int status = 0, len = 0, i = 0;
+
+	if (!wma_handle || !wma_handle->wmi_handle) {
+		WMA_LOGE(FL("WMA is closed, can not issue cmd"));
+		return VOS_STATUS_E_INVAL;
+	}
+
+	if (!wma_handle->fw_therm_throt_enabled) {
+		WMA_LOGE(FL("FW doesnt support thermal throttle!"));
+		return VOS_STATUS_E_NOSUPPORT;
+	}
+
+	len = sizeof(*tt_conf) + WMI_TLV_HDR_SIZE +
+			sizeof(wmi_therm_throt_level_config_info);
+
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
+	if (!buf) {
+		WMA_LOGE("%s:wmi_buf_alloc failed", __func__);
+		return VOS_STATUS_E_NOMEM;
+	}
+
+	tt_conf = (wmi_therm_throt_config_request_fixed_param *) wmi_buf_data(buf);
+
+	/* init fixed params */
+	WMITLV_SET_HDR(tt_conf,
+		WMITLV_TAG_STRUC_wmi_therm_throt_config_request_fixed_param,
+		(WMITLV_GET_STRUCT_TLVLEN(wmi_therm_throt_config_request_fixed_param)));
+
+	tt_conf->pdev_id = 0;
+	tt_conf->enable = param->enable;
+	tt_conf->dc = param->dc;
+	tt_conf->dc_per_event = param->dc_per_event;
+	tt_conf->therm_throt_levels = 1;
+
+	buf_ptr = (uint8_t *) ++tt_conf;
+	/* init TLV params */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+			sizeof(wmi_therm_throt_level_config_info));
+
+	lvl_conf = (wmi_therm_throt_level_config_info *) (buf_ptr +  WMI_TLV_HDR_SIZE);
+	for (i = 0; i < 1; i++) {
+		WMITLV_SET_HDR(&lvl_conf->tlv_header,
+			WMITLV_TAG_STRUC_wmi_therm_throt_level_config_info,
+			WMITLV_GET_STRUCT_TLVLEN(wmi_therm_throt_level_config_info));
+		lvl_conf->temp_lwm = param->level_conf[i].tmplwm;
+		lvl_conf->temp_hwm = param->level_conf[i].tmphwm;
+		lvl_conf->dc_off_percent = param->level_conf[i].dcoffpercent;
+		lvl_conf->prio = param->level_conf[i].priority;
+		lvl_conf++;
+	}
+
+	status = wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
+					WMI_THERM_THROT_SET_CONF_CMDID);
+	if (status != EOK) {
+		WMA_LOGE("Failed to send WMI_THERM_THROT_SET_CONF_CMDID command");
+		wmi_buf_free(buf);
+		return VOS_STATUS_E_FAILURE;
+	}
+	return VOS_STATUS_SUCCESS;
 }
 
 static void wma_process_cli_set_cmd(tp_wma_handle wma,
@@ -21473,6 +21844,10 @@ static void wma_send_beacon(tp_wma_handle wma, tpSendbeaconParams bcn_info)
 				WMA_LOGE("%s : failed to send vdev up", __func__);
 				return;
 			}
+			if (wma->interfaces[vdev_id].pause_bitmap) {
+				wdi_in_vdev_unpause(wma->interfaces[vdev_id].handle, 0xffffffff);
+				wma->interfaces[vdev_id].pause_bitmap = 0;
+			}
 			wma->interfaces[vdev_id].vdev_up = TRUE;
 			wma_set_sap_keepalive(wma, vdev_id);
 		}
@@ -23009,7 +23384,14 @@ static const u8 *wma_wow_wake_reason_str(A_INT32 wake_reason, tp_wma_handle wma)
 		return "ACTION_FRAME_RECV";
 	case WOW_REASON_OEM_RESPONSE_EVENT:
 		return "WOW_REASON_OEM_RESPONSE_EVENT";
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+	case WOW_REASON_WLAN_MD:
+		return "WOW_REASON_WLAN_MD";
+	case WOW_REASON_WLAN_BL:
+		return "WOW_REASON_WLAN_BL";
+#endif
 	}
+
 	return "unknown";
 }
 
@@ -23543,6 +23925,11 @@ static void wma_wow_wake_up_stats_display(tp_wma_handle wma)
 		wma->wow_oem_response_wake_up_count,
 		wma->wow_pwr_save_fail_detected_wake_up_count);
 
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+	WMA_LOGA("md %d bl %d",
+		wma->wow_md_wake_up_count,
+		wma->wow_bl_wake_up_count);
+#endif
 	return;
 }
 
@@ -23674,7 +24061,14 @@ static void wma_wow_wake_up_stats(tp_wma_handle wma, uint8_t *data,
 	case WOW_REASON_CHIP_POWER_FAILURE_DETECT:
 		wma->wow_pwr_save_fail_detected_wake_up_count++;
 		break;
-
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+	case WOW_REASON_WLAN_MD:
+		wma->wow_md_wake_up_count++;
+		break;
+	case WOW_REASON_WLAN_BL:
+		wma->wow_bl_wake_up_count++;
+		break;
+#endif
 	default:
 		WMA_LOGE("Unknown wake up reason");
 		break;
@@ -24535,6 +24929,25 @@ static int wma_wow_wakeup_host_event(void *handle, u_int8_t *event,
 			WMA_LOGD("Host woken up because of chip power save failure");
 		}
 		break;
+
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+	case WOW_REASON_WLAN_MD:
+		{
+			/* Just update stats and exit */
+			wma_wow_wake_up_stats(wma, NULL, 0,
+				WOW_REASON_WLAN_MD);
+			WMA_LOGD("Host woken up because of motion detection");
+		}
+		break;
+	case WOW_REASON_WLAN_BL:
+		{
+			/* Just update stats and exit */
+			wma_wow_wake_up_stats(wma, NULL, 0,
+				WOW_REASON_WLAN_BL);
+			WMA_LOGD("Host woken up because of motion detection bl");
+		}
+		break;
+#endif
 	default:
 		break;
 	}
@@ -29140,6 +29553,7 @@ VOS_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 {
 	t_thermal_cmd_params thermal_params;
 	ol_txrx_pdev_handle curr_pdev;
+	int i = 0;
 
 	if (NULL == wma || NULL == pThermalParams) {
 		WMA_LOGE("TM Invalid input");
@@ -29198,11 +29612,17 @@ VOS_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 			 wma->thermal_mgmt_info.thermalLevels[3].minTempThreshold,
 			 wma->thermal_mgmt_info.thermalLevels[3].maxTempThreshold);
 
-	if (wma->thermal_mgmt_info.thermalMgmtEnabled)
-	{
-		ol_tx_throttle_init_period(curr_pdev,
-			pThermalParams->throttlePeriod,
-			&pThermalParams->throttle_duty_cycle_tbl[0]);
+	for (i = 0; i < THROTTLE_LEVEL_MAX; i++) {
+		wma->thermal_mgmt_info.throttle_duty_cycle_tbl[i] =
+			pThermalParams->throttle_duty_cycle_tbl[i];
+	}
+
+	if (wma->thermal_mgmt_info.thermalMgmtEnabled) {
+		if (!wma->fw_therm_throt_enabled) {
+			ol_tx_throttle_init_period(curr_pdev,
+				pThermalParams->throttlePeriod,
+				&pThermalParams->throttle_duty_cycle_tbl[0]);
+		}
 
 		/* Get the temperature thresholds to set in firmware */
 		thermal_params.minTemp = wma->thermal_mgmt_info.
@@ -29216,8 +29636,17 @@ VOS_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 			thermal_params.minTemp, thermal_params.maxTemp,
 				 thermal_params.thermalEnable);
 
-		if(VOS_STATUS_SUCCESS != wma_set_thermal_mgmt(wma, thermal_params))
-		{
+		if (wma->fw_therm_throt_enabled) {
+			/* Send duty cycle info to firmware for fw to throttle */
+			if (VOS_STATUS_SUCCESS !=
+			    wma_send_dc_to_fw(curr_pdev, wma, WLAN_WMA_THERMAL_LEVEL_0)) {
+				WMA_LOGE("Failed to send thermal mgmt duty off cycle to fw!");
+				return -EINVAL;
+			}
+		}
+
+		if (VOS_STATUS_SUCCESS != wma_set_thermal_mgmt(wma, thermal_params,
+							WMI_THERMAL_MGMT_ACTION_DEFAULT)) {
 			WMA_LOGE("Could not send thermal mgmt command to the firmware!");
 		}
 	}
@@ -32495,8 +32924,10 @@ static VOS_STATUS wma_send_udp_resp_offload_cmd(tp_wma_handle wma_handle,
 
 	WMA_LOGD("%s: Enter", __func__);
 	if (1 == udp_response->enable) {
-		pattern_len = strlen(udp_response->udp_payload_filter);
-		response_len = strlen(udp_response->udp_response_payload);
+		pattern_len = strnlen(udp_response->udp_payload_filter,
+				      MAX_LEN_UDP_RESP_OFFLOAD);
+		response_len = strnlen(udp_response->udp_response_payload,
+				       MAX_LEN_UDP_RESP_OFFLOAD);
 	}
 
 	udp_len = (pattern_len % 4) ?
@@ -32621,7 +33052,7 @@ static VOS_STATUS wma_send_wow_pulse_cmd(tp_wma_handle wma_handle,
 	cmd->pin = wow_pulse_cmd->wow_pulse_pin;
 	cmd->interval_low = wow_pulse_cmd->wow_pulse_interval_low;
 	cmd->interval_high = wow_pulse_cmd->wow_pulse_interval_high;
-	cmd->repeat_cnt = WMI_WOW_PULSE_REPEAT_CNT;
+	cmd->repeat_cnt = wow_pulse_cmd->wow_pulse_repeat_count;
 
 	if (wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
 		WMI_WOW_HOSTWAKEUP_GPIO_PIN_PATTERN_CONFIG_CMDID)) {
@@ -33997,6 +34428,7 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 	tp_wma_handle wma_handle;
 	ol_txrx_vdev_handle txrx_vdev_handle = NULL;
 	extern tANI_U8* macTraceGetWdaMsgString( tANI_U16 wdaMsg );
+	t_thermal_cmd_params thermal_info;
 
 	if(NULL == msg)	{
 		WMA_LOGE("msg is NULL");
@@ -34018,7 +34450,6 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 		vos_status = VOS_STATUS_E_INVAL;
 		goto end;
 	}
-
 	switch (msg->type) {
 #ifdef FEATURE_WLAN_ESE
         case WDA_TSM_STATS_REQ:
@@ -34331,6 +34762,28 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			  (tTdlsChanSwitchParams*)msg->bodyptr);
 			break;
 #endif /* FEATURE_WLAN_TDLS */
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+		case WDA_SET_MOTION_DET_CONFIG:
+			wma_set_motion_det_config(wma_handle,
+			  (tSirMotionDetConfig*)msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
+		case WDA_SET_MOTION_DET_ENABLE:
+			wma_set_motion_det_enable(wma_handle,
+			  (tSirMotionDetEnable*)msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
+		case WDA_SET_MOTION_DET_BASE_LINE_CONFIG:
+			wma_set_motion_det_base_line_config(wma_handle,
+			  (tSirMotionDetBaseLineConfig*)msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
+		case WDA_SET_MOTION_DET_BASE_LINE_ENABLE:
+			wma_set_motion_det_base_line_enable(wma_handle,
+			  (tSirMotionDetBaseLineEnable*)msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
+#endif
 		case WDA_ADD_PERIODIC_TX_PTRN_IND:
 			wma_ProcessAddPeriodicTxPtrnInd(wma_handle,
 				(tSirAddPeriodicTxPtrn *)msg->bodyptr);
@@ -34403,6 +34856,7 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			break;
 		case WDA_INIT_DPD_RECAL_INFO_CMD:
 			wma_process_init_dpd_recal_info(wma_handle, (t_dpd_recal_mgmt *)msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
 			break;
 
 		case WDA_SET_THERMAL_LEVEL:
@@ -34932,6 +35386,21 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 		case WDA_MNT_FILTER_TYPE_CMD:
 			wma_mnt_filter_type_cmd(wma_handle,
 				(struct hal_mnt_filter_type_request*)msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
+		case WDA_THERM_THROT_SET_CONF_CMD:
+			if (!wma_handle->thermal_mgmt_info.thermalMgmtEnabled) {
+				wma_send_thermal_mitigation_param_cmd_tlv(wma_handle,
+					(struct hal_thermal_mitigation_params*)msg->bodyptr);
+			}
+			vos_mem_free(msg->bodyptr);
+			break;
+		case WDA_THERMAL_MGMT_CMD:
+			if (!wma_handle->thermal_mgmt_info.thermalMgmtEnabled) {
+				memcpy(&thermal_info, msg->bodyptr, sizeof(t_thermal_cmd_params));
+				wma_set_thermal_mgmt(wma_handle, thermal_info,
+						     WMI_THERMAL_MGMT_ACTION_DEFAULT);
+			}
 			vos_mem_free(msg->bodyptr);
 			break;
 		default:
@@ -35605,6 +36074,11 @@ static int wma_apfind_evt_handler(void *handle, u_int8_t *event,
 		/* FW had the tlv_header len calculated into the data_len */
 		buf = &param_buf->data[WMI_MAX_SSID_LEN + IEEE80211_ADDR_LEN];
 		vdev_id = *(u_int32_t*) buf;
+		if (vdev_id >= wma->max_bssid) {
+			WMA_LOGE("%s: received invalid vdev_id %d",
+				 __func__, vdev_id);
+			return -EINVAL;
+		}
 
 		/* to trigger AP re-connection after QRF wakeup*/
 		WMA_LOGA("%s, trigger AP re-connection at QRF wakeup (APFIND_WAKEUP_EVENT), vdev_id=%d, SSID=%s",
@@ -35717,7 +36191,7 @@ static int wma_mcc_vdev_tx_pause_evt_handler(void *handle, u_int8_t *event,
  *              VOS_STATUS_SUCCESS for success otherwise failure
  */
 static VOS_STATUS wma_set_thermal_mgmt(tp_wma_handle wma_handle,
-					t_thermal_cmd_params thermal_info)
+					t_thermal_cmd_params thermal_info, A_UINT32 action)
 {
 	wmi_thermal_mgmt_cmd_fixed_param *cmd = NULL;
 	wmi_buf_t buf = NULL;
@@ -35741,6 +36215,7 @@ static VOS_STATUS wma_set_thermal_mgmt(tp_wma_handle wma_handle,
 	cmd->lower_thresh_degreeC = thermal_info.minTemp;
 	cmd->upper_thresh_degreeC = thermal_info.maxTemp;
 	cmd->enable = thermal_info.thermalEnable;
+	cmd->action = action;
 
 	WMA_LOGE("TM Sending thermal mgmt cmd: low temp %d, upper temp %d, enabled %d",
 			 cmd->lower_thresh_degreeC, cmd->upper_thresh_degreeC, cmd->enable);
@@ -35845,6 +36320,56 @@ u_int8_t wma_thermal_mgmt_get_level(void *handle, u_int32_t temp)
 	return level;
 }
 
+static bool wma_is_vdev_in_mcc(tp_wma_handle wma)
+{
+	int32_t chan = 0, i = 0;
+
+	for (i = 0; i < wma->max_bssid; i++) {
+		if (wma->interfaces[i].handle &&
+		    wma->interfaces[i].vdev_up) {
+			if (!chan) {
+				chan = wma->interfaces[i].mhz;
+			}
+			else if (chan != wma->interfaces[i].mhz) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+static VOS_STATUS wma_send_dc_to_fw(ol_txrx_pdev_handle pdev, tp_wma_handle wma,
+				    u_int8_t thermal_level)
+{
+	struct hal_thermal_mitigation_params *therm_data;
+	VOS_STATUS vos_status;
+
+	therm_data = vos_mem_malloc(sizeof(*therm_data));
+	if (!therm_data) {
+		VOS_TRACE(VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
+                          "Unable to allocate memory");
+		return VOS_STATUS_E_NOMEM;
+	}
+	vos_mem_zero(therm_data, sizeof(*therm_data));
+
+	therm_data->enable = 1;
+
+	if (wma_is_vdev_in_mcc(wma))
+		therm_data->dc = 10;
+	else
+		therm_data->dc = 100;
+
+	therm_data->level_conf[0].dcoffpercent =
+		wma->thermal_mgmt_info.throttle_duty_cycle_tbl[thermal_level];
+	therm_data->level_conf[0].priority = 0;
+
+	vos_status =  wma_send_thermal_mitigation_param_cmd_tlv(wma, therm_data);
+	if (VOS_STATUS_SUCCESS ==  vos_status) {
+		vos_mem_free(therm_data);
+	}
+	return vos_status;
+}
+
 static int wma_thermal_throttle_handler(void *handle, u_int32_t degree_c)
 {
 	tp_wma_handle wma = (tp_wma_handle)handle;
@@ -35878,11 +36403,21 @@ static int wma_thermal_throttle_handler(void *handle, u_int32_t degree_c)
 
 	info->thermalCurrLevel = thermal_level;
 
-	/* Inform txrx */
-	ol_tx_throttle_set_level(curr_pdev, thermal_level);
+	if (!wma->fw_therm_throt_enabled) {
+		/* Inform txrx */
+		ol_tx_throttle_set_level(curr_pdev, thermal_level);
+	}
 
 	/* Send SME SET_THERMAL_LEVEL_IND message */
 	wma_set_thermal_level_ind(thermal_level);
+
+	if (wma->fw_therm_throt_enabled) {
+		/* Send duty cycle info to firmware for fw to throttle */
+		if (VOS_STATUS_SUCCESS != wma_send_dc_to_fw(curr_pdev, wma, thermal_level)) {
+			WMA_LOGE("Failed to send thermal mgmt duty off cycle to fw!");
+			return -EINVAL;
+		}
+	}
 
 	/* Get the temperature thresholds to set in firmware */
 	thermal_params.minTemp =
@@ -35891,11 +36426,11 @@ static int wma_thermal_throttle_handler(void *handle, u_int32_t degree_c)
 		info->thermalLevels[thermal_level].maxTempThreshold;
 	thermal_params.thermalEnable = info->thermalMgmtEnabled;
 
-	if (VOS_STATUS_SUCCESS != wma_set_thermal_mgmt(wma, thermal_params)) {
+	if (VOS_STATUS_SUCCESS != wma_set_thermal_mgmt(wma, thermal_params,
+						WMI_THERMAL_MGMT_ACTION_DEFAULT)) {
 		WMA_LOGE("Could not send thermal mgmt cmd to the firmware!");
 		return -EINVAL;
 	}
-
 	return 0;
 }
 
@@ -36436,7 +36971,10 @@ int wma_scpc_event_handler(void *handle, u_int8_t *event_buf, u_int32_t len)
 	param_buf = (WMI_PDEV_UTF_SCPC_EVENTID_param_tlvs *)event_buf;
 	scpc_event = param_buf->fixed_param;
 	length = len - sizeof(wmi_scpc_event_fixed_param);
-
+	if (length < sizeof(u_int32_t)) {
+		WMA_LOGE("%s: invalid length", __func__);
+		return -EINVAL;
+	}
 
 	buf = (u_int8_t *)scpc_event + sizeof(wmi_scpc_event_fixed_param);
 
@@ -36445,22 +36983,30 @@ int wma_scpc_event_handler(void *handle, u_int8_t *event_buf, u_int32_t len)
 
 	/* skip the tag */
 	buf += sizeof(u_int32_t);
+	length -= sizeof(u_int32_t);
+	if (length < sizeof(struct _bd)) {
+		WMA_LOGE("%s: invalid length", __func__);
+		return -EINVAL;
+	}
+
 
 	i = n = 0;
 
-	while ((n < length) && (i < scpc_event->num_patch)) {
+	while ((n <= length - sizeof(struct _bd)) && (i < scpc_event->num_patch)) {
 		bd_data = (struct _bd *)&buf[n];
 
 		WMA_LOGD("%s: board data patch%i, offset= %d, length= %d.\n",
 			__func__, i, bd_data->offset, bd_data->length);
-		if (bd_data->length + n > length)
+		if (bd_data->length > length - sizeof(struct _bd) - n)
 			break;
 
 		/* cache the data section */
 		vos_cache_boarddata(bd_data->offset,
 				    bd_data->length, bd_data->data);
-
-		n += roundup((sizeof(struct _bd) + bd_data->length), 4);
+		len = roundup((sizeof(struct _bd) + bd_data->length), 4);
+		if (len > length - n)
+			break;
+		n += len;
 		i++;
 	}
 
@@ -37309,6 +37855,8 @@ static inline void wma_update_target_services(tp_wma_handle wh,
 	if (WMI_SERVICE_IS_ENABLED(wh->wmi_service_bitmap,
 				WMI_SERVICE_PEER_STATS_INFO))
 		cfg->get_peer_info_enabled = 1;
+	cfg->wow_support = WMI_SERVICE_IS_ENABLED(wh->wmi_service_bitmap,
+						  WMI_SERVICE_WOW);
 }
 
 static inline void wma_update_target_ht_cap(tp_wma_handle wh,
@@ -37670,6 +38218,35 @@ static void wma_update_ra__limit(tp_wma_handle handle)
 }
 #endif
 
+/* Process service available event */
+v_VOID_t wma_rx_service_available_event(WMA_HANDLE handle, void *cmd_param_info)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	WMI_SERVICE_AVAILABLE_EVENTID_param_tlvs *param_buf;
+	wmi_service_available_event_fixed_param *ev;
+
+	WMA_LOGD("%s: Enter", __func__);
+
+	param_buf = (WMI_SERVICE_AVAILABLE_EVENTID_param_tlvs *) cmd_param_info;
+	if (!(handle && param_buf)) {
+		WMA_LOGP("%s: Invalid arguments", __func__);
+		return;
+	}
+
+	ev = param_buf->fixed_param;
+	if (!ev) {
+		WMA_LOGP("%s: Invalid buffer", __func__);
+		return;
+	}
+
+	WMA_LOGA("WMA <-- WMI_SERVICE_AVAILABLE_EVENTID");
+
+	vos_mem_copy(wma_handle->wmi_service_ext_bitmap,
+		     ev->wmi_service_segment_bitmap,
+		     sizeof(wma_handle->wmi_service_ext_bitmap));
+
+	WMA_LOGD(">wmi_service_ext_bitmap = 0x%x\n",wma_handle->wmi_service_ext_bitmap[0]);
+}
 
 /* Process service ready event and send wmi_init command */
 v_VOID_t wma_rx_service_ready_event(WMA_HANDLE handle, void *cmd_param_info)
@@ -37830,6 +38407,10 @@ v_VOID_t wma_rx_service_ready_event(WMA_HANDLE handle, void *cmd_param_info)
 	wma_handle->nan_datapath_enabled =
 		WMI_SERVICE_IS_ENABLED(wma_handle->wmi_service_bitmap,
 			WMI_SERVICE_NAN_DATA);
+	wma_handle->fw_therm_throt_enabled =
+		WMI_SERVICE_EXT_IS_ENABLED(wma_handle->wmi_service_bitmap,
+					   wma_handle->wmi_service_ext_bitmap,
+					   WMI_SERVICE_THERM_THROT);
 	vos_mem_copy(target_cap.wmi_service_bitmap,
 		     param_buf->wmi_service_bitmap,
 		     sizeof(wma_handle->wmi_service_bitmap));
