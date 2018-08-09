@@ -571,7 +571,7 @@ static void request_mcu_irq(struct fastchg_device_info *di)
 	gpio_set_value(di->ap_clk, 1);
 	if (di->adapter_update_real
 		!= ADAPTER_FW_NEED_UPDATE) {
-		pr_info("%s\n", __func__);
+		pr_debug("%s\n", __func__);
 		if (!di->irq_enabled) {
 			retval = request_irq(di->irq, irq_rx_handler,
 					IRQF_TRIGGER_RISING, "mcu_data", di);
