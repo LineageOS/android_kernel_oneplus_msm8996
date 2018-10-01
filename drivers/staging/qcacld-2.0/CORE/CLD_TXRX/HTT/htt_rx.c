@@ -219,6 +219,13 @@ htt_rx_ring_fill_n(struct htt_pdev_t *pdev, int num)
     struct htt_host_rx_desc_base *rx_desc;
 
     idx = *(pdev->rx_ring.alloc_idx.vaddr);
+
+    if ((idx < 0) || (idx > pdev->rx_ring.size_mask) ||
+        (num > pdev->rx_ring.size))  {
+        adf_os_print("%s:rx refill failed!\n", __func__);
+        return;
+    }
+
     while (num > 0) {
         u_int32_t paddr;
         adf_nbuf_t rx_netbuf;
@@ -2028,6 +2035,15 @@ htt_rx_mac_header_mon_process(
 	/* what's the num_elem max value? */
 	if (num_elems <= 0)
 		return 0;
+
+	if (num_elems > ((adf_nbuf_len(rx_ind_msg)
+		- HTT_T2H_MONITOR_MAC_HEADER_IND_HDR_SIZE
+		- sizeof(struct htt_hw_rx_desc_base))
+		/ sizeof(struct ieee80211_frame_addr4))) {
+		adf_os_print("%s: num_elems %d exceed range of nbuf \n",
+				     __func__, num_elems);
+		return 0;
+	}
 
 	/* get htt_hw_rx_desc_base_rx_desc pointer */
 	hw_desc = (struct htt_hw_rx_desc_base *)

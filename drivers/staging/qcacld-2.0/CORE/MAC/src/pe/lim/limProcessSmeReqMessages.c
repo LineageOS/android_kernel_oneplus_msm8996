@@ -3408,7 +3408,8 @@ __limProcessSmeDeauthReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
             return;
     } // end switch (pMac->lim.gLimSystemRole)
 
-    if (smeDeauthReq.reasonCode == eLIM_LINK_MONITORING_DEAUTH)
+    if (smeDeauthReq.reasonCode == eLIM_LINK_MONITORING_DEAUTH &&
+        psessionEntry->limSystemRole == eLIM_STA_ROLE)
     {
         /// Deauthentication is triggered by Link Monitoring
         PELOG1(limLog(pMac, LOG1, FL("**** Lost link with AP ****"));)
@@ -5509,6 +5510,8 @@ __limProcessSmeAddStaSelfReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
                       pSmeReq->tx_non_aggr_sw_retry_threshhold_vi;
    pAddStaSelfParams->tx_non_aggr_sw_retry_threshhold_vo =
                       pSmeReq->tx_non_aggr_sw_retry_threshhold_vo;
+   pAddStaSelfParams->enable_bcast_probe_rsp =
+                      pSmeReq->enable_bcast_probe_rsp;
 
    msg.type = SIR_HAL_ADD_STA_SELF_REQ;
    msg.reserved = 0;

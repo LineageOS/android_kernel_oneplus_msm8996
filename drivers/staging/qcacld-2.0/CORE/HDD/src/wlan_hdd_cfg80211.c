@@ -4168,6 +4168,11 @@ static int hdd_extscan_start_fill_bucket_channel_spec(
 			total_channels++;
 		}
 
+		if (j != pReqMsg->buckets[bktIndex].numChannels) {
+			hddLog(LOG1, FL("Input parameters didn't match"));
+			return -EINVAL;
+		}
+
 		hdd_extscan_update_dwell_time_limits(
 					pReqMsg, bktIndex,
 					min_dwell_time_active_bucket,
@@ -8402,12 +8407,19 @@ wlan_hdd_thermal_cmd_get_temperature(struct wiphy *wiphy,
 		struct wireless_dev *wdev)
 {
 	eHalStatus status;
-	struct statsContext temp_context;
+	int ret;
 	unsigned long rc;
 	struct sk_buff *nl_resp = 0;
 	hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
 	struct net_device *dev = wdev->netdev;
 	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	void *cookie;
+	struct hdd_request *request;
+	struct temperature_info *priv = NULL;
+	static const struct hdd_request_params params = {
+		.priv_size = sizeof(*priv),
+		.timeout_ms = WLAN_WAIT_TIME_STATS,
+	};
 
 	if (VOS_FTM_MODE == hdd_get_conparam()) {
 		  hddLog(LOGE, FL("Command not allowed in FTM mode"));
@@ -8417,28 +8429,43 @@ wlan_hdd_thermal_cmd_get_temperature(struct wiphy *wiphy,
 	if (wlan_hdd_validate_context(hdd_ctx))
 		  return -EINVAL;
 
-	/* prepare callback context and magic pattern */
-	init_completion(&temp_context.completion);
-	temp_context.pAdapter = adapter;
-	temp_context.magic = TEMP_CONTEXT_MAGIC;
+	if (NULL == adapter)
+	{
+		hddLog(VOS_TRACE_LEVEL_ERROR,
+		       FL("adapter is NULL"));
+		return VOS_STATUS_E_FAULT;
+	}
+
+	request = hdd_request_alloc(&params);
+	if (!request) {
+		hddLog(VOS_TRACE_LEVEL_ERROR,
+		       "%s: Request allocation failure", __func__);
+		return VOS_STATUS_E_NOMEM;
+	}
+	cookie = hdd_request_cookie(request);
 
 	status = sme_GetTemperature(WLAN_HDD_GET_HAL_CTX(adapter),
-				&temp_context, hdd_GetTemperatureCB);
+				cookie, hdd_GetTemperatureCB);
 	if (eHAL_STATUS_SUCCESS != status) {
 		  hddLog(VOS_TRACE_LEVEL_ERROR, FL("Unable to get temperature"));
 	} else {
-		  rc = wait_for_completion_timeout(&temp_context.completion,
-				msecs_to_jiffies(1000));
-		  if (!rc) {
-			hddLog(VOS_TRACE_LEVEL_ERROR,
-				FL("SME timed out while getting temperature"));
-			return -EBUSY;
-		  }
+		/* request was sent -- wait for the response */
+		ret = hdd_request_wait_for_response(request);
+		if (ret) {
+			hddLog(VOS_TRACE_LEVEL_WARN,
+			       FL("timeout when get temperature"));
+			/* we'll returned a cached value below */
+		} else {
+			/* update the adapter with the fresh results */
+			priv = hdd_request_priv(request);
+			/* ignore it if this was 0 */
+			if (priv->temperature != 0)
+				adapter->temperature =
+						 priv->temperature;
+		}
 	}
 
-	spin_lock(&hdd_context_lock);
-	temp_context.magic = 0;
-	spin_unlock(&hdd_context_lock);
+	hdd_request_put(request);
 
 	nl_resp = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, 4 + NLMSG_HDRLEN);
 	if (!nl_resp) {
@@ -9846,6 +9873,13 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != status)
 		return status;
+
+	if (!((adapter->device_mode == WLAN_HDD_SOFTAP) ||
+	      (adapter->device_mode == WLAN_HDD_P2P_GO))) {
+		hddLog(LOGE, FL("Invalid device mode %d"),
+		       adapter->device_mode);
+		return -EINVAL;
+	}
 
 	if (hdd_cfg_is_static_sub20_channel_width_enabled(hdd_ctx)) {
 		hddLog(LOGE, FL("ACS not support if static sub20 enable"));
@@ -22585,7 +22619,8 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
              */
             if((WLAN_HDD_SOFTAP == pAdapter->device_mode) && \
                (pHddCtx->no_of_active_sessions[VOS_STA_SAP_MODE] >= 1) && \
-               (pHddCtx->no_of_open_sessions[VOS_STA_SAP_MODE] > 1)) {
+               (pHddCtx->no_of_open_sessions[VOS_STA_SAP_MODE] > 1) && \
+	       (!cfg_param->keeppassivedwelltime)) {
                 scanRequest.scanType = eSIR_ACTIVE_SCAN;
             }
             else {
@@ -26673,6 +26708,92 @@ static int wlan_hdd_get_station_remote(struct wiphy *wiphy,
 	return status;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0))
+/*
+ * wlan_hdd_fill_summary_stats() - populate station_info summary stats
+ * @stats: summary stats to use as a source
+ * @info: kernel station_info struct to use as a destination
+ *
+ * Return: None
+ */
+static void wlan_hdd_fill_summary_stats(tCsrSummaryStatsInfo *stats,
+					struct station_info *info)
+{
+	int i;
+
+	info->rx_packets = stats->rx_frm_cnt;
+	info->tx_packets = 0;
+	info->tx_retries = 0;
+	info->tx_failed = 0;
+
+	for (i = 0; i < 4; ++i) {
+		info->tx_packets += stats->tx_frm_cnt[i];
+		info->tx_retries += stats->multiple_retry_cnt[i];
+		info->tx_failed += stats->fail_cnt[i];
+	}
+
+	info->filled |= STATION_INFO_TX_PACKETS |
+			STATION_INFO_TX_RETRIES |
+			STATION_INFO_TX_FAILED |
+			STATION_INFO_RX_PACKETS;
+}
+#else
+/*
+ * wlan_hdd_fill_summary_stats() - populate station_info summary stats
+ * @stats: summary stats to use as a source
+ * @info: kernel station_info struct to use as a destination
+ *
+ * Return: None
+ */
+static void wlan_hdd_fill_summary_stats(tCsrSummaryStatsInfo *stats,
+					struct station_info *info)
+{
+	int i;
+
+	info->rx_packets = stats->rx_frm_cnt;
+	info->tx_packets = 0;
+	info->tx_retries = 0;
+	info->tx_failed = 0;
+
+	for (i = 0; i < 4; ++i) {
+		info->tx_packets += stats->tx_frm_cnt[i];
+		info->tx_retries += stats->multiple_retry_cnt[i];
+		info->tx_failed += stats->fail_cnt[i];
+	}
+
+	info->filled |= BIT(NL80211_STA_INFO_TX_PACKETS) |
+			BIT(NL80211_STA_INFO_TX_RETRIES) |
+			BIT(NL80211_STA_INFO_TX_FAILED) |
+			BIT(NL80211_STA_INFO_RX_PACKETS);
+}
+#endif
+/**
+ * wlan_hdd_get_sap_stats() - get aggregate SAP stats
+ * @adapter: sap adapter to get stats for
+ * @info: kernel station_info struct to populate
+ *
+ * Fetch the vdev-level aggregate stats for the given SAP adapter. This is to
+ * support "station dump" and "station get" for SAP vdevs, even though they
+ * aren't technically stations.
+ *
+ * Return: errno
+ */
+static int
+wlan_hdd_get_sap_stats(hdd_adapter_t *adapter, struct station_info *info)
+{
+	VOS_STATUS status;
+
+	status = wlan_hdd_get_station_stats(adapter);
+	if (!VOS_IS_STATUS_SUCCESS(status)) {
+		hddLog(LOGE, FL("Failed to get SAP stats; status:%d"), status);
+		return 0;
+	}
+
+	wlan_hdd_fill_summary_stats(&adapter->hdd_stats.summary_stat, info);
+
+	return 0;
+}
+
 static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
                                            struct net_device *dev,
                                            const u8* mac,
@@ -26715,13 +26836,20 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 
     ENTER();
 
+    status = wlan_hdd_validate_context(pHddCtx);
+    if (0 != status)
+        return status;
+
     if (VOS_FTM_MODE == hdd_get_conparam()) {
         hddLog(LOGE, FL("Command not allowed in FTM mode"));
         return -EINVAL;
     }
-    if (pAdapter->device_mode == WLAN_HDD_SOFTAP &&
-		    pCfg->sap_get_peer_info)
-        return wlan_hdd_get_station_remote(wiphy, dev, mac, sinfo);
+    if (pAdapter->device_mode == WLAN_HDD_SOFTAP) {
+        if (pCfg->sap_get_peer_info)
+            return wlan_hdd_get_station_remote(wiphy, dev, mac, sinfo);
+        else
+            return wlan_hdd_get_sap_stats(pAdapter, sinfo);
+    }
 
     if ((eConnectionState_Associated != pHddStaCtx->conn_info.connState) ||
             (0 == ssidlen))
@@ -26743,10 +26871,6 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
         sinfo->signal = pAdapter->rssi;
         return 0;
     }
-
-    status = wlan_hdd_validate_context(pHddCtx);
-    if (0 != status)
-        return status;
 
     wlan_hdd_get_rssi(pAdapter, &sinfo->signal);
     wlan_hdd_get_snr(pAdapter, &snr);
@@ -30673,7 +30797,8 @@ static int wlan_hdd_thermal_resume(hdd_context_t *pHddCtx, bool thermal)
 	}
 
 	/* send auto shutdown timer val 1 to fw as resume */
-	sme_set_auto_shutdown_timer(pHddCtx->hHal, 1);
+	if (thermal)
+		sme_set_auto_shutdown_timer(pHddCtx->hHal, 1);
 
 	return 0;
 }
@@ -30839,18 +30964,12 @@ static bool wlan_hdd_is_thermal_suspended(hdd_context_t *pHddCtx)
 	}
 	return false;
 }
-
-static VOS_STATUS wlan_hdd_suspend_mc_thread(pVosSchedContext vosSchedCtx,
-					hdd_context_t *pHddCtx)
-{
-	return VOS_STATUS_SUCCESS;
-}
 #else
 static bool wlan_hdd_is_thermal_suspended(hdd_context_t *pHddCtx)
 {
 	return false;
 }
-
+#endif
 static VOS_STATUS wlan_hdd_suspend_mc_thread(pVosSchedContext vosSchedCtx,
 					hdd_context_t *pHddCtx)
 {
@@ -30875,7 +30994,6 @@ static VOS_STATUS wlan_hdd_suspend_mc_thread(pVosSchedContext vosSchedCtx,
 	return VOS_STATUS_SUCCESS;
 }
 
-#endif
 /*
  * FUNCTION: __wlan_hdd_cfg80211_suspend_wlan
  * this is called when cfg80211 driver suspends
@@ -31025,11 +31143,14 @@ int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
        goto resume_tx;
     }
 
-    /* Suspend MC thread */
-    status = wlan_hdd_suspend_mc_thread(vosSchedContext, pHddCtx);
-    if (VOS_STATUS_SUCCESS != status)
-        goto resume_tx;
-
+    /* Suspend MC thread. In thermal suspend, MC thread should be alive
+     * to receive FW temperature data and compare to the threshold for resume.
+     */
+    if (!thermal) {
+        status = wlan_hdd_suspend_mc_thread(vosSchedContext, pHddCtx);
+        if (VOS_STATUS_SUCCESS != status)
+            goto resume_tx;
+    }
 #ifdef QCA_CONFIG_SMP
     /* Suspend tlshim rx thread */
     set_bit(RX_SUSPEND_EVENT, &vosSchedContext->tlshimRxEvtFlg);
@@ -31844,7 +31965,9 @@ wlan_hdd_cfg80211_extscan_signif_wifi_change_results_ind(
         for (j = 0; j < ap_info->numOfRssi; j++)
             hddLog(LOG1, "Rssi %d", *rssi++);
 
-        ap_info += ap_info->numOfRssi * sizeof(*rssi);
+        ap_info = (tSirWifiSignificantChange *)((char *)ap_info +
+                    ap_info->numOfRssi * sizeof(*rssi) +
+                    sizeof(*ap_info));
     }
 
     if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_EXTSCAN_RESULTS_REQUEST_ID,
@@ -31887,7 +32010,9 @@ wlan_hdd_cfg80211_extscan_signif_wifi_change_results_ind(
 
               nla_nest_end(skb, ap);
 
-            ap_info += ap_info->numOfRssi * sizeof(*rssi);
+            ap_info = (tSirWifiSignificantChange *)((char *)ap_info +
+                      ap_info->numOfRssi * sizeof(*rssi) +
+                      sizeof(*ap_info));
         }
         nla_nest_end(skb, aps);
 

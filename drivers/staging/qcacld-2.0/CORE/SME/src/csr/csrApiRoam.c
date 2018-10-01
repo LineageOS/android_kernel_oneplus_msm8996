@@ -102,6 +102,8 @@
 
 #define MAX_SOCIAL_CHANNELS  3
 
+#define HOST_LOG_MAX_SSID_SIZE 32
+
 /* packet dump timer duration of 60 secs */
 #define PKT_DUMP_TIMER_DURATION 60
 
@@ -2152,6 +2154,8 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
             pParam->sta_roam_policy_params.skip_unsafe_channels;
         pMac->roam.configParam.sta_roam_policy.sap_operating_band =
             pParam->sta_roam_policy_params.sap_operating_band;
+        pMac->roam.configParam.enable_bcast_probe_rsp =
+            pParam->enable_bcast_probe_rsp;
     }
 
     return status;
@@ -2374,6 +2378,8 @@ eHalStatus csrGetConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
                pMac->roam.configParam.tx_non_aggr_sw_retry_threshhold_vi;
         pParam->tx_non_aggr_sw_retry_threshhold_vo =
                pMac->roam.configParam.tx_non_aggr_sw_retry_threshhold_vo;
+        pParam->enable_bcast_probe_rsp =
+               pMac->roam.configParam.enable_bcast_probe_rsp;
         status = eHAL_STATUS_SUCCESS;
     }
     return (status);
@@ -5497,7 +5503,7 @@ static eHalStatus csrRoamSaveSecurityRspIE(tpAniSirGlobal pMac, tANI_U32 session
                     nIeLen = 8 //version + gp_cipher_suite + pwise_cipher_suite_count
                         + pIesLocal->RSN.pwise_cipher_suite_count * 4    //pwise_cipher_suites
                         + 2 //akm_suite_count
-                        + pIesLocal->RSN.akm_suite_count * 4 //akm_suites
+                        + pIesLocal->RSN.akm_suite_cnt * 4 //akm_suites
                         + 2; //reserved
                     if( pIesLocal->RSN.pmkid_count )
                     {
@@ -5512,7 +5518,7 @@ static eHalStatus csrRoamSaveSecurityRspIE(tpAniSirGlobal pMac, tANI_U32 session
                         vos_mem_set(pSession->pWpaRsnRspIE, nIeLen + 2, 0);
                         pSession->pWpaRsnRspIE[0] = DOT11F_EID_RSN;
                         pSession->pWpaRsnRspIE[1] = (tANI_U8)nIeLen;
-                        /* Copy up to akm_suites */
+                        /* Copy up to akm_suite */
                         pIeBuf = pSession->pWpaRsnRspIE + 2;
                         vos_mem_copy(pIeBuf, &pIesLocal->RSN.version,
                                      sizeof(pIesLocal->RSN.version));
@@ -5531,19 +5537,19 @@ static eHalStatus csrRoamSaveSecurityRspIE(tpAniSirGlobal pMac, tANI_U32 session
                                          pIesLocal->RSN.pwise_cipher_suite_count * 4);
                             pIeBuf += pIesLocal->RSN.pwise_cipher_suite_count * 4;
                         }
-                        vos_mem_copy(pIeBuf, &pIesLocal->RSN.akm_suite_count, 2);
+                        vos_mem_copy(pIeBuf, &pIesLocal->RSN.akm_suite_cnt, 2);
                         pIeBuf += 2;
-                        if( pIesLocal->RSN.akm_suite_count )
+                        if( pIesLocal->RSN.akm_suite_cnt )
                         {
-                            //copy akm_suites
+                            //copy akm_suite
                             vos_mem_copy(pIeBuf,
-                                         pIesLocal->RSN.akm_suites,
-                                         pIesLocal->RSN.akm_suite_count * 4);
-                            pIeBuf += pIesLocal->RSN.akm_suite_count * 4;
+                                         pIesLocal->RSN.akm_suite,
+                                         pIesLocal->RSN.akm_suite_cnt * 4);
+                            pIeBuf += pIesLocal->RSN.akm_suite_cnt * 4;
                         }
                         //copy the rest
                         vos_mem_copy(pIeBuf,
-                                     pIesLocal->RSN.akm_suites + pIesLocal->RSN.akm_suite_count * 4,
+                                     pIesLocal->RSN.akm_suite + pIesLocal->RSN.akm_suite_cnt * 4,
                                      2 + pIesLocal->RSN.pmkid_count * 4);
                         pSession->nWpaRsnRspIeLength = nIeLen + 2;
                     }
@@ -11245,11 +11251,10 @@ void csrRoamCheckForLinkStatusChange( tpAniSirGlobal pMac, tSirSmeRsp *pSirMsg )
                                 if(pNewBss)
                                 {
                                     vos_mem_copy(pIbssLog->bssid, pNewBss->bssId, 6);
-                                    if(pNewBss->ssId.length)
-                                    {
-                                        vos_mem_copy(pIbssLog->ssid, pNewBss->ssId.ssId,
-                                                     pNewBss->ssId.length);
-                                    }
+                                    if (pNewBss->ssId.length > HOST_LOG_MAX_SSID_SIZE)
+                                        pNewBss->ssId.length = HOST_LOG_MAX_SSID_SIZE;
+                                    vos_mem_copy(pIbssLog->ssid, pNewBss->ssId.ssId,
+                                                 pNewBss->ssId.length);
                                     pIbssLog->operatingChannel = pNewBss->channelNumber;
                                 }
                                 if(HAL_STATUS_SUCCESS(ccmCfgGetInt(pMac, WNI_CFG_BEACON_INTERVAL, &bi)))
@@ -16394,6 +16399,8 @@ eHalStatus csrSendMBAddSelfStaReqMsg( tpAniSirGlobal pMac,
                 pMac->roam.configParam.tx_non_aggr_sw_retry_threshhold_vi;
       pMsg->tx_non_aggr_sw_retry_threshhold_vo =
                 pMac->roam.configParam.tx_non_aggr_sw_retry_threshhold_vo;
+      pMsg->enable_bcast_probe_rsp =
+                pMac->roam.configParam.enable_bcast_probe_rsp;
       smsLog( pMac, LOG1, FL("selfMac="MAC_ADDRESS_STR),
               MAC_ADDR_ARRAY(pMsg->selfMacAddr));
       status = palSendMBMessage(pMac->hHdd, pMsg);
