@@ -586,8 +586,9 @@ int rmnet_vnd_create_dev(int id, struct net_device **new_device,
 	else if (prefix && use_name)
 		p = scnprintf(dev_prefix, IFNAMSIZ, "%s", prefix);
 	else if (prefix && !use_name)
-		p = scnprintf(dev_prefix, IFNAMSIZ, "%s%%d",
-			  prefix);
+		p = scnprintf(dev_prefix, IFNAMSIZ, "%s%%d", prefix);
+	else
+		return RMNET_CONFIG_BAD_ARGUMENTS;
 	if (p >= (IFNAMSIZ-1)) {
 		LOGE("Specified prefix longer than IFNAMSIZ");
 		return RMNET_CONFIG_BAD_ARGUMENTS;
