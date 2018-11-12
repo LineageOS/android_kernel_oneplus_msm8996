@@ -309,7 +309,7 @@ static ssize_t config_mode(struct device *dev,
 {
     int error;
     unsigned long data;
-	u8 rdata;
+	u8 rdata = 0;
 	struct fusb301_info *info = dev_get_drvdata(dev);
 
 	error = sstrtoul(buf, 10, &data);
@@ -433,7 +433,7 @@ static int set_property_on_smbchg(enum power_supply_property prop, int val)
 }
 static irqreturn_t fusb301_irq_thread(int irq, void *handle)
 {
-    u8 intr, rdata;
+	u8 intr = 0, rdata = 0;
 	int bc_lvl;
 	struct fusb301_info *info = (struct fusb301_info *)handle;
 

@@ -287,7 +287,7 @@ static void power_supply_callback(struct power_supply *psy)
 	static struct power_supply *bms_psy;
 	static struct power_supply *usb_psy;
 	int usb_state;
-	bool is_usb_present;
+	bool is_usb_present = false;
 	union power_supply_propval ret = {0,};
 	int battery_percentage;
 	enum bcl_threshold_state prev_soc_state;

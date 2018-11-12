@@ -304,7 +304,7 @@ struct synaptics_ts_data {
 
 static int tc_hw_pwron(struct synaptics_ts_data *ts)
 {
-	int rc;
+	int rc = 0;
 
 	//enable the 2v8 power
 	if (!IS_ERR(ts->vdd_2v8)) {
