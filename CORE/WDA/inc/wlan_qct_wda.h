@@ -1117,6 +1117,8 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_SET_MOTION_DET_BASE_LINE_ENABLE   SIR_HAL_SET_MOTION_DET_BASE_LINE_ENABLE
 #endif
 
+#define WDA_SET_HPCS_PULSE_PARAMS             SIR_HAL_SET_HPCS_PULSE_PARMAS
+
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40 // Bit 6 will be used to control BD rate for Management frames

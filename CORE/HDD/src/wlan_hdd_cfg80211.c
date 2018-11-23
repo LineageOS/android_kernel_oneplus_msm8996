@@ -13726,6 +13726,7 @@ __wlan_hdd_cfg80211_avoid_freq(struct wiphy *wiphy,
 	int unsafe_channel_index;
 	tHddAvoidFreqList *channel_list;
 	tVOS_CON_MODE curr_mode;
+	uint8_t num_args = 0;
 
 	ENTER();
         curr_mode = hdd_get_conparam();
@@ -13739,9 +13740,26 @@ __wlan_hdd_cfg80211_avoid_freq(struct wiphy *wiphy,
 	if (0 != ret)
 		return -EINVAL;
 
-	channel_list = (tHddAvoidFreqList *)data;
-	if (!channel_list) {
+	if (!data || data_len < (sizeof(channel_list->avoidFreqRangeCount) +
+				 sizeof(tHddAvoidFreqRange))) {
 		hddLog(LOGE, FL("Avoid frequency channel list empty"));
+		return -EINVAL;
+	}
+	num_args = (data_len - sizeof(channel_list->avoidFreqRangeCount)) /
+		   sizeof(channel_list->avoidFreqRange[0].startFreq);
+
+	if (num_args < 2 || num_args > HDD_MAX_AVOID_FREQ_RANGES * 2 ||
+	    num_args % 2 != 0) {
+		hddLog(LOGE,FL("Invalid avoid frequency channel list"));
+		return -EINVAL;
+	}
+
+	channel_list = (tHddAvoidFreqList *)data;
+	if (channel_list->avoidFreqRangeCount == 0 ||
+	    channel_list->avoidFreqRangeCount > HDD_MAX_AVOID_FREQ_RANGES ||
+	    2 * channel_list->avoidFreqRangeCount != num_args) {
+		hddLog(VOS_TRACE_LEVEL_ERROR, "Invalid freq range count %d",
+		       channel_list->avoidFreqRangeCount);
 		return -EINVAL;
 	}
 
@@ -22554,17 +22572,20 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
             !pHddCtx->last_scan_reject_timestamp) {
             pHddCtx->last_scan_reject_session_id = curr_session_id;
             pHddCtx->last_scan_reject_reason = curr_reason;
-            pHddCtx->last_scan_reject_timestamp =
-              jiffies_to_msecs(jiffies) + SCAN_REJECT_THRESHOLD_TIME;
+            pHddCtx->last_scan_reject_timestamp = jiffies +
+                  msecs_to_jiffies(SCAN_REJECT_THRESHOLD_TIME);
             pHddCtx->scan_reject_cnt = 0;
         } else {
             pHddCtx->scan_reject_cnt++;
             if ((pHddCtx->scan_reject_cnt >=
                SCAN_REJECT_THRESHOLD) &&
-               vos_system_time_after(jiffies_to_msecs(jiffies),
+               vos_system_time_after(jiffies,
                pHddCtx->last_scan_reject_timestamp)) {
-		hddLog(LOGE, FL("scan reject threshold reached Session %d reason %d reject cnt %d"),
-			curr_session_id, curr_reason, pHddCtx->scan_reject_cnt);
+        hddLog(LOGE, FL("scan reject threshold reached Session %d reason %d reject cnt %d reject times tamp %lu jiffies %lu"),
+            curr_session_id, curr_reason,
+            pHddCtx->scan_reject_cnt,
+            pHddCtx->last_scan_reject_timestamp,
+            jiffies);
                 pHddCtx->last_scan_reject_timestamp = 0;
                 pHddCtx->scan_reject_cnt = 0;
                 if (pHddCtx->cfg_ini->enable_fatal_event) {
@@ -27257,15 +27278,13 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
                 sinfo->txrate.flags |= RATE_INFO_FLAGS_40_MHZ_WIDTH;
 #endif
             }
-            else if (rate_flags & eHAL_TX_RATE_VHT20)
+            else
             {
                 sinfo->txrate.flags |= RATE_INFO_FLAGS_VHT_MCS;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
                 sinfo->txrate.bw = RATE_INFO_BW_20;
 #endif
             }
-            else
-                sinfo->txrate.flags |= RATE_INFO_FLAGS_VHT_MCS;
 #endif /* WLAN_FEATURE_11AC */
             if (rate_flags & (eHAL_TX_RATE_HT20 | eHAL_TX_RATE_HT40))
             {
@@ -27318,6 +27337,9 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 #ifdef WLAN_FEATURE_11AC
             sinfo->txrate.nss = nss;
             sinfo->txrate.flags |= RATE_INFO_FLAGS_VHT_MCS;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
+            sinfo->txrate.bw = RATE_INFO_BW_20;
+#endif
             if (rate_flags & eHAL_TX_RATE_VHT80)
             {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
