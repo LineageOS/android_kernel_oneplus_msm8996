@@ -180,6 +180,17 @@ static ssize_t irq_get(struct device *dev,
 	return count;
 }
 
+/**
+ * writing to the irq node will just drop a printk message
+ * and return success, used for latency measurement.
+ */
+static ssize_t irq_ack(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	dev_dbg(dev, "%s\n", __func__);
+	return count;
+}
+
 static ssize_t screen_state_get(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
@@ -239,7 +250,7 @@ static ssize_t report_home_set(struct device *dev,
 }
 
 static DEVICE_ATTR(hw_reset, S_IWUSR, NULL, hw_reset_set);
-static DEVICE_ATTR(irq, S_IRUSR | S_IWUSR, irq_get, NULL);
+static DEVICE_ATTR(irq, S_IRUSR | S_IWUSR, irq_get, irq_ack);
 static DEVICE_ATTR(proximity_state, S_IWUSR, NULL, proximity_state_set);
 static DEVICE_ATTR(report_home, S_IWUSR, NULL, report_home_set);
 static DEVICE_ATTR(screen_state, S_IRUSR, screen_state_get, NULL);
