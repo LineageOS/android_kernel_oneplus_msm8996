@@ -35,11 +35,3 @@
 &pm8994_l27 {
 	qcom,init-voltage = <1030000>;
 };
-
-&msm_gpu {
-	cm,firmware-name = "a530_zap-pro";
-};
-
-&pil_gpu {
-	qcom,firmware-name = "a530_zap-pro";
-};
