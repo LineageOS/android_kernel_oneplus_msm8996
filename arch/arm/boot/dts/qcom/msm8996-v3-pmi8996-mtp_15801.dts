@@ -35,3 +35,11 @@
 	regulator-min-microvolt = <1200000>;
 	qcom,init-voltage = <1200000>;
 };
+
+&soc {
+	qcom,bcl {
+		qcom,ibat-monitor {
+			qcom,mitigation-freq-khz = <1113600>;
+		};
+	};
+};

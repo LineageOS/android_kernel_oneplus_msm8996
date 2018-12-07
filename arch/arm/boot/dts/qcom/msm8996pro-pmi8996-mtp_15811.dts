@@ -43,3 +43,11 @@
 &msm_gpu {
 	qcom,firmware-name = "a530_zap-pro";
 };
+
+&soc {
+	qcom,bcl {
+		qcom,ibat-monitor {
+			qcom,mitigation-freq-khz = <1132800>;
+		};
+	};
+};
