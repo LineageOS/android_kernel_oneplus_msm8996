@@ -23,3 +23,11 @@
 	compatible = "qcom,msm8996-mtp", "qcom,msm8996", "qcom,mtp";
 	qcom,board-id = <8 0 15801 15>, <8 0 15801 16>;
 };
+
+&soc {
+	qcom,bcl {
+		qcom,ibat-monitor {
+			qcom,mitigation-freq-khz = <1113600>;
+		};
+	};
+};
