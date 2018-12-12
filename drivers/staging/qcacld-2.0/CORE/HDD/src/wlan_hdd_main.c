@@ -4075,6 +4075,8 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind)
 	hdd_adapter_t *adapter;
 	v_CONTEXT_t vos_context;
 	int i;
+	struct ieee80211_mgmt *mgmt =
+		(struct ieee80211_mgmt *)frame_ind->frameBuf;
 
 	/* Get the global VOSS context.*/
 	vos_context = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
@@ -4088,6 +4090,11 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind)
 
 	if (0 != wlan_hdd_validate_context(hdd_ctx))
 		return;
+
+	if (frame_ind->frame_len < ieee80211_hdrlen(mgmt->frame_control)) {
+		hddLog(LOGE, FL("Invalid frame length"));
+		return;
+	}
 
 	if (HDD_SESSION_ID_ANY == frame_ind->sessionId) {
 		for (i = 0; i < HDD_SESSION_MAX; i++) {
@@ -14760,6 +14767,13 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
     */
    TRACK_UNLOAD_STATUS(unload_stop_all_adapter);
    hdd_stop_all_adapters( pHddCtx );
+
+   /*
+    * Set conparam to VOS_STA_MODE by default since it won't clear
+    * this flag if switch from sap to sta with static driver mode.
+    */
+   if (VOS_STA_SAP_MODE == hdd_get_conparam())
+       hdd_set_conparam(0);
 
 #ifdef QCA_PKT_PROTO_TRACE
    if (VOS_FTM_MODE != hdd_get_conparam())
