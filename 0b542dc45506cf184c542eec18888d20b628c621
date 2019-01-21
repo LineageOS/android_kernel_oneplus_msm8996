@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7fa15cf0_626ab33d",
+        "filename": "drivers/power/oneplus_fastcg.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1190,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2019-01-21T11:44:55Z",
+      "side": 1,
+      "message": "Thanks for the heads-up, this is wrong.",
+      "range": {
+        "startLine": 1188,
+        "startChar": 0,
+        "endLine": 1190,
+        "endChar": 54
+      },
+      "revId": "0b542dc45506cf184c542eec18888d20b628c621",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
