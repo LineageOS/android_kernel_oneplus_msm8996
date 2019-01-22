@@ -4453,12 +4453,8 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
 				TPD_DEBUG("%s going TP resume start\n",
 				__func__);
                 ts->is_suspended = 0;
-				if (ts->gesture_enable)
-					synaptics_enable_interrupt_for_gesture(ts, false);
-				else
-					synaptics_mode_change(0x00);/*change getbase data*/
-				atomic_set(&ts->is_stop, 0);
-				touch_enable(ts);
+				queue_delayed_work(get_base_report,
+				&ts->base_work, msecs_to_jiffies(80));
 				synaptics_ts_resume(&ts->client->dev);
 				TPD_DEBUG("%s going TP resume end\n", __func__);
 			}
