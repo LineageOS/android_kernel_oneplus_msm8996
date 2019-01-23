@@ -1043,19 +1043,6 @@
 		status = "disabled";
 };
 
-// msm8996-ipcrouter.dtsi
-&soc {
-	qcom,ipc_router_external_modem_xprt2 {
-		compatible = "qcom,ipc_router_mhi_xprt";
-		qcom,ch-name = "IPCRTR";
-		qcom,out-chan-id = <34>;
-		qcom,in-chan-id = <35>;
-		qcom,xprt-remote = "external-modem";
-		qcom,xprt-linkid = <1>;
-		qcom,xprt-version = <3>;
-	};
-};
-
 // msm8996-mdss.dtsi
 &mdss_dsi0 {
 	oled-vdda-supply = <&pm8994_s5>;
