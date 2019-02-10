@@ -45,7 +45,7 @@ static int bhi_alloc_bhie_xfer(struct mhi_device_ctxt *mhi_dev_ctxt,
 	int segments = DIV_ROUND_UP(size, seg_size) + 1;
 	int i;
 	struct scatterlist *sg_list;
-	struct bhie_mem_info *bhie_mem_info, *info;
+	struct bhie_mem_info *bhie_mem_info, *info = NULL;
 
 	mhi_log(mhi_dev_ctxt, MHI_MSG_INFO,
 		"Total size:%lu total_seg:%d seg_size:%lu\n",
@@ -82,6 +82,9 @@ static int bhi_alloc_bhie_xfer(struct mhi_device_ctxt *mhi_dev_ctxt,
 			"Seg:%d unaligned Img: 0x%llx aligned:0x%llx\n",
 			i, info->dma_handle, info->phys_addr);
 	}
+
+	if (!info)
+		goto alloc_dma_error;
 
 	sg_init_table(sg_list, segments);
 	sg_set_buf(sg_list, info->aligned, info->size);
