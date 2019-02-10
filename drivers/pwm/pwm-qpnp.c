@@ -1140,9 +1140,9 @@ static int qpnp_lpg_configure_lut_states(struct qpnp_pwm_chip **chips,
 	struct qpnp_pwm_chip *chip;
 	struct qpnp_lpg_config	*lpg_config;
 	u8			value1, value2, mask1, mask2;
-	u8			*reg1, *reg2;
-	u16			addr, addr1;
-	int			rc, i;
+	u8			*reg1 = NULL, *reg2;
+	u16			addr = 0, addr1 = 0;
+	int			rc = 0, i;
 	bool			test_enable;
 	u8 ramp_en = 0, ramp_mask = 0;
 
@@ -1207,6 +1207,9 @@ static int qpnp_lpg_configure_lut_states(struct qpnp_pwm_chip **chips,
 		ramp_en |= value1;
 		ramp_mask |= mask1;
 	}
+
+	if (!chip || !reg1)
+		return rc;
 
 	if (state == QPNP_LUT_ENABLE
 		|| (chip->sub_type == QPNP_LPG_CHAN_SUB_TYPE

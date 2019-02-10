@@ -9972,6 +9972,7 @@ eHalStatus sme_SetMaxTxPowerPerBand(eCsrBand band, v_S7_t dB,
 		  FL("band : %d power %d dB"),
 		  band, dB);
 
+	msg.type = WDA_SET_MAX_TX_POWER_PER_BAND_REQ;
 	MTRACE(vos_trace(VOS_MODULE_ID_SME,
 			TRACE_CODE_SME_TX_WDA_MSG, NO_SESSION, msg.type));
 
