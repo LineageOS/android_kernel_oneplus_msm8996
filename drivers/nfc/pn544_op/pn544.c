@@ -905,7 +905,7 @@ static int pn544_probe(struct i2c_client *client,
 			WAKE_LOCK_SUSPEND, "pn544_wake_lock");
     /* End, NFC CLK_REQ*/
     pn544_dev->pn544_device.minor = MISC_DYNAMIC_MINOR;
-    pn544_dev->pn544_device.name = "pn544";
+    pn544_dev->pn544_device.name = "nq-nci";
     pn544_dev->pn544_device.fops = &pn544_dev_fops;
 
     ret = misc_register(&pn544_dev->pn544_device);
