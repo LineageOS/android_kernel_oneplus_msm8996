@@ -79,6 +79,7 @@ typedef enum {
     GEN_PARAM_MODULATED_DTIM,
     GEN_PARAM_CAPTURE_TSF,
     GEN_PARAM_RESET_TSF_GPIO,
+    GEN_PARAM_PS_TDCC,
     GEN_PDEV_MONITOR_MODE,
 } GEN_PARAM;
 
@@ -189,5 +190,7 @@ VOS_STATUS wma_set_tx_power_scale_decr_db(uint8_t vdev_id, int value);
 void wma_tx_failure_cb(void *ctx, uint32_t num_msdu,
 		       uint8_t tid, uint32_t status);
 
-VOS_STATUS wma_set_ac_txq_optimize(void *wda_handle, uint8_t *value);
+VOS_STATUS wma_set_ac_txq_optimize(void *wda_handle, uint8_t value);
+VOS_STATUS wma_set_rx_antanna(void *wma_handle, uint8_t pdev_id,
+			      uint32_t matrix);
 #endif

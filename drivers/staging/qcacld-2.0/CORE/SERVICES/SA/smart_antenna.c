@@ -28,10 +28,10 @@ struct smart_ant g_smart_ant_handle;
 /**
  * __smart_ant_init() - Smart antenna module Initialization.
  * @sa: smart antenna handle
- * @new_init: flag for the first initialization.
+ * @new_init: flag for the STA started.
  *
  */
-static int __smart_ant_init(struct smart_ant *sa)
+static int __smart_ant_init(struct smart_ant *sa, bool new_init)
 {
 	int ret = 0;
 	struct smartantenna_ops *sa_ops;
@@ -42,6 +42,9 @@ static int __smart_ant_init(struct smart_ant *sa)
 			   "%s: Smart antenna handle is NULL.", __func__);
 		return SMART_ANT_STATUS_FAILURE;
 	}
+
+	if (new_init)
+		sa->smart_ant_state |= SMART_ANT_STATE_AP_STARTED;
 
 	if (!(sa->smart_ant_state & SMART_ANT_STATE_CB_REGISTERED)) {
 		SA_DPRINTK(sa, SMART_ANTENNA_FATAL,
@@ -58,20 +61,22 @@ static int __smart_ant_init(struct smart_ant *sa)
 		return SMART_ANT_STATUS_FAILURE;
 	}
 
-	sa_init_config.channel_num = sa->curchan;
-	ret = sa_ops->sa_init(&sa_init_config, true);
-	if (ret < 0) {
-		SA_DPRINTK(sa, SMART_ANTENNA_FATAL,
-			   "%s: Failed to initialize Smart Antenna \n",
-			   __func__);
-		return SMART_ANT_STATUS_FAILURE;
-	}
+	if (sa->smart_ant_state & SMART_ANT_STATE_AP_STARTED) {
+		sa_init_config.channel_num = sa->curchan;
+		ret = sa_ops->sa_init(&sa_init_config, true);
+		if (ret < 0) {
+			SA_DPRINTK(sa, SMART_ANTENNA_FATAL,
+				   "%s: Failed to initialize Smart Antenna \n",
+				   __func__);
+			return SMART_ANT_STATUS_FAILURE;
+		}
 
-	adf_os_atomic_inc(&sa->sa_init);
-	sa->smart_ant_enabled = true;
-	sa->smart_ant_state |= SMART_ANT_STATE_INIT_DONE;
-	SA_DPRINTK(sa, SMART_ANTENNA_DEBUG,
-		   "%s: SMART ANTENNA initialized.", __func__);
+		adf_os_atomic_inc(&sa->sa_init);
+		sa->smart_ant_enabled = true;
+		sa->smart_ant_state |= SMART_ANT_STATE_INIT_DONE;
+		SA_DPRINTK(sa, SMART_ANTENNA_DEBUG,
+			   "%s: SMART ANTENNA initialized.", __func__);
+	}
 
 	return SMART_ANT_STATUS_SUCCESS;
 }
@@ -90,6 +95,7 @@ static int __smart_ant_deinit(struct smart_ant *sa)
 			   "%s: Smart antenna handle is NULL.", __func__);
 		return SMART_ANT_STATUS_FAILURE;
 	}
+	sa->smart_ant_state &= ~SMART_ANT_STATE_AP_STARTED;
 	sa_ops = sa->sa_callbacks;
 
 	if (!(sa->smart_ant_state & SMART_ANT_STATE_INIT_DONE)) {
@@ -155,8 +161,7 @@ static void sa_put_node(struct smart_ant *sa, struct sa_node *node)
 	if (!sa || !node)
 		return;
 
-	adf_os_atomic_dec(&node->ref_count);
-	if (adf_os_atomic_read(&node->ref_count) <= 0) {
+	if (adf_os_atomic_dec_and_test(&node->ref_count)) {
 		SA_DPRINTK(sa, SMART_ANTENNA_DEBUG,
 			   "%s: Node "MAC_ADDRESS_STR" is released",
 			   __func__, MAC_ADDR_ARRAY(node->node_info.mac_addr));
@@ -244,7 +249,7 @@ static void __smart_ant_node_connect(struct smart_ant *sa,
 		}
 		adf_os_spin_lock(&sa->sa_lock);
 	}
-	adf_os_atomic_inc(&new_node->ref_count);
+	adf_os_atomic_set(&new_node->ref_count, 1);
 	TAILQ_INSERT_TAIL(&sa->node_list, new_node, sa_elm);
 	adf_os_spin_unlock(&sa->sa_lock);
 
