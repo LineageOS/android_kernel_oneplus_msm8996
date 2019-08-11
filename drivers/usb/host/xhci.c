@@ -2838,6 +2838,12 @@ int xhci_check_bandwidth(struct usb_hcd *hcd, struct usb_device *udev)
 	xhci_dbg_ctx(xhci, virt_dev->in_ctx,
 		     LAST_CTX_TO_EP_NUM(le32_to_cpu(slot_ctx->dev_info)));
 
+	//Anderson@, 2016/09/21, If host controller is not halted, otg can't work
+	xhci_warn(xhci, "hcd->state:%d\n",hcd->state);
+	if(hcd->state == HC_STATE_QUIESCING){
+		goto command_cleanup;
+	}
+
 	ret = xhci_configure_endpoint(xhci, udev, command,
 			false, false);
 	if (ret)
