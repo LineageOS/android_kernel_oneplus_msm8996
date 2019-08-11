@@ -1,0 +1,78 @@
+/* Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+
+/dts-v1/;
+
+#include "msm8996pro.dtsi"
+#include "msm-pmi8996.dtsi"
+#include "15801/msm8996-mtp.dtsi"
+#include "15801/msm8996-camera-sensor-mtp_15811.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. MSM 8996pro + PMI8996 MTP";
+	compatible = "qcom,msm8996-mtp", "qcom,msm8996", "qcom,mtp";
+	qcom,board-id = <8 0 15811 27>, <8 0 15811 28>;
+};
+
+&i2c_6 {
+	bq27541-battery@55 {
+		oem,support-4p4v-battery;
+		op,low-bat-voltage-uv=<3250000>;
+		op,low-bat-capacity=<20>;
+	};
+};
+
+&cam_sensor_mclk2_active {
+	config {
+		drive-strength = <6>; /* 2 MA */
+	};
+};
+
+&cam_sensor_mclk2_suspend {
+	config {
+		drive-strength = <6>; /* 2 MA */
+	};
+};
+
+&pm8994_l27 {
+	regulator-min-microvolt = <1000000>;
+	qcom,init-voltage = <1030000>;
+};
+
+&pmi8994_charger {
+	qcom,ibatmax-pre-normal-ma = <1450>;
+	qcom,ibatmax-warm-ma = <800>;
+	qcom,vbatmax-cool-mv = <4370>;
+	qcom,vbatmax-little-cool-mv = <4370>;
+	qcom,vbatmax-pre-normal-mv = <4370>;
+	qcom,vbatmax-normal-mv = <4370>;
+	qcom,vbatdet-cool-mv = <4150>;
+	qcom,vbatdet-little-cool-mv = <4270>;
+	qcom,vbatdet-pre-normal-mv = <4270>;
+	qcom,vbatdet-normal-mv = <4270>;
+	qcom,vbatdet-warm-mv = <3980>;
+};
+
+&qusb_phy0 {
+        qcom,qusb-phy-init-seq = <0x10 0x80
+                 0x03 0x84
+                 0x83 0x88
+                 0xC7 0x8C
+                 0x02 0x90
+                 0x30 0x08
+                 0x79 0x0C
+                 0x21 0x10
+                 0x14 0x9C
+                 0x9F 0x1C
+                 0x00 0x18>;
+};
