@@ -394,6 +394,9 @@ struct dsi_err_container {
 #define MDSS_DSI_COMMAND_COMPRESSION_MODE_CTRL3	0x02b0
 #define MSM_DBA_CHIP_NAME_MAX_LEN				20
 
+// lcm driver porting
+#define MDSS_OEM_PORTING
+
 struct mdss_dsi_ctrl_pdata {
 	int ndx;	/* panel_num */
 	int (*on) (struct mdss_panel_data *pdata);
@@ -540,6 +543,9 @@ struct mdss_dsi_ctrl_pdata {
 	int m_mdp_vote_cnt;
 	/* debugfs structure */
 	struct mdss_dsi_debugfs_info *debugfs_info;
+#if (defined MDSS_OEM_PORTING)
+	int lcd_power_1v8_en; //guozhiming modify for lcd 2015-10-15
+#endif
 
 	struct dsi_err_container err_cont;
 
