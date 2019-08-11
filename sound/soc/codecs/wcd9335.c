@@ -869,6 +869,36 @@ static const struct tasha_reg_mask_val tasha_reset_high_impedance[] = {
 	{WCD9335_TEST_DEBUG_PIN_CTL_OE_2, 0x01, 0x00},
 };
 
+/*zhiguang.su@MultiMedia.AudioDrv, 2015-10-26, Modify for headset uevent*/
+enum
+{
+	NO_DEVICE	= 0,
+	HS_WITH_MIC	= 1,
+	HS_WITHOUT_MIC = 2,
+};
+
+struct tasha_priv *priv_headset_type;
+
+static ssize_t wcd9xxx_print_name(struct switch_dev *sdev, char *buf)
+{
+	switch (switch_get_state(sdev))
+	{
+		case NO_DEVICE:
+			return sprintf(buf, "No Device\n");
+		case HS_WITH_MIC:
+            if(priv_headset_type->mbhc.mbhc_cfg->headset_type == 1) {
+		        return sprintf(buf, "American Headset\n");
+            } else {
+                return sprintf(buf, "Headset\n");
+            }
+
+		case HS_WITHOUT_MIC:
+			return sprintf(buf, "Handset\n");
+
+	}
+	return -EINVAL;
+}
+
 /**
  * tasha_set_spkr_gain_offset - offset the speaker path
  * gain with the given offset value.
@@ -13890,6 +13920,15 @@ static int tasha_codec_probe(struct snd_soc_codec *codec)
 		goto err_hwdep;
 	}
 
+/*zhiguang.su@MultiMedia.AudioDrv, 2015-10-26, Modify for headset uevent*/
+		tasha->mbhc.wcd9xxx_sdev.name= "h2w";
+		tasha->mbhc.wcd9xxx_sdev.print_name = wcd9xxx_print_name;
+		ret = switch_dev_register(&tasha->mbhc.wcd9xxx_sdev);
+		if (ret)
+		{
+			goto err_switch_dev_register;
+		}
+
 	ptr = devm_kzalloc(codec->dev, (sizeof(tasha_rx_chs) +
 			   sizeof(tasha_tx_chs)), GFP_KERNEL);
 	if (!ptr) {
@@ -13981,10 +14020,16 @@ static int tasha_codec_probe(struct snd_soc_codec *codec)
 	mutex_unlock(&codec->mutex);
 	snd_soc_dapm_sync(dapm);
 
+	/*zhiguang.su@MultiMedia.AudioDrv, 2015-10-26, Modify for headset uevent*/
+	priv_headset_type = tasha;
+
 	return ret;
 
 err_pdata:
 	devm_kfree(codec->dev, ptr);
+	/*zhiguang.su@MultiMedia.AudioDrv, 2015-10-26, Modify for headset uevent*/
+	switch_dev_unregister(&tasha->mbhc.wcd9xxx_sdev);
+	err_switch_dev_register:
 err_hwdep:
 	devm_kfree(codec->dev, tasha->fw_data);
 err:
