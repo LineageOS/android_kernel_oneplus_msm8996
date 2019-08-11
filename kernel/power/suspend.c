@@ -311,6 +311,8 @@ void __weak arch_suspend_enable_irqs(void)
  *
  * This function should be called after devices have been suspended.
  */
+//huruihuan add for speed up resume
+extern void thaw_fingerprintd(void);
 static int suspend_enter(suspend_state_t state, bool *wakeup)
 {
 	char suspend_abort[MAX_SUSPEND_ABORT_LEN];
@@ -400,6 +402,8 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 
  Platform_wake:
 	platform_resume_noirq(state);
+//huruihuan add for speed up resume
+	thaw_fingerprintd();
 	dpm_resume_noirq(PMSG_RESUME);
 
  Platform_early_resume:
