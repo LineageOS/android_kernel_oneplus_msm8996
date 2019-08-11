@@ -75,6 +75,8 @@ source "drivers/nfc/st21nfca/Kconfig"
 source "drivers/nfc/st21nfcb/Kconfig"
 endmenu
 
+source "drivers/nfc/pn544_op/Kconfig"
+
 config NFC_NQ
 	tristate "Qualcomm NCI based NFC Controller Driver for NQx"
 	depends on I2C
