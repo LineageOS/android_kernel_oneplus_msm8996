@@ -198,10 +198,10 @@ CONFIG_WLAN_FEATURE_SAE := y
 # Feature flags which are not (currently) configurable via Kconfig
 
 #Whether to build debug version
-BUILD_DEBUG_VERSION := 1
+BUILD_DEBUG_VERSION := 0
 
 #Enable this flag to build driver in diag version
-BUILD_DIAG_VERSION := 1
+BUILD_DIAG_VERSION := 0
 
 #Do we panic on bug?  default is to warn
 PANIC_ON_BUG := 1
@@ -1343,7 +1343,7 @@ CDEFINES += -DHIF_USB_TASKLET
 endif
 endif
 
-ifneq ($(TARGET_BUILD_VARIANT),user)
+ifeq ($(TARGET_BUILD_VARIANT),eng)
 CDEFINES += -DDEBUG_RX_RING_BUFFER
 ifneq ($(CONFIG_TXRX_PERF),y)
 CDEFINES += -DQCA_PKT_PROTO_TRACE
