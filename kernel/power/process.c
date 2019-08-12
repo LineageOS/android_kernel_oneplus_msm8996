@@ -232,9 +232,12 @@ void thaw_fingerprintd(void)
     for_each_process_thread(g, p) {
     /* No other threads should have PF_SUSPEND_TASK set */
         WARN_ON((p != curr) && (p->flags & PF_SUSPEND_TASK));
-        if(!memcmp(p->comm, "fps_work", 9))
+        if(!memcmp(p->comm, "fps_work", 9)) {
             __thaw_task(p);
+            goto done;
+        }
     }
+done:
     read_unlock(&tasklist_lock);
     pm_freezing = true;
     pm_nosig_freezing = true;
