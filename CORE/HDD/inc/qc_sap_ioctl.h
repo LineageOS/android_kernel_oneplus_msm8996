@@ -141,18 +141,16 @@ typedef struct
 #define QCSAP_IOCTL_GETPARAM                    (SIOCIWFIRSTPRIV+1)
 #define QCSAP_IOCTL_PRIV_SET_VAR_INT_GET_CHAR   (SIOCIWFIRSTPRIV+2)
 #define QCSAP_ADD_MULTICAST_GROUP                   1
-/* (SIOCIWFIRSTPRIV+2) is unused */
 #define QCSAP_IOCTL_SET_NONE_GET_THREE          (SIOCIWFIRSTPRIV+3)
 #define WE_GET_TSF                              1
 
 #define QCSAP_IOCTL_GET_STAWPAIE                (SIOCIWFIRSTPRIV+4)
-#define QCSAP_IOCTL_PRIV_SET_CHAR_GET_CHAR   (SIOCIWFIRSTPRIV+5)
-#define QCSAP_GET_GROUP_INFO                   1
-#define QCSAP_GET_GROUP_ADDR                  2
-#define QCSAP_GET_GROUP_MEMB                   3
-#define QCSAP_GET_GROUP_TX_RATE                   4
-#define QCSAP_GET_GROUP_RETRY_LIMIT                   5
-#define QCSAP_SET_GROUP_INFO                   6
+#define QCSAP_IOCTL_PRIV_SET_CHAR_GET_CHAR      (SIOCIWFIRSTPRIV+5)
+#define QCSAP_GET_GROUP_INFO                    1
+#define QCSAP_GET_GROUP_ADDR                    2
+#define QCSAP_GET_GROUP_MEMB                    3
+#define QCSAP_GET_GROUP_TX_RATE                 4
+#define QCSAP_GET_GROUP_RETRY_LIMIT             5
 
 #define QCSAP_IOCTL_STOPBSS                     (SIOCIWFIRSTPRIV+6)
 #define QCSAP_IOCTL_VERSION                     (SIOCIWFIRSTPRIV+7)
@@ -220,7 +218,6 @@ typedef struct
 
 #define QCSAP_IOCTL_PRIV_GET_RSSI               (SIOCIWFIRSTPRIV + 29)
 #define QCSAP_IOCTL_PRIV_GET_SOFTAP_LINK_SPEED  (SIOCIWFIRSTPRIV + 31)
-
 
 #define QCSAP_IOCTL_MAX_STR_LEN                 1024
 

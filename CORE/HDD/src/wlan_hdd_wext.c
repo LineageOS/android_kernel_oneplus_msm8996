@@ -8814,17 +8814,10 @@ void hdd_wmm_tx_snapshot(hdd_adapter_t *pAdapter)
 static int wlan_hdd_set_multicast_rate(hdd_adapter_t *pAdapter,
 				int * args)
 {
-	struct audio_multicast_aggr *pMultiAggr = &pAdapter->multicast_aggr;
-	struct audio_multicast_group *pMultiGroup;
-	struct audio_multicast_group *pMultiGroup2;
+	struct audio_multicast_set_rate *pMultiGroup;
 	int i = 0;
 	int group_id,num_rate_set;
 	vos_msg_t msg;
-
-	if (pMultiAggr->aggr_enable != 1) {
-		hddLog(LOGW, FL("multicast aggr not enabled"));
-		return -EINVAL;
-	}
 
 	num_rate_set = args[1];
 	if (num_rate_set <= 0 || num_rate_set > MAX_NUM_RATE_SET) {
@@ -8833,25 +8826,25 @@ static int wlan_hdd_set_multicast_rate(hdd_adapter_t *pAdapter,
 	}
 
 	group_id = args[0];
-	if (group_id < 0 || group_id >= MAX_GROUP_NUM) {
+	if (group_id < MIN_GROUP_ID || group_id >= MAX_GROUP_ID) {
 		hddLog(LOGW, FL("Invalid group id %d"), group_id);
 		return -EINVAL;
 	}
-	pMultiGroup2 = &pMultiAggr->multicast_group[group_id];
 
-	pMultiGroup = vos_mem_malloc(sizeof(struct audio_multicast_group));
+	pMultiGroup = vos_mem_malloc(sizeof(struct audio_multicast_set_rate));
 	if (NULL == pMultiGroup) {
 		hddLog(LOGE,
 		FL("vos_mem_alloc failed for pMultiRate"));
 		return -ENOMEM;
 	}
-	adf_os_mem_zero(pMultiGroup, sizeof(struct audio_multicast_group));
+	adf_os_mem_zero(pMultiGroup, sizeof(struct audio_multicast_set_rate));
 
+	pMultiGroup->param_vdev_id = pAdapter->sessionId;
 	pMultiGroup->group_id = group_id;
 	pMultiGroup->num_rate_set= num_rate_set;
 	for (i = 0; i < num_rate_set; i++) {
 		pMultiGroup->rate_set[i].mcs = args[2+2*i];
-		pMultiGroup->rate_set[i].bandwith = args[3+2*i];
+		pMultiGroup->rate_set[i].bandwidth = args[3+2*i];
 	}
 
 	msg.type = WDA_SET_MULTICAST_RATE;
@@ -8864,13 +8857,6 @@ static int wlan_hdd_set_multicast_rate(hdd_adapter_t *pAdapter,
 			FL("Not able to post Set Multicast group Rate message to WDA"));
 		return -EINVAL;
 	}
-	pMultiGroup2->num_rate_set = pMultiGroup->num_rate_set;
-	for (i = 0; i < pMultiGroup2->num_rate_set; i++) {
-		pMultiGroup2->rate_set[i].mcs = pMultiGroup->rate_set[i].mcs;
-		pMultiGroup2->rate_set[i].bandwith = pMultiGroup->rate_set[i].bandwith;
-	}
-	VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-		FL("set Multicast Rate group%d num_rate_set%d"), group_id, num_rate_set);
 
 	return VOS_STATUS_SUCCESS;
 }
@@ -8880,10 +8866,8 @@ wlan_hdd_set_multicast_retry_limit(hdd_adapter_t *adapter,
 			int group_id,int retry_limit)
 {
 	int ret;
-	struct audio_multicast_aggr *pMultiAggr = &adapter->multicast_aggr;
-	struct audio_multicast_group *pMultiGroup;
 
-	if (group_id < 0 || group_id >= MAX_GROUP_NUM) {
+	if (group_id < MIN_GROUP_ID || group_id >= MAX_GROUP_ID) {
 		hddLog(LOGW, FL("Invalid group id %d"), group_id);
 		return -EINVAL;
 	}
@@ -8896,10 +8880,6 @@ wlan_hdd_set_multicast_retry_limit(hdd_adapter_t *adapter,
 					       (int)GEN_PARAM_MULTICAST_RETRY_LIMIT,
 					       group_id, retry_limit, GEN_CMD);
 
-	if (!ret) {
-		pMultiGroup = &pMultiAggr->multicast_group[group_id];
-		pMultiGroup->retry_limit = retry_limit;
-	}
 	return ret;
 }
 
@@ -8908,7 +8888,6 @@ wlan_hdd_multicast_aggr_enable(hdd_adapter_t *adapter,
 						int aggr_enable, int tbd_enable)
 {
 	int ret;
-	struct audio_multicast_aggr *pMultiAggr = &adapter->multicast_aggr;
 
 	if (aggr_enable != 0 && aggr_enable != 1) {
 		hddLog(LOGW, FL("Invalid input %d"), aggr_enable);
@@ -8923,10 +8902,6 @@ wlan_hdd_multicast_aggr_enable(hdd_adapter_t *adapter,
 						   (int)GEN_PARAM_MULTICAST_AGGR_ENABLED,
 						   aggr_enable, tbd_enable, GEN_CMD);
 
-	if (!ret) {
-		pMultiAggr->aggr_enable = aggr_enable;
-		pMultiAggr->tbd_enable = tbd_enable;
-	}
 	return ret;
 }
 
@@ -9348,16 +9323,16 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
             break;
 #ifdef AUDIO_MULTICAST_AGGR_SUPPORT
         case WE_AUDIO_AGGR_SET_GROUP_RATE:
-        {
+            {
                 if (num_args != (2 + 2*apps_args[1])) {
-                        hddLog(LOGE, FL("au_set_rate: Invalid arguments"));
-                        return -EINVAL;
+                    hddLog(LOGE, FL("au_set_rate: Invalid arguments"));
+                    return -EINVAL;
                 }
                 ret = wlan_hdd_set_multicast_rate(pAdapter, apps_args);
                 if (ret != eHAL_STATUS_SUCCESS)
-                return -EINVAL;
-        }
-        break;
+                    return -EINVAL;
+            }
+            break;
 #endif
         default:
             {

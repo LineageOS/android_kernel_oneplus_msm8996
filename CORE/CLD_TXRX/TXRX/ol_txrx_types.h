@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -48,6 +48,9 @@
 #include "ol_htt_rx_api.h"
 #include "wlan_qct_tl.h"
 #include <ol_txrx_ctrl_api.h>
+#if defined(AUDIO_MULTICAST_AGGR_SUPPORT)
+#include "halMsgApi.h"
+#endif
 /*
  * The target may allocate multiple IDs for a peer.
  * In particular, the target may allocate one ID to represent the
@@ -311,6 +314,45 @@ enum {
 	((_mask >> _ac_mask) & 0x01)
 #define OL_TXQ_GROUP_MEMBERSHIP_GET(_vdev_mask, _ac_mask)     \
 			((_vdev_mask << 16) | _ac_mask)
+
+#if defined(AUDIO_MULTICAST_AGGR_SUPPORT)
+struct ol_audio_multicast_rate
+{
+    uint32_t mcs;
+    uint32_t bandwidth;
+};
+
+#define OL_TX_VO_MCAST_GROUP_EXP_TIME	1000	/* ms */
+
+struct ol_audio_multicast_group
+{
+	u_int8_t group_id; // start from MIN_GROUP_ID for user and fw
+	u_int8_t group_index; // start from 0 for internal host usage
+	u_int8_t in_use;
+	u_int32_t client_num;
+	u_int32_t retry_limit;
+	u_int32_t num_rate_set;
+	struct ol_audio_multicast_rate rate_set[MAX_NUM_RATE_SET];
+	htt_mac_addr multicast_addr;
+	htt_mac_addr client_addr[MAX_CLIENT_NUM];
+	u_int8_t macaddr[IEEE80211_ADDR_LEN];
+};
+
+struct ol_audio_multicast_aggr_conf
+{
+	u_int32_t aggr_enable;
+	u_int32_t tbd_enable;
+	u_int8_t group_num;
+	u_int8_t total_client_num;
+	adf_os_spinlock_t lock;
+	struct ol_audio_multicast_group multicast_group[MAX_GROUP_NUM];
+	u_int32_t seqno_error;
+	u_int32_t packet_error;
+	u_int32_t expire_error;
+	u_int32_t enqeue_count;
+	u_int32_t packet_success;
+};
+#endif
 
 struct ol_tx_frms_queue_t {
 	/* list_elem -
@@ -1005,6 +1047,9 @@ struct ol_txrx_vdev_t {
 #if defined(CONFIG_HL_SUPPORT)
 	struct ol_tx_frms_queue_t txqs[OL_TX_VDEV_NUM_QUEUES];
 	u_int32_t hl_paused_reason;
+#if defined(AUDIO_MULTICAST_AGGR_SUPPORT)
+	struct ol_audio_multicast_aggr_conf au_mcast_conf;
+#endif
 #endif
 
 	struct {
