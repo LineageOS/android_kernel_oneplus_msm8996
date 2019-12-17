@@ -62,9 +62,9 @@
 #define OL_TXRX_MAC_ADDR_LEN 6
 
 /* OL_TXRX_NUM_EXT_TIDS -
- * 16 "real" TIDs + 3 pseudo-TIDs for mgmt, mcast/bcast & non-QoS data
+ * 16 "real" TIDs + 3 pseudo-TIDs for mgmt, mcast/bcast, non-QoS data & mcast vo
  */
-#define OL_TXRX_NUM_EXT_TIDS 19
+#define OL_TXRX_NUM_EXT_TIDS 20
 
 #define OL_TX_NUM_QOS_TIDS 16 /* 16 regular TIDs */
 #define OL_TX_NON_QOS_TID 16
@@ -75,7 +75,8 @@
 
 #define OL_TX_VDEV_MCAST_BCAST    0 // HTT_TX_EXT_TID_MCAST_BCAST
 #define OL_TX_VDEV_DEFAULT_MGMT   1 // HTT_TX_EXT_TID_DEFALT_MGMT
-#define OL_TX_VDEV_NUM_QUEUES     2
+#define OL_TX_VDEV_MCAST_VO	  2
+#define OL_TX_VDEV_NUM_QUEUES     3
 
 #define OL_TXRX_MGMT_TYPE_BASE htt_pkt_num_types
 #define OL_TXRX_MGMT_NUM_TYPES 8
@@ -208,6 +209,13 @@ struct ol_tx_desc_t {
 	void *txq;
 	uint8_t rtap[MAX_RADIOTAP_LEN];
 	uint8_t rtap_len;
+#if defined(AUDIO_MULTICAST_AGGR_SUPPORT)
+	u_int8_t seqno;
+	u_int8_t total_num;
+	u_int8_t group_id;
+	u_int64_t tsf;
+	u_int32_t tag_offset;
+#endif
 };
 
 typedef TAILQ_HEAD(, ol_tx_desc_t) ol_tx_desc_list;
@@ -254,6 +262,7 @@ enum {
     OL_TX_SCHED_WRR_ADV_CAT_UCAST_MGMT,
     OL_TX_SCHED_WRR_ADV_CAT_MCAST_DATA,
     OL_TX_SCHED_WRR_ADV_CAT_MCAST_MGMT,
+    OL_TX_SCHED_WRR_ADV_CAT_MCAST_VO,
 
     OL_TX_SCHED_WRR_ADV_NUM_CATEGORIES /* must be last */
 };
@@ -269,7 +278,8 @@ A_COMPILE_TIME_ASSERT(ol_tx_sched_htt_ac_values,
     ((int)OL_TX_SCHED_WRR_ADV_CAT_NON_QOS_DATA == (int)HTT_AC_EXT_NON_QOS) &&
     ((int)OL_TX_SCHED_WRR_ADV_CAT_UCAST_MGMT == (int)HTT_AC_EXT_UCAST_MGMT) &&
     ((int)OL_TX_SCHED_WRR_ADV_CAT_MCAST_DATA == (int)HTT_AC_EXT_MCAST_DATA) &&
-    ((int)OL_TX_SCHED_WRR_ADV_CAT_MCAST_MGMT == (int)HTT_AC_EXT_MCAST_MGMT));
+    ((int)OL_TX_SCHED_WRR_ADV_CAT_MCAST_MGMT == (int)HTT_AC_EXT_MCAST_MGMT) &&
+    ((int)OL_TX_SCHED_WRR_ADV_CAT_MCAST_VO == (int)HTT_AC_EXT_MCAST_VO));
 
 struct ol_tx_reorder_cat_timeout_t {
 	TAILQ_HEAD(, ol_rx_reorder_timeout_list_elem_t) virtual_timer_list;
@@ -323,6 +333,7 @@ struct ol_audio_multicast_rate
 };
 
 #define OL_TX_VO_MCAST_GROUP_EXP_TIME	1000	/* ms */
+#define OL_TX_VO_MCAST_TAG_SIZE		1
 
 struct ol_audio_multicast_group
 {
@@ -346,6 +357,7 @@ struct ol_audio_multicast_aggr_conf
 	u_int8_t total_client_num;
 	adf_os_spinlock_t lock;
 	struct ol_audio_multicast_group multicast_group[MAX_GROUP_NUM];
+	u_int64_t tsf;
 	u_int32_t seqno_error;
 	u_int32_t packet_error;
 	u_int32_t expire_error;
@@ -375,6 +387,7 @@ struct ol_tx_frms_queue_t {
 #if defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL)
 	struct ol_txrx_peer_t *peer;
 #endif
+	u_int64_t last_enq_time;
 };
 
 enum {

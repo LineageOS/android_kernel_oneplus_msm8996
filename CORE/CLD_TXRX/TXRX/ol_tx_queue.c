@@ -122,10 +122,11 @@ ol_tx_queue_vdev_flush(struct ol_txrx_pdev_t *pdev, struct ol_txrx_vdev_t *vdev)
         * into scheduler, so use same tid when we flush them
         */
         if (i == OL_TX_VDEV_MCAST_BCAST)
-            ol_tx_queue_free(pdev, txq, HTT_TX_EXT_TID_NON_QOS_MCAST_BCAST,
-                             false);
+            ol_tx_queue_free(pdev, txq, HTT_TX_EXT_TID_MCAST_DATA, false);
         else if (i == OL_TX_VDEV_DEFAULT_MGMT)
-            ol_tx_queue_free(pdev, txq, HTT_TX_EXT_TID_MGMT, false);
+            ol_tx_queue_free(pdev, txq, HTT_TX_EXT_TID_MCAST_MGMT, false);
+        else if (i == OL_TX_VDEV_MCAST_VO)
+            ol_tx_queue_free(pdev, txq, HTT_TX_EXT_TID_MCAST_VO, false);
         else
             ol_tx_queue_free(pdev, txq, (i + OL_TX_NUM_TIDS), false);
     }
@@ -257,6 +258,7 @@ ol_tx_enqueue(
         //Discard Frames in Discard List
         ol_tx_desc_frame_list_free(pdev, &tx_descs, 1 /* error */);
     }
+
     adf_os_spin_lock_bh(&pdev->tx_queue_spinlock);
     TAILQ_INSERT_TAIL(&txq->head, tx_desc, tx_desc_list_elem);
 

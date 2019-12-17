@@ -59,6 +59,9 @@
 #define HTT_TX_EXT_TID_DEFAULT              0
 #define HTT_TX_EXT_TID_NON_QOS_MCAST_BCAST 16
 #define HTT_TX_EXT_TID_MGMT                17
+#define HTT_TX_EXT_TID_MCAST_DATA          18
+#define HTT_TX_EXT_TID_MCAST_MGMT          19
+#define HTT_TX_EXT_TID_MCAST_VO            20
 #define HTT_TX_EXT_TID_INVALID             31
 #define HTT_TX_EXT_TID_NONPAUSE            19
 
