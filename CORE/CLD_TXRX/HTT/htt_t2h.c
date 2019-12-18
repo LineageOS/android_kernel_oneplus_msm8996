@@ -547,6 +547,11 @@ htt_t2h_lp_msg_handler(void *context, adf_nbuf_t htt_t2h_msg )
         adf_nbuf_t buf;
         u8 *msg_start_ptr;
 
+        if (!vos_is_fast_chswitch_cali_enabled()) {
+            adf_os_print("fcs cali not enabled");
+            break;
+        }
+
         msg_start_ptr = (u8 *)msg_word;
         msg_subtype = HTT_CHAN_CALDATA_MSG_SUB_TYPE_GET(*msg_word);
         chksum_valid = HTT_CHAN_CALDATA_MSG_CHKSUM_V_GET(*msg_word);

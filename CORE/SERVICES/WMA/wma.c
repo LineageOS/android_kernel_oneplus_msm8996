@@ -16286,18 +16286,16 @@ static void wma_set_channel(tp_wma_handle wma, tpSwitchChannelParams params)
 				 status);
 		return;
 	} else {
-		if (wma->interfaces[req.vdev_id].is_channel_switch) {
+		if (vos_is_fast_chswitch_cali_enabled() &&
+		    wma->interfaces[req.vdev_id].is_channel_switch) {
 			u32 freq;
-			int j;
+			int ret;
 
 			freq = vos_chan_to_freq(req.chan);
-			for (j = 0; j < CALI_FRAG_IDX_MAX; j++) {
-				if (A_OK !=
-				    htt_h2t_chan_cali_data_msg(pdev->htt_pdev,
-							       freq, j))
-					WMA_LOGE("%s: download cali data failed for chan %d\n",
-						 __func__, req.chan);
-			}
+			ret = htt_h2t_chan_cali_data_msg(pdev->htt_pdev, freq);
+			if (A_OK != ret)
+				WMA_LOGE("%s: dl chan %d cali data fail: %d\n",
+					 __func__, req.chan, ret);
 		}
 
 		status = wma_vdev_start(wma, &req,

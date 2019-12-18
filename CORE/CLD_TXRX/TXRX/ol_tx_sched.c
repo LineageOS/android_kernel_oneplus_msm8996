@@ -1488,6 +1488,30 @@ ol_tx_sched(struct ol_txrx_pdev_t *pdev)
     u_int32_t credit;
 
     TX_SCHED_DEBUG_PRINT("Enter %s\n", __func__);
+
+    if (vos_is_fast_chswitch_cali_enabled()) {
+        int cali_tx_credit_availability = A_EINVAL;
+
+        if (adf_os_atomic_read(&pdev->htt_pdev->tx_cali_pending) != 0) {
+            VOS_TRACE(VOS_MODULE_ID_TXRX, VOS_TRACE_LEVEL_ERROR,
+                      "<HTT>ol_tx_sched while cali dl pending, credit %d\n",
+                      adf_os_atomic_read(&pdev->target_tx_credit));
+            if (adf_os_atomic_read(&pdev->target_tx_credit) >= 2) {
+                cali_tx_credit_availability =
+                    ol_tx_target_credit_dec(pdev, 2);
+                if (cali_tx_credit_availability == A_ERROR)
+                    return;
+                ol_tx_cali_pending_status_set(pdev, 0);
+                complete(&pdev->htt_pdev->tx_cali_resource);
+                VOS_TRACE(VOS_MODULE_ID_TXRX, VOS_TRACE_LEVEL_ERROR,
+                          "<HTT>ol_tx_sched up cali dl, current credit %d\n",
+                          adf_os_atomic_read(&pdev->target_tx_credit));
+            }
+            else
+                return;
+        }
+    }
+
     adf_os_spin_lock_bh(&pdev->tx_queue_spinlock);
     if (pdev->tx_sched.tx_sched_status != ol_tx_scheduler_idle) {
         adf_os_spin_unlock_bh(&pdev->tx_queue_spinlock);

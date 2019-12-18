@@ -344,13 +344,11 @@ htt_ipa_uc_detach(struct htt_pdev_t *pdev);
  * htt_h2t_chan_cali_data_msg()
  * @pdev: handle to the HTT instance
  * @freq: channel freq
- * @frag_idx: fragment of cali data
  *
  * This function is used send cali data to firmware
  * Return: A_OK if cali data send successful
  */
-int htt_h2t_chan_cali_data_msg(struct htt_pdev_t *pdev, u32 freq,
-			       u32 frag_idx);
+int htt_h2t_chan_cali_data_msg(struct htt_pdev_t *pdev, u32 freq);
 
 #if defined(DEBUG_HL_LOGGING) && defined(CONFIG_HL_SUPPORT)
 void

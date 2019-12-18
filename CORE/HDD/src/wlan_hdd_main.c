@@ -17905,6 +17905,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    hdd_runtime_suspend_init(pHddCtx);
 
    if (vos_is_fast_chswitch_cali_enabled()) {
+       long cali_rc;
        mac_ptr = PMAC_STRUCT(pHddCtx->hHal);
        init_completion(&mac_ptr->full_chan_cal);
        ret = process_wma_set_command(0, WMI_PDEV_CHECK_CAL_VERSION_CMDID,
@@ -17915,12 +17916,12 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
                   __func__, ret);
        }
        sme_set_cali_chanlist(mac_ptr);
-       rc = wait_for_completion_timeout(
+       cali_rc = wait_for_completion_timeout(
 	 &mac_ptr->full_chan_cal,
 	 msecs_to_jiffies(6000));
-       if (!rc)
+       if (!cali_rc)
            hddLog(VOS_TRACE_LEVEL_ERROR,
-                  "%s: cali timeout", __func__);
+                  "%s: cali timeout, rc %ld", __func__, cali_rc);
    }
 
    pHddCtx->isLoadInProgress = FALSE;
