@@ -1610,6 +1610,7 @@ struct hal_gpio_output {
 #define MAX_CLIENT_NUM      10
 #define MAX_NUM_RATE_SET    4
 #define MAX_RETRY_LIMIT     MAX_NUM_RATE_SET-1
+#define MAX_PERIOD_LIMIT    60000
 
 #define AU_GROUP_INFO_ADDR      0x01
 #define AU_GROUP_INFO_MEMBER    0x02
@@ -1643,6 +1644,26 @@ struct audio_multicast_set_rate
     uint32_t group_id;
     uint32_t num_rate_set;
     struct audio_multicast_rate rate_set[MAX_NUM_RATE_SET];
+};
+
+struct audio_multicast_set_auto_rate
+{
+    uint32_t param_vdev_id;
+    uint32_t group_id;
+    uint32_t bandwidth;
+    uint32_t nss;
+    uint32_t mcs_min;
+    uint32_t mcs_max;
+    uint32_t mcs_offset;
+};
+
+/* used on STA side */
+struct audio_multicast_set_sta
+{
+    uint32_t param_vdev_id;
+    uint32_t group_num;
+    uint32_t bitmap;
+    struct mac_addr_s group_addr[MAX_GROUP_NUM];
 };
 #endif
 

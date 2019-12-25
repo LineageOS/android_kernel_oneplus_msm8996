@@ -528,5 +528,7 @@ int wlan_hdd_set_multicast_retry_limit(hdd_adapter_t *adapter,
 			int group_id,int retry_limit);
 int wlan_hdd_multicast_aggr_enable(hdd_adapter_t *adapter,
 						int aggr_enable, int tbd_enable);
+int wlan_hdd_set_multicast_probe(hdd_adapter_t *adapter,
+			int group_id,int interval);
 #endif
 #endif // __WEXT_IW_H__

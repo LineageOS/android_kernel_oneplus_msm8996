@@ -190,7 +190,9 @@ typedef struct
 #define WE_SET_THERMAL_THROTTLE_CONFIG          14
 #define WE_SET_HPCS_PULSE_PARAMS_CONFIG         15
 
-#define WE_AUDIO_AGGR_SET_GROUP_RATE         16
+#define WE_AUDIO_AGGR_SET_GROUP_RATE            16
+#define WE_AUDIO_AGGR_SET_AUTO_RATE             17
+#define WE_AUDIO_AGGR_SET_STA                   18
 
 #define QCSAP_IOCTL_SET_CHANNEL_RANGE           (SIOCIWFIRSTPRIV+17)
 #define QCSAP_IOCTL_MODIFY_ACL                  (SIOCIWFIRSTPRIV+18)
@@ -213,6 +215,7 @@ typedef struct
 #define QCSAP_IOCTL_SET_PS_TDCC                 3
 #define QCSAP_AUDIO_AGGR_SET_GROUP_RETRY        4
 #define QCSAP_AUDIO_AGGR_ENABLE                 5
+#define QCSAP_AUDIO_AGGR_SET_GROUP_PROBE        6
 
 
 

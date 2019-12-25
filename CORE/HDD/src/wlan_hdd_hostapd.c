@@ -3772,6 +3772,11 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
                         value[1], value[2]);
                 ret = wlan_hdd_multicast_aggr_enable(pAdapter, value[1], value[2]);
                 break;
+    case QCSAP_AUDIO_AGGR_SET_GROUP_PROBE:
+                hddLog(LOG1, "au_set_probe: %d %d",
+                        value[1], value[2]);
+                ret = wlan_hdd_set_multicast_probe(pAdapter, value[1], value[2]);
+                break;
 #endif
     default:
         hddLog(LOGE, "%s: Invalid IOCTL command %d", __func__, sub_cmd);
@@ -8132,6 +8137,14 @@ static const struct iw_priv_args hostapd_private_args[] = {
         IW_PRIV_TYPE_INT| IW_PRIV_SIZE_FIXED | 1,
         0,
         "au_del_group" },
+
+    {   WE_AUDIO_AGGR_SET_AUTO_RATE,
+        IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+        0, "au_set_auto" },
+
+    {   QCSAP_AUDIO_AGGR_SET_GROUP_PROBE,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
+        0, "au_set_probe"},
 
     {   QCSAP_GET_ALL_GROUP_INFO,
          0,
