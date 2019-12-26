@@ -686,6 +686,7 @@ static struct adf_nbuf_map_metadata *adf_nbuf_meta_get(adf_nbuf_t nbuf)
 	return NULL;
 }
 
+#ifdef HIF_PCI
 static a_status_t
 adf_nbuf_track_map(adf_nbuf_t nbuf, const char *file, uint32_t line)
 {
@@ -757,6 +758,17 @@ adf_nbuf_untrack_map(adf_nbuf_t nbuf, const char *file, uint32_t line)
 
 	adf_nbuf_history_add(nbuf, file, line, ADF_NBUF_UNMAP);
 }
+#else
+static inline a_status_t
+adf_nbuf_track_map(adf_nbuf_t nbuf, const char *file, uint32_t line)
+{
+	return A_STATUS_OK;
+}
+
+static inline void
+adf_nbuf_untrack_map(adf_nbuf_t nbuf, const char *file, uint32_t line)
+{}
+#endif
 
 a_status_t adf_nbuf_map_debug(adf_os_device_t osdev,
 			      adf_nbuf_t buf,
