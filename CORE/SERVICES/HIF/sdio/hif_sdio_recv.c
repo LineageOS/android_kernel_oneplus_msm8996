@@ -874,8 +874,8 @@ int rx_completion_task(void *param)
     target = (HTC_TARGET *)device->pTarget;
     AR_DEBUG_PRINTF(ATH_DEBUG_TRACE, ("AR6000: rx completion task\n"));
 
-    set_current_state(TASK_INTERRUPTIBLE);
     vos_set_cpus_allowed_ptr(current, 1);
+    set_current_state(TASK_INTERRUPTIBLE);
 
     while (!device->pRecvTask->rx_completion_shutdown) {
         if (down_interruptible(&device->pRecvTask->sem_rx_completion) != 0) {
@@ -1142,12 +1142,12 @@ static A_STATUS HIFDevIssueRecvPacketBundle(HIF_SDIO_DEVICE *pDev,
         pPacketRxBundle->BundlePktnum = i;
         adf_os_spin_lock_irqsave(&pDev->pRecvTask->rx_bundle_lock);
         HTC_PACKET_ENQUEUE(&pDev->pRecvTask->rxBundleQueue, pPacketRxBundle);
-        adf_os_spin_unlock_irqrestore(&pDev->pRecvTask->rx_bundle_lock);
 
         adf_os_spin_lock_irqsave(&pDev->pRecvTask->rx_sync_completion_lock);
         HTC_PACKET_QUEUE_TRANSFER_TO_TAIL(&pDev->pRecvTask->rxSyncCompletionQueue,
                                           pSyncCompletionQueue);
         adf_os_spin_unlock_irqrestore(&pDev->pRecvTask->rx_sync_completion_lock);
+        adf_os_spin_unlock_irqrestore(&pDev->pRecvTask->rx_bundle_lock);
 #else
         *pNumPacketsFetched = i;
         pBuffer = pBundleBuffer;
