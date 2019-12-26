@@ -15354,6 +15354,8 @@ eHalStatus sme_ProcessChannelChangeResp(tpAniSirGlobal pMac,
     roam_info = vos_mem_malloc(sizeof(*roam_info));
     if (!roam_info)
         return eHAL_STATUS_FAILED_ALLOC;
+    vos_mem_zero(roam_info, sizeof(*roam_info));
+
     roam_info->channelChangeRespEvent =
         (tSirChanChangeResponse *)vos_mem_malloc(
                                 sizeof(tSirChanChangeResponse));
