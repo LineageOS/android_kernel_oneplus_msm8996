@@ -6034,7 +6034,7 @@ static int __iw_get_channel_list(struct net_device *dev,
         if (hdd_ctx->cfg_ini->dot11p_mode) {
             bandEndChannel = RF_CHAN_184;
         } else {
-            bandEndChannel = RF_CHAN_165;
+            bandEndChannel = RF_CHAN_173;
         }
     }
 
