@@ -332,6 +332,15 @@ struct ol_audio_multicast_rate
     uint32_t bandwidth;
 };
 
+struct ol_audio_multicast_auto_rate
+{
+    uint32_t bandwidth;
+    uint32_t mcs_min;
+    uint32_t mcs_max;
+    uint32_t mcs_offset;
+    uint32_t nss;
+};
+
 #define OL_TX_VO_MCAST_GROUP_EXP_TIME	1000	/* ms */
 #define OL_TX_VO_MCAST_TAG_SIZE		1
 
@@ -343,7 +352,9 @@ struct ol_audio_multicast_group
 	u_int32_t client_num;
 	u_int32_t retry_limit;
 	u_int32_t num_rate_set;
+	u_int32_t interval;
 	struct ol_audio_multicast_rate rate_set[MAX_NUM_RATE_SET];
+	struct ol_audio_multicast_auto_rate auto_rate_set;
 	htt_mac_addr multicast_addr;
 	htt_mac_addr client_addr[MAX_CLIENT_NUM];
 	u_int8_t macaddr[IEEE80211_ADDR_LEN];

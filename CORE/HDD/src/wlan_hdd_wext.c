@@ -8905,6 +8905,104 @@ wlan_hdd_multicast_aggr_enable(hdd_adapter_t *adapter,
 	return ret;
 }
 
+static int wlan_hdd_set_multicast_auto_rate(hdd_adapter_t *pAdapter,
+				int * args)
+{
+	struct audio_multicast_set_auto_rate *pMultiGroup;
+	int group_id;
+	vos_msg_t msg;
+
+	group_id = args[0];
+	if (group_id < MIN_GROUP_ID || group_id >= MAX_GROUP_ID) {
+		hddLog(LOGW, FL("Invalid group id %d"), group_id);
+		return -EINVAL;
+	}
+
+	pMultiGroup = vos_mem_malloc(sizeof(struct audio_multicast_set_auto_rate));
+	if (NULL == pMultiGroup) {
+		hddLog(LOGE, FL("vos_mem_alloc failed for pMultiRate"));
+		return -ENOMEM;
+	}
+	adf_os_mem_zero(pMultiGroup, sizeof(struct audio_multicast_set_auto_rate));
+
+	pMultiGroup->param_vdev_id = pAdapter->sessionId;
+	pMultiGroup->group_id = group_id;
+	pMultiGroup->bandwidth = args[1];
+	pMultiGroup->nss = args[2];
+	pMultiGroup->mcs_min = args[3];
+	pMultiGroup->mcs_max = args[4];
+	pMultiGroup->mcs_offset = args[5];
+
+	msg.type = WDA_SET_MULTICAST_AUTO_RATE;
+	msg.reserved = 0;
+	msg.bodyptr = pMultiGroup;
+	if (VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MODULE_ID_WDA,
+						&msg)) {
+		vos_mem_free(pMultiGroup);
+		VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+			FL("Not able to post Set Multicast group Rate message to WDA"));
+		return -EINVAL;
+	}
+
+	return VOS_STATUS_SUCCESS;
+}
+
+int
+wlan_hdd_set_multicast_probe(hdd_adapter_t *adapter,
+			int group_id,int interval)
+{
+	int ret;
+
+	if (interval < 0 || interval > MAX_PERIOD_LIMIT) {
+		hddLog(LOGW, FL("Invalid Interval %d"), interval);
+		return -EINVAL;
+	}
+
+	ret = process_wma_set_command_twoargs((int)adapter->sessionId,
+					       (int)GEN_PARAM_MULTICAST_SET_PROBE,
+					       group_id, interval, GEN_CMD);
+
+	return ret;
+}
+
+static int wlan_hdd_set_multicast_sta(hdd_adapter_t *pAdapter,
+				int * args, int group_num)
+{
+	struct audio_multicast_set_sta *pMultiGroup;
+	int i;
+	vos_msg_t msg;
+
+	pMultiGroup = vos_mem_malloc(sizeof(struct audio_multicast_set_sta));
+	if (NULL == pMultiGroup) {
+		hddLog(LOGE, FL("vos_mem_alloc failed for pMultiGroup"));
+		return -ENOMEM;
+	}
+	adf_os_mem_zero(pMultiGroup, sizeof(struct audio_multicast_set_sta));
+
+	pMultiGroup->param_vdev_id = pAdapter->sessionId;
+	pMultiGroup->group_num = group_num;
+	pMultiGroup->bitmap = args[0];
+
+	if (group_num > 0) {
+		for (i = 0; i < group_num; i++) {
+			pMultiGroup->group_addr[i].mac_addr31to0 = args[i*2+1];
+			pMultiGroup->group_addr[i].mac_addr47to32 = args[i*2+2];
+		}
+	}
+
+	msg.type = WDA_SET_MULTICAST_STA;
+	msg.reserved = 0;
+	msg.bodyptr = pMultiGroup;
+	if (VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MODULE_ID_WDA,
+						&msg)) {
+		vos_mem_free(pMultiGroup);
+		VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+			FL("Not able to post Set Multicast group Rate message to WDA"));
+		return -EINVAL;
+	}
+
+	return VOS_STATUS_SUCCESS;
+}
 #endif
 
 static int __iw_set_var_ints_getnone(struct net_device *dev,
@@ -9331,6 +9429,29 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
                 ret = wlan_hdd_set_multicast_rate(pAdapter, apps_args);
                 if (ret != eHAL_STATUS_SUCCESS)
                     return -EINVAL;
+            }
+            break;
+        case WE_AUDIO_AGGR_SET_AUTO_RATE:
+            {
+                if (num_args != 6) {
+                    hddLog(LOGE, FL("au_set_auto: Invalid arguments"));
+                    return -EINVAL;
+                }
+                ret = wlan_hdd_set_multicast_auto_rate(pAdapter, apps_args);
+                if (ret != eHAL_STATUS_SUCCESS)
+                    return -EINVAL;
+            }
+            break;
+        case WE_AUDIO_AGGR_SET_STA:
+            {
+                if ((num_args < 1) || (num_args > (MAX_GROUP_NUM*2 + 1))
+                    || ((num_args & 0x1) == 0)) {
+                        hddLog(LOGE, FL("au_set_sta: Invalid arguments"));
+                        return -EINVAL;
+                }
+                ret = wlan_hdd_set_multicast_sta(pAdapter, apps_args, (num_args-1)/2);
+                if (ret != eHAL_STATUS_SUCCESS)
+                        return -EINVAL;
             }
             break;
 #endif
@@ -13080,6 +13201,11 @@ static const struct iw_priv_args we_private_args[] = {
     {   WE_SET_HPCS_PULSE_PARAMS_CONFIG,
         IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
         0, "setHpcsParams" },
+#ifdef AUDIO_MULTICAST_AGGR_SUPPORT
+    {   WE_AUDIO_AGGR_SET_STA,
+        IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+        0, "au_set_sta" },
+#endif
 };
 
 
