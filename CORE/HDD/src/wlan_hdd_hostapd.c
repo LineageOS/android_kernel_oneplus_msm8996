@@ -3951,101 +3951,79 @@ static VOS_STATUS hdd_print_acl(hdd_adapter_t *pHostapdAdapter)
 }
 
 #ifdef AUDIO_MULTICAST_AGGR_SUPPORT
-#define INVALID_GROUP_ID 0xff
-uint32
-find_available_multicast_group(struct audio_multicast_aggr *pMultiAggr)
-{
-	int i;
-
-	if (pMultiAggr->group_num >= MAX_GROUP_NUM) {
-		return INVALID_GROUP_ID;
-	}
-	//Group 0 is reserved for multicast paket of non-audio.
-	for (i = 1; i < MAX_GROUP_NUM; i++) {
-		if (pMultiAggr->multicast_group[i].in_use == 0)
-			return i;
-	}
-	return INVALID_GROUP_ID;
-}
 static int wlan_hdd_add_multicast_grp(hdd_adapter_t *pAdapter,
-			int * args, union iwreq_data *wrqu)
+			int * args, union iwreq_data *wrqu, int num_args)
 {
-	struct audio_multicast_aggr *pMultiAggr = &pAdapter->multicast_aggr;
-	struct audio_multicast_group *pMultiGroup;
-	struct audio_multicast_group *pMultiGroup2;
-	int i = 0;
-	uint32 group_id;
-	vos_msg_t msg;
-	int length = 0;
-	char output[16]={0,};
+	struct audio_multicast_add_group *pMultiGroup;
+	int i = 0, group_id = 0, length = 0, ret = 0, client_num = 0;
+	char output[4] = {0,};
+	hdd_context_t *pHddCtx;
+	tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
 
-	if (pMultiAggr->aggr_enable != 1) {
-		hddLog(LOGW, FL("multicast aggr not enabled"));
+	pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+	ret = wlan_hdd_validate_context(pHddCtx);
+	if (0 != ret)
+		return ret;
+
+	if (VOS_STATUS_SUCCESS != sme_is_session_valid(hHal,
+	    pAdapter->sessionId)) {
+		hddLog(LOGE, FL("session id is not valid %d"),
+			pAdapter->sessionId);
 		return -EINVAL;
 	}
 
-	group_id = find_available_multicast_group(pMultiAggr);
-	if (INVALID_GROUP_ID == group_id) {
-		hddLog(LOGW, FL("No available group num %d!"), pMultiAggr->group_num);
+	if (num_args < 3)
+		return -EINVAL;
+
+	client_num = args[2];
+
+	if (client_num > MAX_CLIENT_NUM|| (num_args != (3+2*client_num))) {
+		hddLog(LOGW, FL("add_multicast_group: Invalid arguments"));
 		return -EINVAL;
 	}
-	pMultiGroup2 = &pMultiAggr->multicast_group[group_id];
+
 	pMultiGroup = vos_mem_malloc(sizeof(*pMultiGroup));
 	if (NULL == pMultiGroup) {
-		hddLog(LOGE,
-		FL("vos_mem_alloc failed for pMultiGroup"));
+		hddLog(LOGE, FL("vos_mem_alloc failed for pMultiGroup"));
 		return -ENOMEM;
 	}
 	adf_os_mem_zero(pMultiGroup, sizeof(*pMultiGroup));
 
-	pMultiGroup->group_id = group_id;
-	pMultiGroup->multicast_addr.mac_addr31to0= args[0];
-	pMultiGroup->multicast_addr.mac_addr47to32= args[1];
-	pMultiGroup->client_num = args[2];
-	for (i = 0; i < pMultiGroup->client_num; i++) {
+	pMultiGroup->multicast_addr.mac_addr31to0 = args[0];
+	pMultiGroup->multicast_addr.mac_addr47to32 = args[1];
+	pMultiGroup->client_num = client_num;
+	for (i = 0; i < client_num; i++) {
 		pMultiGroup->client_addr[i].mac_addr31to0 = args[3+2*i];
 		pMultiGroup->client_addr[i].mac_addr47to32 = args[4+2*i];
 	}
-	adf_os_mem_copy(pMultiGroup2,pMultiGroup,sizeof(*pMultiGroup2));
 
-	msg.type = WDA_ADD_MULTICAST_GROUP;
-	msg.reserved = 0;
-	msg.bodyptr = pMultiGroup;
-	if (VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MODULE_ID_WDA,
-							&msg)) {
-		vos_mem_free(pMultiGroup);
-		VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-		FL("Not able to post Add Multicast group message to WDA"));
-		return -EINVAL;
+	group_id = wma_add_multicast_group(pHddCtx->pvosContext,
+				(int)pAdapter->sessionId,
+				pMultiGroup);
+
+	if( group_id < MIN_GROUP_ID || group_id >= MAX_GROUP_ID ) {
+		length += scnprintf(output, sizeof(output),"err");
 	}
-	pMultiGroup2->in_use = 1;
-	pMultiAggr->group_num++;
+	else {
+		length += scnprintf(output, sizeof(output),"%d", group_id);
+	}
 
-	length += scnprintf(output, sizeof(output),"ID=%d", group_id);
 	wrqu->data.length = length + 1;
-
 	if (copy_to_user(wrqu->data.pointer, output, wrqu->data.length)) {
 		hddLog(LOG1, "%s: failed to copy group ID to user buffer", __func__);
 	}
 
-	return 0;
+	vos_mem_free(pMultiGroup);
+	return group_id;
 }
 
 static int
 wlan_hdd_multicast_del_group(hdd_adapter_t * adapter, int group_id)
 {
 	int ret;
-	struct audio_multicast_aggr *pMultiAggr = &adapter->multicast_aggr;
-	struct audio_multicast_group *pMultiGroup;
 
-	if (group_id < 0 || group_id >= MAX_GROUP_NUM) {
+	if (group_id < MIN_GROUP_ID || group_id >= MAX_GROUP_ID) {
 		hddLog(LOGW, FL("Invalid group id %d"), group_id);
-		return -EINVAL;
-	}
-
-	pMultiGroup = &pMultiAggr->multicast_group[group_id];
-	if (pMultiGroup->in_use != 1) {
-		hddLog(LOGW, FL("Group %d is not inused!"), group_id);
 		return -EINVAL;
 	}
 
@@ -4054,59 +4032,54 @@ wlan_hdd_multicast_del_group(hdd_adapter_t * adapter, int group_id)
 		group_id, GEN_CMD);
 
 	if (!ret) {
-		vos_mem_zero(pMultiGroup, sizeof(*pMultiGroup));
-		pMultiAggr->group_num--;
 	}
 	return ret;
 }
 
 static int
-wlan_hdd_get_all_group_info(hdd_adapter_t * adapter,
+wlan_hdd_get_all_group_info(hdd_adapter_t * pAdapter,
 		union iwreq_data *wrqu, char *extra)
 {
-	int i, length = 0;
-	struct audio_multicast_aggr *pMultiAggr = &adapter->multicast_aggr;
-	struct audio_multicast_group *pMultiGroup;
-	int in_use = 0;
-	int j;
+	int i, ret, length = 0;
+	hdd_context_t *pHddCtx;
+	tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
 
-	for (i = 0; i < MAX_GROUP_NUM; i++) {
-		pMultiGroup = &pMultiAggr->multicast_group[i];
-		if (pMultiGroup->in_use == 0)
-			continue;
-		in_use++;
+	pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+	ret = wlan_hdd_validate_context(pHddCtx);
+	if (0 != ret)
+		return ret;
 
-		length += scnprintf(extra+length, WE_MAX_STR_LEN - length,
-		"\nGroup id: %d\n"
-		"Group mac addr: [0x%x, 0x%x]\n"
-		"Retry limit: %d\n"
-		"Num client: %d\n"
-		"Rate set num: %d\n",
-		i,
-		pMultiGroup->multicast_addr.mac_addr31to0,
-		pMultiGroup->multicast_addr.mac_addr47to32,
-		pMultiGroup->retry_limit,
-		pMultiGroup->client_num,
-		pMultiGroup->num_rate_set);
-
-		for (j = 0; j<pMultiGroup->client_num; j++) {
-			length += scnprintf(extra+length, WE_MAX_STR_LEN - length,
-				"Client%d addr: [0x%x, 0x%x]\n", j,
-				pMultiGroup->client_addr[j].mac_addr31to0,
-				pMultiGroup->client_addr[j].mac_addr47to32);
-		}
-
-		for (j = 0; j<pMultiGroup->num_rate_set; j++) {
-			length += scnprintf(extra+length, WE_MAX_STR_LEN - length,
-			"Rate set%d: [mcs%d, bandwith%d]\n", j,
-			pMultiGroup->rate_set[j].mcs,
-			pMultiGroup->rate_set[j].bandwith);
-		}
-
+	if (VOS_STATUS_SUCCESS != sme_is_session_valid(hHal,
+	    pAdapter->sessionId)) {
+		hddLog(LOGE, FL("session id is not valid %d"),
+		pAdapter->sessionId);
+		return -EINVAL;
 	}
-	wrqu->data.length = length + 1;
-	if (in_use == 0)
-		hddLog(LOGE, "No Multicast Group was found");
+
+	length = wma_cli_au_get_global_info(pHddCtx->pvosContext,
+				(int)pAdapter->sessionId,
+				extra);
+	if (length < 0) {
+		hddLog(LOGE, FL("get group info fail\n"));
+		wrqu->data.length = 0;
+		return length;
+	}
+	wrqu->data.length += length;
+
+	for (i = MIN_GROUP_ID; i < MAX_GROUP_ID; i++) {
+		length = wma_cli_au_get_group_info(pHddCtx->pvosContext,
+					(int)pAdapter->sessionId,
+					(int)AU_GROUP_INFO_ALL,
+					extra + wrqu->data.length,
+					i);
+		if (length < 0) {
+			hddLog(LOGE, FL("get group %d info fail"), i);
+			wrqu->data.length = 0;
+			return length;
+		}
+		wrqu->data.length += length;
+	}
+	wrqu->data.length ++;
 	return 0;
  }
 #endif
@@ -4886,12 +4859,8 @@ static int __iw_softap_set_var_int_get_char(struct net_device *dev,
 	{
 #ifdef AUDIO_MULTICAST_AGGR_SUPPORT
 		case QCSAP_ADD_MULTICAST_GROUP:
-			if (value[2] > MAX_CLIENT_NUM|| (num_args != (3+2*value[2]))) {
-				hddLog(LOGW, FL("add_multicast_group: Invalid arguments"));
-				ret = -EINVAL;
-			}
-			ret = wlan_hdd_add_multicast_grp(padapter, value, wrqu);
-			if (ret != 0) {
+			ret = wlan_hdd_add_multicast_grp(padapter, value, wrqu, num_args);
+			if (ret < 0) {
 				hddLog(LOGW, FL("add_multicast_group failed"));
 				ret = -EINVAL;
 			}
@@ -5254,158 +5223,34 @@ static iw_softap_getparam(struct net_device *dev,
 
 #ifdef AUDIO_MULTICAST_AGGR_SUPPORT
 static int
-wlan_hdd_get_group_info_all(
-				union iwreq_data *wrqu,
-				char *extra,
-				struct audio_multicast_group *pMultiGroup)
+wlan_hdd_get_group_info(hdd_adapter_t *pAdapter, union iwreq_data *wrqu,
+			char *extra, int sub_cmd)
 {
-	int length=0;
-	int j;
-
-	ENTER();
-
-	length += scnprintf(extra+length, WE_MAX_STR_LEN - length,
-		"\nGroup id: %d\n"
-		"Group mac addr: [0x%x, 0x%x]\n"
-		"Retry limit: %d\n"
-		"Num client: %d\n"
-		"Rate set num: %d\n",
-		pMultiGroup->group_id,
-		pMultiGroup->multicast_addr.mac_addr31to0,
-		pMultiGroup->multicast_addr.mac_addr47to32,
-		pMultiGroup->retry_limit,
-		pMultiGroup->client_num,
-		pMultiGroup->num_rate_set);
-
-	for (j = 0; j<pMultiGroup->client_num; j++) {
-		length += scnprintf(extra+length, WE_MAX_STR_LEN - length,
-			"Client%d addr: [0x%x, 0x%x]\n", j,
-			pMultiGroup->client_addr[j].mac_addr31to0,
-			pMultiGroup->client_addr[j].mac_addr47to32);
-	}
-
-	for (j = 0; j<pMultiGroup->num_rate_set; j++) {
-		length += scnprintf(extra+length, WE_MAX_STR_LEN - length,
-			"Rate set%d: [mcs%d, bandwith%d]\n", j,
-			pMultiGroup->rate_set[j].mcs,
-			pMultiGroup->rate_set[j].bandwith);
-	}
-
-	wrqu->data.length = length + 1;
-
-	EXIT();
-
-	return 0;
- }
-
-static int
-wlan_hdd_get_group_addr(
-				union iwreq_data *wrqu,
-				char *extra,
-				struct audio_multicast_group *pMultiGroup)
-{
-	int length=0;
-
-	length += scnprintf(extra, WE_MAX_STR_LEN,
-		"Group id: %d, Group mac addr: [0x%x, 0x%x]",
-		pMultiGroup->group_id,
-		pMultiGroup->multicast_addr.mac_addr31to0,
-		pMultiGroup->multicast_addr.mac_addr47to32);
-
-	wrqu->data.length = length + 1;
-
-	return 0;
-}
-
-static int
-wlan_hdd_get_group_member(
-				union iwreq_data *wrqu,
-				char *extra,
-				struct audio_multicast_group *pMultiGroup)
-{
-	int length=0;
-	int j;
-
-	length += scnprintf(extra+length, WE_MAX_STR_LEN - length,
-				"Group id: %d,Num client: %d\n",
-				pMultiGroup->group_id,
-				pMultiGroup->client_num);
-
-	for (j = 0; j<pMultiGroup->client_num; j++) {
-		length += scnprintf(extra+length, WE_MAX_STR_LEN - length,
-					"Client%d addr: [0x%x, 0x%x]\n", j,
-					pMultiGroup->client_addr[j].mac_addr31to0,
-					pMultiGroup->client_addr[j].mac_addr47to32);
-	}
-
-	wrqu->data.length = length + 1;
-
-	return 0;
-}
-
-static int
-wlan_hdd_get_group_tx_rate(
-				union iwreq_data *wrqu,
-				char *extra,
-				struct audio_multicast_group *pMultiGroup)
-{
-	int length=0;
-	int j;
-
-	length += scnprintf(extra+length, WE_MAX_STR_LEN - length,
-				"Group id: %d,Rate set num: %d\n",
-				pMultiGroup->group_id,
-				pMultiGroup->num_rate_set);
-
-	for (j = 0; j<pMultiGroup->num_rate_set; j++) {
-		length += scnprintf(extra+length, WE_MAX_STR_LEN - length,
-					"Rate set%d: [mcs%d, bandwith%d]\n", j,
-					pMultiGroup->rate_set[j].mcs,
-					pMultiGroup->rate_set[j].bandwith);
-	}
-	wrqu->data.length = length + 1;
-
-	return 0;
-}
-
-static int
-wlan_hdd_get_group_retry_limit(
-				union iwreq_data *wrqu,
-				char *extra,
-				struct audio_multicast_group *pMultiGroup)
-{
-	int length=0;
-
-	length += scnprintf(extra+length, WE_MAX_STR_LEN,
-				"Group id: %d,Retry limit: %d\n",
-				pMultiGroup->group_id,
-				pMultiGroup->retry_limit);
-
-	wrqu->data.length = length + 1;
-
-	return 0;
-}
-
-static int
-wlan_hdd_get_group_info(hdd_adapter_t * adapter,
-			union iwreq_data *wrqu, char *extra, int sub_cmd)
-{
-	struct audio_multicast_aggr *pMultiAggr = &adapter->multicast_aggr;
-	struct audio_multicast_group *pMultiGroup;
-	char group_id;
+	int length = 0, ret = 0;
+	hdd_context_t *pHddCtx;
+	tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
 	char group_id_s[32];
-	int length=0;
+	v_U8_t group_id;
 
 	ENTER();
 
-	if (copy_from_user(group_id_s,
-		wrqu->data.pointer, 32)) {
+	pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+	ret = wlan_hdd_validate_context(pHddCtx);
+	if (0 != ret)
+		return ret;
 
+	if (VOS_STATUS_SUCCESS != sme_is_session_valid(hHal,
+	    pAdapter->sessionId)) {
+		hddLog(LOGE, FL("session id is not valid %d"),
+		pAdapter->sessionId);
+		return -EINVAL;
+	}
+
+	if (copy_from_user(group_id_s, wrqu->data.pointer, 32)) {
 		hddLog(LOG1, "%s: failed to copy data to user buffer",
-		       __func__);
+			__func__);
 		return -EFAULT;
 	}
-
 	group_id_s[1] = '\0';
 	hddLog(LOG1, "%s, %s", __func__, group_id_s);
 
@@ -5414,17 +5259,9 @@ wlan_hdd_get_group_info(hdd_adapter_t * adapter,
 		return -EFAULT;
 	}
 
-	if (group_id < 0 || group_id >= MAX_GROUP_NUM) {
-		hddLog(LOG1, "%s: Invalid group id:%d", __func__, group_id);
+	if (group_id < MIN_GROUP_ID || group_id >= MAX_GROUP_ID) {
+		hddLog(LOG1, "Invalid group id:%d", group_id);
 		length = scnprintf(extra, WE_MAX_STR_LEN,"Invalid group id");
-		wrqu->data.length = length + 1;
-		return 0;
-	}
-
-	pMultiGroup = &pMultiAggr->multicast_group[(int)group_id];
-	if (pMultiGroup->in_use == 0) {
-		hddLog(LOGW, "No Multicast Group was found");
-		length = scnprintf(extra, WE_MAX_STR_LEN,"No Multicast Group was found");
 		wrqu->data.length = length + 1;
 		return 0;
 	}
@@ -5434,35 +5271,55 @@ wlan_hdd_get_group_info(hdd_adapter_t * adapter,
 		case QCSAP_GET_GROUP_INFO:
 		{
 			hddLog(LOG1, "QCSAP_GET_MULTICAST_GROUP_INFO ");
-			wlan_hdd_get_group_info_all(wrqu, extra, pMultiGroup);
+			length = wma_cli_au_get_group_info(pHddCtx->pvosContext,
+					(int)pAdapter->sessionId,
+					(int)AU_GROUP_INFO_ALL,
+					extra,
+					group_id);
 			break;
 		}
 
 		case QCSAP_GET_GROUP_ADDR:
 		{
 			hddLog(LOG1, "QCSAP_IOCTL_GET_GROUP_ADDR ");
-			wlan_hdd_get_group_addr(wrqu, extra, pMultiGroup);
+			length = wma_cli_au_get_group_info(pHddCtx->pvosContext,
+					(int)pAdapter->sessionId,
+					(int)AU_GROUP_INFO_ADDR,
+					extra,
+					group_id);
 			break;
 		}
 
 		case QCSAP_GET_GROUP_MEMB:
 		{
 			hddLog(LOG1, "QCSAP_IOCTL_GET_GROUP_MEM ");
-			wlan_hdd_get_group_member(wrqu, extra, pMultiGroup);
+			length = wma_cli_au_get_group_info(pHddCtx->pvosContext,
+					(int)pAdapter->sessionId,
+					(int)AU_GROUP_INFO_MEMBER,
+					extra,
+					group_id);
 			break;
 		}
 
 		case QCSAP_GET_GROUP_TX_RATE:
 		{
 			hddLog(LOG1, "QCSAP_IOCTL_GET_GROUP_TX_RATE ");
-			wlan_hdd_get_group_tx_rate(wrqu, extra, pMultiGroup);
+			length = wma_cli_au_get_group_info(pHddCtx->pvosContext,
+					(int)pAdapter->sessionId,
+					(int)AU_GROUP_INFO_RATE,
+					extra,
+					group_id);
 			break;
 		}
 
 		case QCSAP_GET_GROUP_RETRY_LIMIT:
 		{
 			hddLog(LOG1, "QCSAP_IOCTL_GET_GROUP_RETRY_LIMIT ");
-			wlan_hdd_get_group_retry_limit(wrqu, extra, pMultiGroup);
+			length = wma_cli_au_get_group_info(pHddCtx->pvosContext,
+					(int)pAdapter->sessionId,
+					(int)AU_GROUP_INFO_RETRY,
+					extra,
+					group_id);
 			break;
 		}
 
@@ -5470,6 +5327,13 @@ wlan_hdd_get_group_info(hdd_adapter_t * adapter,
 			hddLog(LOGW, "%s, sub_cmd not supported", __func__);
 			break;
 	}
+
+	if (length < 0) {
+		hddLog(LOGE, FL("get group %d info fail"), group_id);
+		return length;
+	}
+
+	wrqu->data.length = length + 1;
 
 	EXIT();
 
@@ -5482,17 +5346,13 @@ static __iw_set_char_get_char(struct net_device *dev,
                                struct iw_request_info *info,
                                union iwreq_data *wrqu, char *extra)
 {
-	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_context_t *hddctx;
+	hdd_adapter_t *pAdapter;
 	int sub_cmd = wrqu->data.flags;
 	int ret;
 
 	ENTER();
-	hddctx = WLAN_HDD_GET_CTX(pAdapter);
-	ret = wlan_hdd_validate_context(hddctx);
-	if (0 != ret)
-		return ret;
 
+	pAdapter = (netdev_priv(dev));
 	switch(sub_cmd)
 	{
 #ifdef AUDIO_MULTICAST_AGGR_SUPPORT
@@ -5502,17 +5362,19 @@ static __iw_set_char_get_char(struct net_device *dev,
 		case QCSAP_GET_GROUP_TX_RATE:
 		case QCSAP_GET_GROUP_RETRY_LIMIT:
 		{
-			hddLog(LOG1, "QCSAP_GET_MULTICAST_GROUP_INFO ");
-			wlan_hdd_get_group_info(pAdapter, wrqu, extra, sub_cmd);
+			ret = wlan_hdd_get_group_info(pAdapter, wrqu, extra, sub_cmd);
 			break;
 		}
 #endif
 		default:
-			hddLog(LOGW, "%s, sub_cmd not supported", __func__);
+			hddLog(LOGE, FL("Invalid getparam command %d"), sub_cmd);
+			ret = -EINVAL;
 			break;
 	}
-	return 0;
 
+
+	EXIT();
+	return ret;
 }
 
 static int iw_set_char_get_char(struct net_device *dev,

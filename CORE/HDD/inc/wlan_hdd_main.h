@@ -1478,9 +1478,6 @@ struct hdd_adapter_s
      */
     uint8_t restrict_offchannel_cnt;
 
-#ifdef AUDIO_MULTICAST_AGGR_SUPPORT
-    struct audio_multicast_aggr multicast_aggr;
-#endif
     bool spectral_enabled;
 };
 

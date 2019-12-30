@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -328,6 +328,113 @@ ol_tx_tid(
     return tid;
 }
 
+#if defined(AUDIO_MULTICAST_AGGR_SUPPORT)
+static inline int
+ol_tx_vo_mcast_group_find(struct ol_audio_multicast_aggr_conf *conf,
+			  A_UINT8 *dest_addr, A_UINT8 *group_id)
+{
+	A_UINT8 i, ret = 0;
+
+	/* double check in critical context */
+	if (!conf->aggr_enable || !conf->group_num)
+		goto out;
+
+	for (i = 0; i < MAX_GROUP_NUM; i++) {
+		if (!conf->multicast_group[i].in_use)
+			continue;
+
+		if (!adf_os_mem_cmp(dest_addr,
+				    conf->multicast_group[i].macaddr,
+				    OL_TXRX_MAC_ADDR_LEN)) {
+			*group_id = i;
+			ret = 1;
+			break;
+		}
+	}
+out:
+	return ret;
+}
+
+static struct ol_tx_frms_queue_t *
+ol_tx_vo_mcast_classify_fixup(adf_nbuf_t tx_nbuf,
+			      struct ol_txrx_pdev_t *pdev,
+			      struct ol_txrx_vdev_t *vdev,
+			      struct ol_tx_desc_t *tx_desc,
+			      struct ol_txrx_msdu_info_t *tx_msdu_info,
+			      struct ol_tx_frms_queue_t *txq)
+{
+	A_UINT8 *data;
+	struct ol_audio_multicast_aggr_conf *conf;
+	A_UINT8 seqno, total_num, group_id;
+	A_UINT32 datalen;
+
+	/* sanity check */
+        if (vdev->opmode != wlan_op_mode_ap ||
+	    pdev->frame_format != wlan_frm_fmt_802_3 ||
+	    !adf_nbuf_is_ipv4_pkt(tx_nbuf))
+		return txq;
+
+	conf = &vdev->au_mcast_conf;
+	if (!conf->aggr_enable)
+		return txq;
+
+	data = adf_nbuf_data(tx_nbuf);
+
+	adf_os_spin_lock_bh(&conf->lock);
+
+	if (!ol_tx_vo_mcast_group_find(conf, data, &group_id))
+		goto out;
+
+	/*
+	 * Packet info format:
+	 * 1 byte		1 byte		8 bytes
+	 * sequence number	total number	time limit
+	 */
+	datalen = adf_nbuf_len(tx_nbuf);
+	seqno = *(data + datalen - 8 - 2);
+	total_num = *(data + datalen - 8 - 1);
+
+	if (!seqno || !total_num || seqno > total_num) {
+		conf->packet_error++;
+		goto out;
+	}
+
+	if (!adf_nbuf_put_tail(tx_nbuf, OL_TX_VO_MCAST_TAG_SIZE)) {
+		VOS_TRACE(VOS_MODULE_ID_TXRX, VOS_TRACE_LEVEL_ERROR,
+			  "No enough room to add audio multicast tag");
+		goto out;
+	}
+
+	/* tsf only for compare, no byte order conversion */
+	tx_desc->tsf = *((A_UINT64 *)(data + datalen - 8));
+
+	tx_desc->tag_offset = datalen;
+	tx_desc->seqno = seqno;
+	tx_desc->total_num = total_num;
+	tx_desc->group_id = group_id;
+
+        tx_msdu_info->htt.info.ext_tid = HTT_TX_EXT_TID_MCAST_VO;
+        txq = &vdev->txqs[OL_TX_VDEV_MCAST_VO];
+	txq->last_enq_time = jiffies;
+	conf->enqeue_count++;
+out:
+	adf_os_spin_unlock_bh(&conf->lock);
+
+	return txq;
+}
+#else
+static struct ol_tx_frms_queue_t *
+ol_tx_vo_mcast_classify_fixup(adf_nbuf_t tx_nbuf,
+			      struct ol_txrx_pdev_t *pdev,
+			      struct ol_txrx_vdev_t *vdev,
+			      struct ol_tx_desc_t *tx_desc,
+			      struct ol_txrx_msdu_info_t *tx_msdu_info,
+			      struct ol_tx_frms_queue_t *txq)
+{
+	return txq;
+}
+#endif
+
 struct ol_tx_frms_queue_t *
 ol_tx_classify(
     struct ol_txrx_vdev_t *vdev,
@@ -355,7 +462,7 @@ ol_tx_classify(
     if ((IEEE80211_IS_MULTICAST(dest_addr))
             || (vdev->opmode == wlan_op_mode_ocb)) {
         txq = &vdev->txqs[OL_TX_VDEV_MCAST_BCAST];
-        tx_msdu_info->htt.info.ext_tid = HTT_TX_EXT_TID_NON_QOS_MCAST_BCAST;
+        tx_msdu_info->htt.info.ext_tid = HTT_TX_EXT_TID_MCAST_DATA;
         if (vdev->opmode == wlan_op_mode_sta) {
             /*
              * The STA sends a frame with a broadcast dest addr (DA) as a
@@ -408,6 +515,9 @@ ol_tx_classify(
                     vdev->mac_addr.raw[4], vdev->mac_addr.raw[5]);
                 return NULL; /* error */
             }
+
+	    txq = ol_tx_vo_mcast_classify_fixup(tx_nbuf, pdev, vdev, tx_desc,
+						tx_msdu_info, txq);
         }
         tx_msdu_info->htt.info.is_unicast = FALSE;
     } else {
@@ -604,6 +714,7 @@ ol_tx_classify_mgmt(
         tx_msdu_info->htt.info.peer_id = HTT_INVALID_PEER_ID;
         tx_msdu_info->peer = NULL;
         tx_msdu_info->htt.info.is_unicast = 0;
+	tx_msdu_info->htt.info.ext_tid = HTT_TX_EXT_TID_MCAST_MGMT;
     } else {
         /*
          * Find the peer and increment its reference count.
