@@ -4678,10 +4678,11 @@ eHalStatus sme_set_sta_chanlist_with_sub20(tHalHandle hal_ptr,
  * sme_set_cali_chanlist()- update full channel list for cali
  *
  * @hal_ptr: Hal context pointor
+ * @cali_chanlist: true means update channel list for cali
  *
  * Return: eHalStatus
  */
-eHalStatus sme_set_cali_chanlist(tHalHandle hal_ptr);
+eHalStatus sme_set_cali_chanlist(tHalHandle hal_ptr, bool cali_chanlist);
 
 eHalStatus sme_set_rssi_monitoring(tHalHandle hal,
 					struct rssi_monitor_req *input);

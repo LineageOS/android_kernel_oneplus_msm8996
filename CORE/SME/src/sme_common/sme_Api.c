@@ -18673,12 +18673,15 @@ sme_set_sta_chanlist_with_sub20(tHalHandle hal_ptr, uint8_t chan_width)
 }
 
 eHalStatus
-sme_set_cali_chanlist(tHalHandle hal_ptr)
+sme_set_cali_chanlist(tHalHandle hal_ptr, bool cali_chanlist)
 {
 	eHalStatus status = eHAL_STATUS_SUCCESS;
 	tpAniSirGlobal mac_ptr  = PMAC_STRUCT(hal_ptr);
 
-	status = csrUpdateCaliChannelList(mac_ptr);
+	if (cali_chanlist == true)
+		status = csrUpdateCaliChannelList(mac_ptr);
+	else
+		status = csrUpdateChannelList(mac_ptr);
 
 	return status;
 }

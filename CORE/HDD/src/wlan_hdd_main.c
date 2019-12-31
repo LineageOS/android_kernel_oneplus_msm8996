@@ -17915,13 +17915,14 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
                   "%s: WMI_PDEV_CHECK_CAL_VERSION_CMDID failed %d",
                   __func__, ret);
        }
-       sme_set_cali_chanlist(mac_ptr);
+       sme_set_cali_chanlist(mac_ptr, true);
        cali_rc = wait_for_completion_timeout(
 	 &mac_ptr->full_chan_cal,
-	 msecs_to_jiffies(6000));
+	 msecs_to_jiffies(8000));
        if (!cali_rc)
            hddLog(VOS_TRACE_LEVEL_ERROR,
                   "%s: cali timeout, rc %ld", __func__, cali_rc);
+       sme_set_cali_chanlist(mac_ptr, false);
    }
 
    pHddCtx->isLoadInProgress = FALSE;

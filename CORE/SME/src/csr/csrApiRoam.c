@@ -754,6 +754,13 @@ eHalStatus csrUpdateCaliChannelList(tpAniSirGlobal mac_ptr)
 
 		chanlist_ptr->chanParam[num_channel].chanId =
 			scan_ptr->baseChannels.channelList[i];
+
+		if (mac_ptr->sub20_channelwidth == SUB20_MODE_5MHZ)
+		    chanlist_ptr->chanParam[num_channel].quarter_rate =
+								 VOS_TRUE;
+		else if (mac_ptr->sub20_channelwidth == SUB20_MODE_10MHZ)
+		    chanlist_ptr->chanParam[num_channel].half_rate = VOS_TRUE;
+
 		num_channel++;
 	}
 
