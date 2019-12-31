@@ -189,6 +189,9 @@ int cali_init(struct htt_pdev_t *pdev)
 
 	adf_os_print("cali_init enter\n");
 
+	adf_os_atomic_init(&pdev->tx_cali_pending);
+	init_completion(&pdev->tx_cali_resource);
+
 	for (i = 0; i < MAX_WIFI_CHAN_CNT; i++) {
 		for (j = 0; j < CALI_FRAG_IDX_MAX; j++) {
 			pdev->chan_cali_data_array[i].cali_data_buf[j] = NULL;

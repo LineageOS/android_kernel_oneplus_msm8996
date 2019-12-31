@@ -396,6 +396,8 @@ struct htt_pdev_t {
     int rx_buff_index;
 #endif
     struct chan_cali_data chan_cali_data_array[MAX_WIFI_CHAN_CNT + 1];
+    adf_os_atomic_t tx_cali_pending;
+    struct completion tx_cali_resource;
 
     /* callback function for packetdump */
     tp_rx_pkt_dump_cb rx_pkt_dump_cb;
