@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -122,9 +122,10 @@ ol_tx_queue_vdev_flush(struct ol_txrx_pdev_t *pdev, struct ol_txrx_vdev_t *vdev)
         * into scheduler, so use same tid when we flush them
         */
         if (i == OL_TX_VDEV_MCAST_BCAST)
-            ol_tx_queue_free(pdev, txq, HTT_TX_EXT_TID_MCAST_DATA, false);
+            ol_tx_queue_free(pdev, txq, HTT_TX_EXT_TID_NON_QOS_MCAST_BCAST,
+                             false);
         else if (i == OL_TX_VDEV_DEFAULT_MGMT)
-            ol_tx_queue_free(pdev, txq, HTT_TX_EXT_TID_MCAST_MGMT, false);
+            ol_tx_queue_free(pdev, txq, HTT_TX_EXT_TID_MGMT, false);
         else if (i == OL_TX_VDEV_MCAST_VO)
             ol_tx_queue_free(pdev, txq, HTT_TX_EXT_TID_MCAST_VO, false);
         else

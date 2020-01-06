@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -462,7 +462,7 @@ ol_tx_classify(
     if ((IEEE80211_IS_MULTICAST(dest_addr))
             || (vdev->opmode == wlan_op_mode_ocb)) {
         txq = &vdev->txqs[OL_TX_VDEV_MCAST_BCAST];
-        tx_msdu_info->htt.info.ext_tid = HTT_TX_EXT_TID_MCAST_DATA;
+        tx_msdu_info->htt.info.ext_tid = HTT_TX_EXT_TID_NON_QOS_MCAST_BCAST;
         if (vdev->opmode == wlan_op_mode_sta) {
             /*
              * The STA sends a frame with a broadcast dest addr (DA) as a
@@ -714,7 +714,6 @@ ol_tx_classify_mgmt(
         tx_msdu_info->htt.info.peer_id = HTT_INVALID_PEER_ID;
         tx_msdu_info->peer = NULL;
         tx_msdu_info->htt.info.is_unicast = 0;
-	tx_msdu_info->htt.info.ext_tid = HTT_TX_EXT_TID_MCAST_MGMT;
     } else {
         /*
          * Find the peer and increment its reference count.
