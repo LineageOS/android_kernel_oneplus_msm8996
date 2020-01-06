@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -18314,7 +18314,8 @@ int wma_cli_au_get_global_info(void *wmapvosContext, int vdev_id,
 		"packet_error: %d\n"
 		"expire_error: %d\n"
 		"enqeue_count: %d\n"
-		"packet_success: %d\n",
+		"packet_success: %d\n"
+		"sched_count: %d\n",
 		au_mcast_conf->aggr_enable,
 		au_mcast_conf->tbd_enable,
 		au_mcast_conf->group_num,
@@ -18323,7 +18324,8 @@ int wma_cli_au_get_global_info(void *wmapvosContext, int vdev_id,
 		au_mcast_conf->packet_error,
 		au_mcast_conf->expire_error,
 		au_mcast_conf->enqeue_count,
-		au_mcast_conf->packet_success);
+		au_mcast_conf->packet_success,
+		au_mcast_conf->sched_count);
 
 	return length;
 }

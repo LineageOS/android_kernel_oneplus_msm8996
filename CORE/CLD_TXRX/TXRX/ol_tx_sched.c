@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016, 2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016, 2019-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -881,6 +881,7 @@ static int ol_tx_sched_wrr_adv_vo_mcast_aggr(struct ol_tx_frms_queue_t *txq,
 	ol_tx_sched_wrr_adv_vo_mcast_addtag(txq, tx_limit);
 
 	conf->packet_success += tx_limit;
+	conf->sched_count++;
 out:
 	return tx_limit;
 }

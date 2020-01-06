@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -374,6 +374,7 @@ struct ol_audio_multicast_aggr_conf
 	u_int32_t expire_error;
 	u_int32_t enqeue_count;
 	u_int32_t packet_success;
+	u_int32_t sched_count;
 };
 #endif
 
