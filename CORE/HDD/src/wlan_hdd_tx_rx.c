@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1444,6 +1444,7 @@ VOS_STATUS hdd_rx_packet_cbk(v_VOID_t *vosContext,
    pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
    while (NULL != skb) {
       skb_next = skb->next;
+      skb->next = NULL;
 
       if (((pHddStaCtx->conn_info.proxyARPService) &&
          cfg80211_is_gratuitous_arp_unsolicited_na(skb)) ||
@@ -1541,7 +1542,7 @@ VOS_STATUS hdd_rx_packet_cbk(v_VOID_t *vosContext,
        * If this is not a last packet on the chain
        * Just put packet into backlog queue, not scheduling RX sirq
        */
-      if (skb->next) {
+      if (skb_next) {
 #ifdef RX_LATENCY_OPTIMIZE
 	local_bh_disable();
 	rxstat = netif_receive_skb(skb);
