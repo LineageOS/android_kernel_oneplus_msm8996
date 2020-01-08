@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24643,8 +24643,8 @@ static int wlan_hdd_cfg80211_set_fils_config(hdd_adapter_t *adapter,
     req->fils_erp_realm_len;
     if (roam_profile->fils_con_info->key_nai_length >
             FILS_MAX_KEYNAME_NAI_LENGTH) {
-            hdd_err("Key NAI Length %d",
-                    roam_profile->fils_con_info->key_nai_length);
+            hddLog(LOGE, "Key NAI Length %d",
+                   roam_profile->fils_con_info->key_nai_length);
             return -EINVAL;
     }
     if (req->fils_erp_username_len) {
