@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -945,7 +945,8 @@ if (adf_os_unlikely(pdev->rx_ring.rx_reset)) {
                  */
                 if (ol_cfg_tx_free_at_download(pdev->ctrl_pdev) &&
                     HTT_FAIL_NOTIFY_BREAK_CHECK(status)) {
-                    adf_os_print("HTT TX COMPL for failed data frm.\n");
+                    adf_os_print("HTT TX COMPL for failed data frm: NUM %d TID %d\n",
+                                 num_msdus, HTT_TX_COMPL_IND_TID_GET(*msg_word));
                     break;
                 }
 
