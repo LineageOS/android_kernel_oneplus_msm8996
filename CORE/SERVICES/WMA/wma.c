@@ -27764,6 +27764,7 @@ static VOS_STATUS wma_wow_enter(tp_wma_handle wma,
 				tpSirHalWowlEnterParams info)
 {
 	struct wma_txrx_node *iface;
+	int i;
 
 	WMA_LOGD("wow enable req received for vdev id: %d", info->sessionId);
 
@@ -27773,9 +27774,12 @@ static VOS_STATUS wma_wow_enter(tp_wma_handle wma,
 		return VOS_STATUS_E_INVAL;
 	}
 
-	iface = &wma->interfaces[info->sessionId];
-	iface->ptrn_match_enable = info->ucPatternFilteringEnable ?
-							    TRUE : FALSE;
+	/* All interfaces must have same pattern match config */
+	for (i = 0; i < wma->max_bssid; i++) {
+		iface = &wma->interfaces[i];
+		iface->ptrn_match_enable = info->ucPatternFilteringEnable ?
+					   TRUE : FALSE;
+	}
 	wma->wow.magic_ptrn_enable = info->ucMagicPktEnable ? TRUE : FALSE;
 	wma->wow.deauth_enable = info->ucWowDeauthRcv ? TRUE : FALSE;
 	wma->wow.disassoc_enable = info->ucWowDeauthRcv ? TRUE : FALSE;
@@ -27791,6 +27795,7 @@ static VOS_STATUS wma_wow_exit(tp_wma_handle wma,
 			       tpSirHalWowlExitParams info)
 {
 	struct wma_txrx_node *iface;
+	int i;
 
 	WMA_LOGD("wow disable req received for vdev id: %d", info->sessionId);
 
@@ -27800,8 +27805,11 @@ static VOS_STATUS wma_wow_exit(tp_wma_handle wma,
 		return VOS_STATUS_E_INVAL;
 	}
 
-	iface = &wma->interfaces[info->sessionId];
-	iface->ptrn_match_enable = FALSE;
+	/* All interfaces must have same pattern match config */
+	for (i = 0; i < wma->max_bssid; i++) {
+		iface = &wma->interfaces[i];
+		iface->ptrn_match_enable = FALSE;
+	}
 	wma->wow.magic_ptrn_enable = FALSE;
 	vos_mem_free(info);
 
