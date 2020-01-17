@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -457,7 +457,7 @@ enum hdd_ts_status hdd_check_timestamp_status(
 
 	/* the deviation should be smaller than a threshold */
 	if (delta_ns > MAX_ALLOWED_DEVIATION_NS) {
-		hddLog(VOS_TRACE_LEVEL_ERROR,
+		hddLog(VOS_TRACE_LEVEL_INFO,
 		       FL("Invalid timestamps - delta: %llu ns"), delta_ns);
 		return HDD_TS_STATUS_INVALID;
 	} else {
