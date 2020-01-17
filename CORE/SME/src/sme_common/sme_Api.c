@@ -15350,11 +15350,16 @@ eHalStatus sme_ProcessChannelChangeResp(tpAniSirGlobal pMac,
     eCsrRoamResult roamResult;
     tpSwitchChannelParams pChnlParams = (tpSwitchChannelParams) pMsgBuf;
     tANI_U32 SessionId = pChnlParams->peSessionId;
+    tpPESession psessionEntry;
 
     roam_info = vos_mem_malloc(sizeof(*roam_info));
     if (!roam_info)
         return eHAL_STATUS_FAILED_ALLOC;
     vos_mem_zero(roam_info, sizeof(*roam_info));
+
+    psessionEntry = peFindSessionBySessionId(pMac, SessionId);
+    if (psessionEntry)
+	    roam_info->staId = psessionEntry->staId;
 
     roam_info->channelChangeRespEvent =
         (tSirChanChangeResponse *)vos_mem_malloc(
