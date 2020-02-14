@@ -2026,8 +2026,8 @@ static const struct soc_enum msm8996_mi2s_snd_enum[] = {
 	SOC_ENUM_SINGLE_EXT(4, sec_mi2s_tx_ch_text),
 	SOC_ENUM_SINGLE_EXT(4, tert_mi2s_rx_ch_text),
 	SOC_ENUM_SINGLE_EXT(4, tert_mi2s_tx_ch_text),
-	SOC_ENUM_SINGLE_EXT(8, quat_mi2s_rx_ch_text),
-	SOC_ENUM_SINGLE_EXT(8, quat_mi2s_tx_ch_text),
+	SOC_ENUM_SINGLE_EXT(4, quat_mi2s_rx_ch_text),
+	SOC_ENUM_SINGLE_EXT(4, quat_mi2s_tx_ch_text),
 };
 
 static int msm_slim_5_rx_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
