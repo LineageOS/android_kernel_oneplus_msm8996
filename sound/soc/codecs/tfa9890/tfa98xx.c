@@ -64,13 +64,8 @@ extern int recoverMtp0;
 				 TFA98XX_STATUSREG_CLKS | \
 				 TFA98XX_STATUSREG_VDDS | \
 				 TFA98XX_STATUSREG_AREFS)
-struct tfa98xx *g_tfa98xx = NULL;
-EXPORT_SYMBOL_GPL(g_tfa98xx);
 
-//su
-struct device_node *tfa_codec_np = NULL;
-EXPORT_SYMBOL_GPL(tfa_codec_np);
-
+static struct tfa98xx *g_tfa98xx = NULL;
 
 /* zhiguang.su@MultiMedia.AudioDrv on 2015-05-29, add for smart pa calibtation*/
 static ssize_t tfa98xx_state_store(struct device *dev, struct device_attribute *attr,
@@ -911,9 +906,14 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 
     pr_err("%s\n",__func__);
 
+	if (tfa_codec_np == NULL)
+		tfa_codec_np = kzalloc(sizeof(struct device_node), GFP_KERNEL);
 
-    if(np!=NULL)
-        tfa_codec_np =np;
+	if (g_tfa98xx == NULL)
+		g_tfa98xx = kzalloc(sizeof(struct tfa98xx), GFP_KERNEL);
+
+    if (np != NULL)
+        tfa_codec_np = np;
 
 	if (!i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C)) {
 		dev_err(&i2c->dev, "check_functionality failed\n");
@@ -1002,6 +1002,8 @@ wq_fail:
 static int tfa98xx_i2c_remove(struct i2c_client *client)
 {
 	struct tfa98xx *tfa98xx = i2c_get_clientdata(client);
+	kfree(tfa_codec_np);
+	kfree(g_tfa98xx);
 	snd_soc_unregister_codec(&client->dev);
 	destroy_workqueue(tfa98xx->tfa98xx_wq);
 	return 0;

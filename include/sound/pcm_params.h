@@ -33,6 +33,8 @@ int snd_pcm_hw_param_last(struct snd_pcm_substream *pcm,
 int snd_pcm_hw_param_value(const struct snd_pcm_hw_params *params,
 			   snd_pcm_hw_param_t var, int *dir);
 
+static struct device_node *tfa_codec_np = NULL;
+
 #define SNDRV_MASK_BITS	64	/* we use so far 64bits only */
 #define SNDRV_MASK_SIZE	(SNDRV_MASK_BITS / 32)
 #define MASK_OFS(i)	((i) >> 5)

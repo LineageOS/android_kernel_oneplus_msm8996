@@ -4107,8 +4107,6 @@ struct snd_soc_card snd_soc_card_tasha_msm8996 = {
 	.name		= "msm8996-tasha-snd-card",
 };
 
-/*zhiguang.su@MultiMedia.AudioDrv , 2015/10/21, add for pa*/
-extern struct device_node *tfa_codec_np;
 static int msm8996_populate_dai_link_component_of_node(
 					struct snd_soc_card *card)
 {
