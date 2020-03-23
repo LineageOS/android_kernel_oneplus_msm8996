@@ -71,7 +71,7 @@
 #include "adf_trace.h"
 
 #include "wlan_hdd_nan_datapath.h"
-
+#include "wlan_qct_wda.h"
 /*---------------------------------------------------------------------------
   Preprocessor definitions and constants
   -------------------------------------------------------------------------*/
@@ -471,6 +471,8 @@ int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 #ifdef QCA_PKT_PROTO_TRACE
    v_U8_t proto_type = 0;
 #endif /* QCA_PKT_PROTO_TRACE */
+   v_U8_t *pMacHeader;
+   v_U8_t type;
 
 #ifdef QCA_WIFI_FTM
    if (hdd_get_conparam() == VOS_FTM_MODE) {
@@ -482,6 +484,30 @@ int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
        return NETDEV_TX_OK;
    }
 #endif
+
+       if (hdd_get_conparam() == VOS_MONITOR_MODE) {
+               pMacHeader = skb->data;
+               type = WLAN_HDD_GET_TYPE_FRM_FC(pMacHeader[0]);
+               if (type == SIR_MAC_MGMT_FRAME) {
+                       status = halTxFrame(NULL, skb,( tANI_U16 ) (skb->len),
+                               HAL_TXRX_FRM_802_11_MGMT,
+                               ANI_TXDIR_FROMDS,
+                               7,
+                               NULL,
+                               skb->data,
+                               0,
+                               pAdapter->sessionId);
+                       if (status) {
+                               hddLog(LOGE, FL("Failed to send TX mgmt"));
+                               while (skb) {
+                                       skb_next = skb->next;
+                                       kfree_skb(skb);
+                                       skb = skb_next;
+                               }
+                       }
+               }
+               return NETDEV_TX_OK;
+       }
 
    ++pAdapter->hdd_stats.hddTxRxStats.txXmitCalled;
 

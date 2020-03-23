@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -5739,7 +5739,8 @@ VOS_STATUS wlan_hdd_get_temperature(hdd_adapter_t *adapter_ptr,
  *
  * Return: An error code or 0 on success.
  */
-static int wlan_hdd_mnt_filter_type_cmd(hdd_adapter_t *pAdapter, v_U8_t *data,
+static int wlan_hdd_mnt_filter_type_cmd(hdd_adapter_t *pAdapter,
+                                        v_U32_t *data,
                                         int data_len)
 {
     hdd_context_t *pHddCtx = NULL;
@@ -7160,33 +7161,52 @@ static int __iw_setint_getnone(struct net_device *dev,
         }
         case WE_SET_MON_FILTER:
         {
-            v_U8_t filter_type = 0;
+            v_U32_t filter_type = (v_U32_t)set_value;
 
             if (VOS_MONITOR_MODE != hdd_get_conparam()) {
                 hddLog(LOGE, "Unable to set Monitor Mode Filters");
                 hddLog(LOGE, "WLAN Device is not in Monitor mode!!");
                 return -EINVAL;
             }
-
-            if (set_value < MON_MGMT_PKT || set_value > MON_ALL_PKT) {
-                hddLog(LOGE, "Invalid Filter value recieved...");
-                hddLog(LOGE, "Valid Values to set monitor mode filter:");
-                hddLog(LOGE, "0: Filter management packets");
-                hddLog(LOGE, "1: Filter control packets");
-                hddLog(LOGE, "2: Filter data packets");
-                hddLog(LOGE, "3: Filter All packets");
-                return -EINVAL;
-            }
-            filter_type = (v_U8_t) (set_value & 0xFF);
-
-            /* filter packetin monitor mode. */
-            if (filter_type < MON_MGMT_PKT || filter_type > MON_ALL_PKT) {
-                hddLog(LOGE, "Invalid monitor mode filter type received");
-                return -EINVAL;
-            }
-
-            hddLog(LOG1, "Monitor Mode Filter type  = %d", filter_type);
-            wlan_hdd_mnt_filter_type_cmd(pAdapter, &filter_type,sizeof(v_U8_t));
+            /*
+             *filter type usage: 0-filter, 1-not filter;
+             * Bit 0 : OFFLOAD_FRAME_TYPE_MGMT
+             * Bit 1 : OFFLOAD_FRAME_TYPE_DATA
+             * Bit 2 : OFFLOAD_FRAME_TYPE_CTRL
+             * Bit 3 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_ASSOC_REQ
+             * Bit 4 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_ASSOC_RES
+             * Bit 5 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_REASSOC_REQ
+             * Bit 6 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_REASSOC_RSP
+             * Bit 7 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_PROBE_REQ
+             * Bit 8 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_PROBE_RSP
+             * Bit 9 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_BEACON
+             * Bit 10 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_ATIM
+             * Bit 11 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_DISASSOC
+             * Bit 12 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_AUTH
+             * Bit 13 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_DEAUTH
+             * Bit 14 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_ACTION
+             * Bit 15 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_BAR
+             * Bit 16 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_BA
+             * Bit 17 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_PSPOLL
+             * Bit 18 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_RTS
+             * Bit 19 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_CTS
+             * Bit 20 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_ACK
+             * Bit 21 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_CFEND
+             * Bit 22 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_CFENDCFACK
+             * Bit 23 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_TIMING_ADVERT
+             * Bit 24 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_ACTION_NOACK
+             * Bit 25 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_BRPOLL
+             * Bit 26 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_NDPA
+             * Bit 27 : OFFLOAD_FRAME_TYPE_DATA_SUBTYPE_DATA
+             * Bit 28 : OFFLOAD_FRAME_TYPE_DATA_SUBTYPE_CF_POLL
+             * Bit 29 : OFFLOAD_FRAME_TYPE_DATA_SUBTYPE_QOS
+             * Bit 30 : OFFLOAD_FRAME_TYPE_DATA_SUBTYPE_NODATA
+             * Bit 31 : OFFLOAD_FRAME_TYPE_DATA_SUBTYPE_QOS_NULL
+             */
+            hddLog(LOG1, "Monitor Mode Filter type  = %x", filter_type);
+            wlan_hdd_mnt_filter_type_cmd(pAdapter,
+                                         &filter_type,
+                                         sizeof(v_U32_t));
             break;
         }
 #ifdef FEATURE_WLAN_TDLS
