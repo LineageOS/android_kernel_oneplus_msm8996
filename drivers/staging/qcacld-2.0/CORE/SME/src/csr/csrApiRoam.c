@@ -18057,7 +18057,7 @@ eHalStatus csrGetStatistics(tpAniSirGlobal pMac, eCsrStatsRequesterType requeste
                             tANI_U8 staId, void *pContext,
                             tANI_U8 sessionId)
 {
-   tCsrStatsClientReqInfo staEntry = {0};
+   tCsrStatsClientReqInfo staEntry;
    tCsrStatsClientReqInfo *pStaEntry = NULL;
    tCsrPeStatsReqInfo *pPeStaEntry = NULL;
    tListElem *pEntry = NULL;
@@ -18066,6 +18066,8 @@ eHalStatus csrGetStatistics(tpAniSirGlobal pMac, eCsrStatsRequesterType requeste
    tANI_BOOLEAN insertInClientList = FALSE;
    VOS_STATUS vosStatus;
    WLANTL_TRANSFER_STA_TYPE *pTlStats;
+
+   memset(&staEntry, 0, sizeof(staEntry));
 
    if( csrIsAllSessionDisconnected(pMac) )
    {

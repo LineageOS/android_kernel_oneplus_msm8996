@@ -5348,7 +5348,7 @@ int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
 #endif
     v_BOOL_t band_24 = VOS_FALSE, band_5g = VOS_FALSE;
     v_BOOL_t ch_bond24 = VOS_FALSE, ch_bond5g = VOS_FALSE;
-    tSmeConfigParams smeconfig = {0};
+    tSmeConfigParams smeconfig;
     tANI_U32 chwidth = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
 #ifdef WLAN_FEATURE_11AC
     tANI_U32 vhtchanwidth;
@@ -5356,6 +5356,8 @@ int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
     eCsrPhyMode phymode = -EIO, old_phymode;
     eHddDot11Mode hdd_dot11mode = phddctx->cfg_ini->dot11Mode;
     eCsrBand curr_band = eCSR_BAND_ALL;
+
+    memset(&smeconfig, 0, sizeof(smeconfig));
 
     old_phymode = sme_GetPhyMode(hal);
 
