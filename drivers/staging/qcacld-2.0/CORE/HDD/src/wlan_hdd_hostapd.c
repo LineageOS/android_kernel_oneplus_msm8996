@@ -2766,8 +2766,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             {
                v_U16_t iesLen =  event->iesLen;
 
-               if (iesLen <= MAX_ASSOC_IND_IE_LEN )
-               {
                   struct station_info *stainfo;
                   stainfo = vos_mem_malloc(sizeof(*stainfo));
                   if (stainfo == NULL) {
@@ -2775,8 +2773,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                       return VOS_STATUS_E_NOMEM;
                   }
                   memset(stainfo, 0, sizeof(*stainfo));
-                  stainfo->assoc_req_ies =
-                     (const u8 *)&event->ies[0];
+                  stainfo->assoc_req_ies = event->ies;
                   stainfo->assoc_req_ies_len = iesLen;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0))
                   /*
@@ -2793,11 +2790,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                         (const u8 *)&event->staMac.bytes[0],
                         stainfo, GFP_KERNEL);
                   vos_mem_free(stainfo);
-               }
-               else
-               {
-                  hddLog(LOGE, FL(" Assoc Ie length is too long"));
-               }
             }
 
             pScanInfo =  &pHostapdAdapter->scan_info;
@@ -3042,6 +3034,16 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             hddLog(LOG1,"%s", maxAssocExceededEvent);
             break;
         case eSAP_STA_ASSOC_IND:
+            if (pSapEvent->sapevt.sapAssocIndication.owe_ie) {
+                hdd_send_update_owe_info_event(pHostapdAdapter,
+                       pSapEvent->sapevt.sapAssocIndication.staMac.bytes,
+                       pSapEvent->sapevt.sapAssocIndication.owe_ie,
+                       pSapEvent->sapevt.sapAssocIndication.owe_ie_len);
+                       vos_mem_free(
+                          pSapEvent->sapevt.sapAssocIndication.owe_ie);
+                       pSapEvent->sapevt.sapAssocIndication.owe_ie = NULL;
+                       pSapEvent->sapevt.sapAssocIndication.owe_ie_len = 0;
+            }
             return VOS_STATUS_SUCCESS;
 
         case eSAP_DISCONNECT_ALL_P2P_CLIENT:
@@ -3236,7 +3238,7 @@ int hdd_softap_unpackIE(
                 tHalHandle halHandle,
                 eCsrEncryptionType *pEncryptType,
                 eCsrEncryptionType *mcEncryptType,
-                eCsrAuthType *pAuthType,
+                tCsrAuthList *akm_list,
                 v_BOOL_t *pMFPCapable,
                 v_BOOL_t *pMFPRequired,
                 u_int16_t gen_ie_len,
@@ -3246,7 +3248,7 @@ int hdd_softap_unpackIE(
     tDot11fIEWPA dot11WPAIE;
 
     tANI_U8 *pRsnIe;
-    tANI_U16 RSNIeLen;
+    tANI_U16 RSNIeLen, i;
     tANI_U32 status;
 
     if (NULL == halHandle)
@@ -3291,11 +3293,11 @@ int hdd_softap_unpackIE(
                 __func__, dot11RSNIE.pwise_cipher_suite_count );
         hddLog(LOG1, FL("%s: authentication suite count: %d"),
                 __func__, dot11RSNIE.akm_suite_cnt);
-        /*Here we have followed the apple base code,
-          but probably I suspect we can do something different*/
-        //dot11RSNIE.akm_suite_cnt
-        // Just translate the FIRST one
-        *pAuthType =  hdd_TranslateRSNToCsrAuthType(dot11RSNIE.akm_suite[0]);
+        //Translate akms in akm suite
+        for (i = 0; i < dot11RSNIE.akm_suite_cnt; i++)
+            akm_list->authType[i] =
+                hdd_TranslateRSNToCsrAuthType(dot11RSNIE.akm_suite[i]);
+        akm_list->numEntries = dot11RSNIE.akm_suite_cnt;
         //dot11RSNIE.pwise_cipher_suite_count
         *pEncryptType = hdd_TranslateRSNToCsrEncryptionType(dot11RSNIE.pwise_cipher_suites[0]);
         //dot11RSNIE.gp_cipher_suite_count
@@ -3336,8 +3338,11 @@ int hdd_softap_unpackIE(
         hddLog(LOG1, FL("%s: WPA authentication suite count: %d"),
                 __func__, dot11WPAIE.auth_suite_count);
         //dot11WPAIE.auth_suite_count
-        // Just translate the FIRST one
-        *pAuthType =  hdd_TranslateWPAToCsrAuthType(dot11WPAIE.auth_suites[0]);
+        //Translate akms in akm suite
+        for (i = 0; i < dot11WPAIE.auth_suite_count; i++)
+            akm_list->authType[i] =
+                hdd_TranslateWPAToCsrAuthType(dot11WPAIE.auth_suites[i]);
+        akm_list->numEntries = dot11WPAIE.auth_suite_count;
         //dot11WPAIE.unicast_cipher_count
         *pEncryptType = hdd_TranslateWPAToCsrEncryptionType(dot11WPAIE.unicast_ciphers[0]);
         //dot11WPAIE.unicast_cipher_count
@@ -3741,7 +3746,8 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
         break;
 #endif
     case QCSAP_IOCTL_SET_PS_TDCC:
-        ret = wlan_hdd_process_tdcc_ps(pAdapter, value[1], value[2]);
+        ret = wlan_hdd_process_tdcc_ps(pAdapter, PS_TDCC_SET,
+                                       &value[1], &value[2]);
         break;
     case QCSAP_IOCTL_DUMP_DP_TRACE_LEVEL:
         hddLog(LOG1, "WE_DUMP_DP_TRACE: %d %d",
@@ -6049,6 +6055,11 @@ static __iw_get_char_setnone(struct net_device *dev,
             return hdd_wlan_get_stats(pAdapter, &(wrqu->data.length),
                                extra, WE_MAX_STR_LEN);
         }
+        case QCSAP_GET_PS_TDCC:
+        {
+            return hdd_wlan_get_ps_tdcc_info(pAdapter, &(wrqu->data.length),
+                                             extra, WE_MAX_STR_LEN);
+        }
 #ifdef AUDIO_MULTICAST_AGGR_SUPPORT
         case QCSAP_GET_ALL_GROUP_INFO:
         {
@@ -8181,10 +8192,16 @@ static const struct iw_priv_args hostapd_private_args[] = {
         0,
         "crash_inject" },
 #endif
+
     {   QCSAP_IOCTL_SET_PS_TDCC,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 	0,
 	"set_ps_tdcc" },
+
+    {   QCSAP_GET_PS_TDCC,
+        0,
+        IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
+        "get_ps_tdcc" },
 
     /* handlers for main ioctl */
     {   QCSAP_IOCTL_WOWL_CONFIG_PTRN,
@@ -8330,9 +8347,11 @@ const struct iw_handler_def hostapd_handler_def = {
    .get_wireless_stats = NULL,
 };
 
+#ifdef WLAN_FEATURE_TSF_PTP
 static const struct ethtool_ops wlan_hostapd_ethtool_ops = {
 	.get_ts_info = wlan_get_ts_info,
 };
+#endif
 
 struct net_device_ops net_ops_struct  = {
     .ndo_open = hdd_hostapd_open,
@@ -8352,11 +8371,18 @@ static int hdd_set_hostapd(hdd_adapter_t *pAdapter)
     return VOS_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_TSF_PTP
 void hdd_set_ap_ops( struct net_device *pWlanHostapdDev )
 {
 	pWlanHostapdDev->netdev_ops = &net_ops_struct;
 	pWlanHostapdDev->ethtool_ops = &wlan_hostapd_ethtool_ops;
 }
+#else
+void hdd_set_ap_ops( struct net_device *pWlanHostapdDev )
+{
+	pWlanHostapdDev->netdev_ops = &net_ops_struct;
+}
+#endif
 
 VOS_STATUS hdd_init_ap_mode(hdd_adapter_t *pAdapter, bool reinit)
 {
@@ -8429,7 +8455,7 @@ VOS_STATUS hdd_init_ap_mode(hdd_adapter_t *pAdapter, bool reinit)
 
     status = WLANSAP_Start(sapContext, device_mode,
             pAdapter->macAddressCurrent.bytes,
-            &session_id);
+            &session_id, reinit);
     if ( ! VOS_IS_STATUS_SUCCESS( status ) )
     {
           VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, ("ERROR: WLANSAP_Start failed!!"));
