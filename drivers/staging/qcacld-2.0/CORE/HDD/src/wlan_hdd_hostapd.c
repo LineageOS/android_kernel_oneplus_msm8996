@@ -4845,7 +4845,9 @@ static int __iw_softap_set_var_int_get_char(struct net_device *dev,
 			struct iw_request_info *info,
 			union iwreq_data *wrqu, char *extra)
 {
+#ifdef WLAN_DEBUG
 	int *value = (int *)extra;
+#endif
 	int ret = 0; /* success */
 	int num_args;
 	hdd_adapter_t *padapter = WLAN_HDD_GET_PRIV_PTR(dev);
