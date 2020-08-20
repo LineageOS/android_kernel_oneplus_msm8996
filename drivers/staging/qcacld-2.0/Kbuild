@@ -23,6 +23,7 @@ ifeq ($(KERNEL_BUILD),1)
 	WLAN_OPEN_SOURCE := 1
 endif
 
+ifeq ($(KERNEL_BUILD), 0)
 	# These are configurable via Kconfig for kernel-based builds
 	# Need to explicitly configure for Android-based builds
 
@@ -75,7 +76,7 @@ endif
 	# way no critical debug feature will be enabled for perf and shipment
 	# builds. Other OEMs are also protected using the TARGET_BUILD_VARIANT
 	# config.
-	ifeq ($(TARGET_BUILD_VARIANT), eng)
+	ifneq ($(TARGET_BUILD_VARIANT), user)
 		ifeq ($(CONFIG_SLUB_DEBUG_ON), y)
 			CONFIG_DPTRACE_ENABLE := y
 		else
@@ -168,6 +169,8 @@ endif
 	CONFIG_WLAN_FEATURE_DSRC := y
 	endif
 
+endif
+
 ifeq ($(CONFIG_ARCH_QCS405), y)
 	CONFIG_TXRX_PERF := y
 	CONFIG_NON_QC_PLATFORM := n
@@ -203,10 +206,10 @@ CONFIG_WLAN_FEATURE_SAE := y
 # Feature flags which are not (currently) configurable via Kconfig
 
 #Whether to build debug version
-BUILD_DEBUG_VERSION := 0
+BUILD_DEBUG_VERSION := 1
 
 #Enable this flag to build driver in diag version
-BUILD_DIAG_VERSION := 0
+BUILD_DIAG_VERSION := 1
 
 #Do we panic on bug?  default is to warn
 PANIC_ON_BUG := 1
@@ -1370,7 +1373,7 @@ CDEFINES += -DHIF_USB_TASKLET
 endif
 endif
 
-ifeq ($(TARGET_BUILD_VARIANT),eng)
+ifneq ($(TARGET_BUILD_VARIANT),user)
 CDEFINES += -DDEBUG_RX_RING_BUFFER
 ifneq ($(CONFIG_TXRX_PERF),y)
 CDEFINES += -DQCA_PKT_PROTO_TRACE
