@@ -1008,6 +1008,33 @@ typedef enum {
     WMITLV_TAG_STRUC_wmi_audio_aggr_del_group,
     WMITLV_TAG_STRUC_wmi_audio_aggr_set_group_rate,
     WMITLV_TAG_STRUC_wmi_audio_aggr_set_group_retry,
+    WMITLV_TAG_STRUC_wmi_cfr_capture_filter_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_cfr_filter_group_config,
+    WMITLV_TAG_STRUC_wmi_fd_tmpl_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_vdev_bss_max_idle_time_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_atf_ssid_grp_request_fixed_param,
+    WMITLV_TAG_STRUC_wmi_atf_group_info,
+    WMITLV_TAG_STRUC_wmi_atf_grp_wmm_ac_cfg_request_fixed_param,
+    WMITLV_TAG_STRUC_wmi_atf_group_wmm_ac_info,
+    WMITLV_TAG_STRUC_wmi_peer_atf_ext_request_fixed_param,
+    WMITLV_TAG_STRUC_wmi_peer_atf_ext_info,
+    WMITLV_TAG_STRUC_wmi_get_channel_ani_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_channel_ani_info_tlv_param,
+    WMITLV_TAG_STRUC_wmi_get_channel_ani_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_oem_data_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_peer_config_vlan_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_roam_stats_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_roam_trigger_reason_tlv_param,
+    WMITLV_TAG_STRUC_wmi_roam_scan_info_tlv_param,
+    WMITLV_TAG_STRUC_wmi_roam_scan_channel_info_tlv_param,
+    WMITLV_TAG_STRUC_wmi_roam_ap_info_tlv_param,
+    WMITLV_TAG_STRUC_wmi_roam_result_tlv_param,
+    WMITLV_TAG_STRUC_wmi_roam_neighbor_report_info_tlv_param,
+    WMITLV_TAG_STRUC_wmi_roam_neighbor_report_channel_info_tlv_param,
+    WMITLV_TAG_STRUC_wmi_set_ocl_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_audio_aggr_set_group_auto_rate,
+    WMITLV_TAG_STRUC_wmi_audio_aggr_set_group_probe,
+    WMITLV_TAG_STRUC_wmi_audio_aggr_update_sta_group_info,
 } WMITLV_TAG_ID;
 
 /*
@@ -1420,6 +1447,9 @@ typedef enum {
     OP(WMI_AUDIO_AGGR_DEL_GROUP_CMDID) \
     OP(WMI_AUDIO_AGGR_SET_GROUP_RATE_CMDID) \
     OP(WMI_AUDIO_AGGR_SET_GROUP_RETRY_CMDID) \
+    OP(WMI_AUDIO_AGGR_UPDATE_STA_GROUP_INFO_CMDID) \
+    OP(WMI_AUDIO_AGGR_SET_GROUP_AUTO_RATE_CMDID) \
+    OP(WMI_AUDIO_AGGR_SET_GROUP_PROBE_CMDID) \
     /* add new CMD_LIST elements above this line */
 
 
@@ -4111,6 +4141,18 @@ WMITLV_CREATE_PARAM_STRUC(WMI_AUDIO_AGGR_SET_GROUP_RATE_CMDID);
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_audio_aggr_set_group_retry, wmi_audio_aggr_set_group_retry_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 WMITLV_CREATE_PARAM_STRUC(WMI_AUDIO_AGGR_SET_GROUP_RETRY_CMDID);
 
+#define WMITLV_TABLE_WMI_AUDIO_AGGR_SET_GROUP_AUTO_RATE_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_audio_aggr_set_group_auto_rate, wmi_audio_aggr_set_group_auto_rate_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+WMITLV_CREATE_PARAM_STRUC(WMI_AUDIO_AGGR_SET_GROUP_AUTO_RATE_CMDID);
+
+#define WMITLV_TABLE_WMI_AUDIO_AGGR_SET_GROUP_PROBE_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_audio_aggr_set_group_probe, wmi_audio_aggr_set_group_probe_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+WMITLV_CREATE_PARAM_STRUC(WMI_AUDIO_AGGR_SET_GROUP_PROBE_CMDID);
+
+#define WMITLV_TABLE_WMI_AUDIO_AGGR_UPDATE_STA_GROUP_INFO_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_audio_aggr_update_sta_group_info,  wmi_audio_aggr_update_sta_group_info_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_FIXED_STRUC, wmi_mac_addr, group_addr, WMITLV_SIZE_VAR)
+WMITLV_CREATE_PARAM_STRUC(WMI_AUDIO_AGGR_UPDATE_STA_GROUP_INFO_CMDID);
 
 /************************** TLV definitions of WMI events *******************************/
 

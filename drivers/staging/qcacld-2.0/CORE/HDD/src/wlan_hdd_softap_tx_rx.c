@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -881,6 +881,7 @@ VOS_STATUS hdd_softap_rx_packet_cbk(v_VOID_t *vosContext,
 
    while (NULL != skb) {
       skb_next = skb->next;
+      skb->next = NULL;
       skb->dev = pAdapter->dev;
 
       cpu_index = wlan_hdd_get_cpu();
@@ -947,8 +948,14 @@ VOS_STATUS hdd_softap_rx_packet_cbk(v_VOID_t *vosContext,
        * If this is not a last packet on the chain
        * Just put packet into backlog queue, not scheduling RX sirq
        */
-      if (skb->next) {
+      if (skb_next) {
+#ifdef RX_LATENCY_OPTIMIZE
+	local_bh_disable();
+	rxstat = netif_receive_skb(skb);
+	local_bh_enable();
+#else
          rxstat = netif_rx(skb);
+#endif
       } else {
          if ((pHddCtx->cfg_ini->rx_wakelock_timeout) &&
              (PACKET_BROADCAST != skb->pkt_type) &&
@@ -960,7 +967,13 @@ VOS_STATUS hdd_softap_rx_packet_cbk(v_VOID_t *vosContext,
           * This is the last packet on the chain
           * Scheduling rx sirq
           */
+#ifdef RX_LATENCY_OPTIMIZE
+	local_bh_disable();
+	rxstat = netif_receive_skb(skb);
+	local_bh_enable();
+#else
          rxstat = netif_rx_ni(skb);
+#endif
       }
 
       if (NET_RX_SUCCESS == rxstat)

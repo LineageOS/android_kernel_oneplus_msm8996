@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -12988,7 +12988,7 @@ void sme_UpdateEnableSSR(tHalHandle hHal, tANI_BOOLEAN enableSSR)
 /*
  * SME API to stringify bonding mode. (hostapd convention)
  */
-
+#ifdef WLAN_DEBUG
 static const char* sme_CBMode2String( tANI_U32 mode)
 {
    switch (mode)
@@ -13014,6 +13014,7 @@ static const char* sme_CBMode2String( tANI_U32 mode)
          return "Unknown";
    }
 }
+#endif
 
 /*
  * SME API to adjust bonding mode to regulatory, dfs nol .. etc.
@@ -15349,10 +15350,17 @@ eHalStatus sme_ProcessChannelChangeResp(tpAniSirGlobal pMac,
     eCsrRoamResult roamResult;
     tpSwitchChannelParams pChnlParams = (tpSwitchChannelParams) pMsgBuf;
     tANI_U32 SessionId = pChnlParams->peSessionId;
+    tpPESession psessionEntry;
 
     roam_info = vos_mem_malloc(sizeof(*roam_info));
     if (!roam_info)
         return eHAL_STATUS_FAILED_ALLOC;
+    vos_mem_zero(roam_info, sizeof(*roam_info));
+
+    psessionEntry = peFindSessionBySessionId(pMac, SessionId);
+    if (psessionEntry)
+	    roam_info->staId = psessionEntry->staId;
+
     roam_info->channelChangeRespEvent =
         (tSirChanChangeResponse *)vos_mem_malloc(
                                 sizeof(tSirChanChangeResponse));
@@ -16105,25 +16113,13 @@ VOS_STATUS sme_UpdateDSCPtoUPMapping( tHalHandle hHal,
             for (i = 0; i < SME_QOS_WMM_UP_MAX; i++)
             {
                 for (j = pSession->QosMapSet.dscp_range[i][0];
-                               j <= pSession->QosMapSet.dscp_range[i][1]; j++)
-                {
-                   if ((pSession->QosMapSet.dscp_range[i][0] == 255) &&
-                                (pSession->QosMapSet.dscp_range[i][1] == 255))
-                   {
-                       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-                       "%s: User Priority %d is not used in mapping",
-                                                             __func__, i);
-                       break;
-                   }
-                   else
-                   {
-                       dscpmapping[j]= i;
-                   }
-                }
+                               j <= pSession->QosMapSet.dscp_range[i][1] &&
+                               j <= WLAN_MAX_DSCP; j++)
+                    dscpmapping[j]= i;
             }
             for (i = 0; i< pSession->QosMapSet.num_dscp_exceptions; i++)
             {
-                if (pSession->QosMapSet.dscp_exceptions[i][0] != 255)
+                if (pSession->QosMapSet.dscp_exceptions[i][0] <= WLAN_MAX_DSCP)
                 {
                     dscpmapping[pSession->QosMapSet.dscp_exceptions[i][0] ] =
                                          pSession->QosMapSet.dscp_exceptions[i][1];
@@ -18669,6 +18665,20 @@ sme_set_sta_chanlist_with_sub20(tHalHandle hal_ptr, uint8_t chan_width)
 	return status;
 }
 
+eHalStatus
+sme_set_cali_chanlist(tHalHandle hal_ptr, bool cali_chanlist)
+{
+	eHalStatus status = eHAL_STATUS_SUCCESS;
+	tpAniSirGlobal mac_ptr  = PMAC_STRUCT(hal_ptr);
+
+	if (cali_chanlist == true)
+		status = csrUpdateCaliChannelList(mac_ptr);
+	else
+		status = csrUpdateChannelList(mac_ptr);
+
+	return status;
+}
+
 /**
  * sme_enable_phy_error_logs() - Enable DFS phy error logs
  * @hal:        global hal handle
@@ -19597,6 +19607,45 @@ VOS_STATUS sme_configure_pta_coex(uint8_t coex_pta_config_enable, uint32_t coex_
 	sme_pta_config->config_type = WMI_COEX_CONFIG_PTA_CONFIG;
 	sme_pta_config->config_arg1 = coex_pta_config_enable;
 	sme_pta_config->config_arg2 = coex_pta_config_param;
+
+	msg.type = WDA_BTC_BT_WLAN_INTERVAL_CMD;
+	msg.reserved = 0;
+	msg.bodyptr = sme_pta_config;
+
+	vos_status = vos_mq_post_message(VOS_MODULE_ID_WDA,&msg);
+	if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			  FL("Not able to post message to WDA"));
+		vos_mem_free(sme_pta_config);
+		return VOS_STATUS_E_FAILURE;
+	}
+
+	return vos_status;
+}
+#endif
+
+#ifdef FEATURE_COEX_TPUT_SHAPING_CONFIG
+/**
+ * sme_configure_tput_shaping_enable() - Set coex traffic shaping enable/disable
+ * @coex_tput_shaping_enable: traffic shaping enable or not
+ *
+ * Return: Return VOS_STATUS.
+ */
+VOS_STATUS sme_configure_tput_shaping_enable(uint32_t coex_tput_shaping_enable)
+{
+	vos_msg_t msg = {0};
+	VOS_STATUS vos_status;
+	WMI_COEX_CONFIG_CMD_fixed_param *sme_pta_config;
+
+	sme_pta_config = vos_mem_malloc(sizeof(*sme_pta_config));
+	if (!sme_pta_config) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			  FL("Malloc failed"));
+		return VOS_STATUS_E_NOMEM;
+	}
+
+	sme_pta_config->config_type = WMI_COEX_CONFIG_ENABLE_TPUT_SHAPING;
+	sme_pta_config->config_arg1 = coex_tput_shaping_enable;
 
 	msg.type = WDA_BTC_BT_WLAN_INTERVAL_CMD;
 	msg.reserved = 0;
@@ -21437,4 +21486,86 @@ eHalStatus sme_set_gpio_output(tHalHandle hal,
 	}
 
 	return hal_status;
+}
+
+eHalStatus sme_spectral_scan_enable(tHalHandle hal,
+				    sir_spectral_enable_params_t *params)
+{
+	eHalStatus status = eHAL_STATUS_SUCCESS;
+	VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	vos_msg_t vos_msg;
+	sir_spectral_enable_params_t *spectral_enable_params;
+
+	spectral_enable_params = vos_mem_malloc(sizeof(*spectral_enable_params));
+	if (!spectral_enable_params) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			  FL("Failed to alloc spectral enable params"));
+		return eHAL_STATUS_FAILED_ALLOC;
+	}
+
+	*spectral_enable_params = *params;
+
+	status = sme_AcquireGlobalLock(&mac_ctx->sme);
+	if (status == eHAL_STATUS_SUCCESS) {
+		/* Serialize the req through MC thread */
+		vos_msg.bodyptr = spectral_enable_params;
+		vos_msg.type = SIR_HAL_SPECTRAL_SCAN_ENABLE_CMDID;
+		vos_status = vos_mq_post_message(VOS_MQ_ID_WDA, &vos_msg);
+
+		if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+			VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+				  FL("post spectal scan enable msg fail"));
+			status = eHAL_STATUS_FAILURE;
+			vos_mem_free(spectral_enable_params);
+		}
+		sme_ReleaseGlobalLock(&mac_ctx->sme);
+	} else {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			  FL("sme_AcquireGlobalLock failed"));
+		vos_mem_free(spectral_enable_params);
+	}
+
+	return status;
+}
+
+eHalStatus sme_spectral_scan_config(tHalHandle hal,
+				    sir_spectral_config_params_t *params)
+{
+	eHalStatus status = eHAL_STATUS_SUCCESS;
+	VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	vos_msg_t vos_msg;
+	sir_spectral_config_params_t *spectral_config_params;
+
+	spectral_config_params = vos_mem_malloc(sizeof(*spectral_config_params));
+	if (!spectral_config_params) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			  FL("Failed to alloc spectral config params"));
+		return eHAL_STATUS_FAILED_ALLOC;
+	}
+
+	*spectral_config_params = *params;
+
+	status = sme_AcquireGlobalLock(&mac_ctx->sme);
+	if (status == eHAL_STATUS_SUCCESS) {
+		/* Serialize the req through MC thread */
+		vos_msg.bodyptr = spectral_config_params;
+		vos_msg.type = SIR_HAL_SPECTRAL_SCAN_CONFIG_CMDID;
+		vos_status = vos_mq_post_message(VOS_MQ_ID_WDA, &vos_msg);
+
+		if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+			VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+				  FL("post spectal scan config msg fail"));
+			status = eHAL_STATUS_FAILURE;
+			vos_mem_free(spectral_config_params);
+		}
+		sme_ReleaseGlobalLock(&mac_ctx->sme);
+	} else {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			  FL("sme_AcquireGlobalLock failed"));
+		vos_mem_free(spectral_config_params);
+	}
+
+	return status;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -48,6 +48,9 @@
 #include "ol_htt_rx_api.h"
 #include "wlan_qct_tl.h"
 #include <ol_txrx_ctrl_api.h>
+#if defined(AUDIO_MULTICAST_AGGR_SUPPORT)
+#include "halMsgApi.h"
+#endif
 /*
  * The target may allocate multiple IDs for a peer.
  * In particular, the target may allocate one ID to represent the
@@ -59,9 +62,9 @@
 #define OL_TXRX_MAC_ADDR_LEN 6
 
 /* OL_TXRX_NUM_EXT_TIDS -
- * 16 "real" TIDs + 3 pseudo-TIDs for mgmt, mcast/bcast & non-QoS data
+ * 16 "real" TIDs + 3 pseudo-TIDs for mgmt, mcast/bcast, non-QoS data & mcast vo
  */
-#define OL_TXRX_NUM_EXT_TIDS 19
+#define OL_TXRX_NUM_EXT_TIDS 20
 
 #define OL_TX_NUM_QOS_TIDS 16 /* 16 regular TIDs */
 #define OL_TX_NON_QOS_TID 16
@@ -72,7 +75,8 @@
 
 #define OL_TX_VDEV_MCAST_BCAST    0 // HTT_TX_EXT_TID_MCAST_BCAST
 #define OL_TX_VDEV_DEFAULT_MGMT   1 // HTT_TX_EXT_TID_DEFALT_MGMT
-#define OL_TX_VDEV_NUM_QUEUES     2
+#define OL_TX_VDEV_MCAST_VO	  2
+#define OL_TX_VDEV_NUM_QUEUES     3
 
 #define OL_TXRX_MGMT_TYPE_BASE htt_pkt_num_types
 #define OL_TXRX_MGMT_NUM_TYPES 8
@@ -205,6 +209,13 @@ struct ol_tx_desc_t {
 	void *txq;
 	uint8_t rtap[MAX_RADIOTAP_LEN];
 	uint8_t rtap_len;
+#if defined(AUDIO_MULTICAST_AGGR_SUPPORT)
+	u_int8_t seqno;
+	u_int8_t total_num;
+	u_int8_t group_id;
+	u_int64_t tsf;
+	u_int32_t tag_offset;
+#endif
 };
 
 typedef TAILQ_HEAD(, ol_tx_desc_t) ol_tx_desc_list;
@@ -251,6 +262,7 @@ enum {
     OL_TX_SCHED_WRR_ADV_CAT_UCAST_MGMT,
     OL_TX_SCHED_WRR_ADV_CAT_MCAST_DATA,
     OL_TX_SCHED_WRR_ADV_CAT_MCAST_MGMT,
+    OL_TX_SCHED_WRR_ADV_CAT_MCAST_VO,
 
     OL_TX_SCHED_WRR_ADV_NUM_CATEGORIES /* must be last */
 };
@@ -266,7 +278,8 @@ A_COMPILE_TIME_ASSERT(ol_tx_sched_htt_ac_values,
     ((int)OL_TX_SCHED_WRR_ADV_CAT_NON_QOS_DATA == (int)HTT_AC_EXT_NON_QOS) &&
     ((int)OL_TX_SCHED_WRR_ADV_CAT_UCAST_MGMT == (int)HTT_AC_EXT_UCAST_MGMT) &&
     ((int)OL_TX_SCHED_WRR_ADV_CAT_MCAST_DATA == (int)HTT_AC_EXT_MCAST_DATA) &&
-    ((int)OL_TX_SCHED_WRR_ADV_CAT_MCAST_MGMT == (int)HTT_AC_EXT_MCAST_MGMT));
+    ((int)OL_TX_SCHED_WRR_ADV_CAT_MCAST_MGMT == (int)HTT_AC_EXT_MCAST_MGMT) &&
+    ((int)OL_TX_SCHED_WRR_ADV_CAT_MCAST_VO == (int)HTT_AC_EXT_MCAST_VO));
 
 struct ol_tx_reorder_cat_timeout_t {
 	TAILQ_HEAD(, ol_rx_reorder_timeout_list_elem_t) virtual_timer_list;
@@ -312,6 +325,59 @@ enum {
 #define OL_TXQ_GROUP_MEMBERSHIP_GET(_vdev_mask, _ac_mask)     \
 			((_vdev_mask << 16) | _ac_mask)
 
+#if defined(AUDIO_MULTICAST_AGGR_SUPPORT)
+struct ol_audio_multicast_rate
+{
+    uint32_t mcs;
+    uint32_t bandwidth;
+};
+
+struct ol_audio_multicast_auto_rate
+{
+    uint32_t bandwidth;
+    uint32_t mcs_min;
+    uint32_t mcs_max;
+    uint32_t mcs_offset;
+    uint32_t nss;
+};
+
+#define OL_TX_VO_MCAST_GROUP_EXP_TIME	1000	/* ms */
+#define OL_TX_VO_MCAST_TAG_SIZE		1
+
+struct ol_audio_multicast_group
+{
+	u_int8_t group_id; // start from MIN_GROUP_ID for user and fw
+	u_int8_t group_index; // start from 0 for internal host usage
+	u_int8_t in_use;
+	u_int32_t client_num;
+	u_int32_t retry_limit;
+	u_int32_t num_rate_set;
+	u_int32_t interval;
+	struct ol_audio_multicast_rate rate_set[MAX_NUM_RATE_SET];
+	struct ol_audio_multicast_auto_rate auto_rate_set;
+	htt_mac_addr multicast_addr;
+	htt_mac_addr client_addr[MAX_CLIENT_NUM];
+	u_int8_t macaddr[IEEE80211_ADDR_LEN];
+};
+
+struct ol_audio_multicast_aggr_conf
+{
+	u_int32_t aggr_enable;
+	u_int32_t tbd_enable;
+	u_int8_t group_num;
+	u_int8_t total_client_num;
+	adf_os_spinlock_t lock;
+	struct ol_audio_multicast_group multicast_group[MAX_GROUP_NUM];
+	u_int64_t tsf;
+	u_int32_t seqno_error;
+	u_int32_t packet_error;
+	u_int32_t expire_error;
+	u_int32_t enqeue_count;
+	u_int32_t packet_success;
+	u_int32_t sched_count;
+};
+#endif
+
 struct ol_tx_frms_queue_t {
 	/* list_elem -
 	 * Allow individual tx frame queues to be linked together into
@@ -333,6 +399,7 @@ struct ol_tx_frms_queue_t {
 #if defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL)
 	struct ol_txrx_peer_t *peer;
 #endif
+	u_int64_t last_enq_time;
 };
 
 enum {
@@ -1005,6 +1072,9 @@ struct ol_txrx_vdev_t {
 #if defined(CONFIG_HL_SUPPORT)
 	struct ol_tx_frms_queue_t txqs[OL_TX_VDEV_NUM_QUEUES];
 	u_int32_t hl_paused_reason;
+#if defined(AUDIO_MULTICAST_AGGR_SUPPORT)
+	struct ol_audio_multicast_aggr_conf au_mcast_conf;
+#endif
 #endif
 
 	struct {

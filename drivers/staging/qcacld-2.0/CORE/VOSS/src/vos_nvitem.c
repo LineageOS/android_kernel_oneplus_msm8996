@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -399,6 +399,7 @@ const tRfChannelProps rfChannels[NUM_RF_CHANNELS] =
     { 5825, 165, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_165,
     { 5845, 169, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_169,
 
+#ifdef WLAN_FEATURE_DSRC
     /* 5.9GHz 10 MHz bandwidth (802.11p) */
     { 5852, 170, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_170,
     { 5855, 171, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_171,
@@ -415,7 +416,9 @@ const tRfChannelProps rfChannels[NUM_RF_CHANNELS] =
     { 5910, 182, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_182,
     { 5915, 183, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_183,
     { 5920, 184, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_184,
-
+#else
+    { 5865, 173, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_173,
+#endif
     { 2422, 3  , NUM_RF_SUBBANDS},           //RF_CHAN_BOND_3,
     { 2427, 4  , NUM_RF_SUBBANDS},           //RF_CHAN_BOND_4,
     { 2432, 5  , NUM_RF_SUBBANDS},           //RF_CHAN_BOND_5,
@@ -1626,12 +1629,17 @@ bool vos_is_dsrc_channel(uint16_t center_freq)
 {
     switch (center_freq) {
     case 5852:
+    case 5855:
     case 5860:
+    case 5865:
     case 5870:
     case 5880:
+    case 5885:
     case 5890:
+    case 5895:
     case 5900:
     case 5910:
+    case 5915:
     case 5920:
     case 5875:
     case 5905:

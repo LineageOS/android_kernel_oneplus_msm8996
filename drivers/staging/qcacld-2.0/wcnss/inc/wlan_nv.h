@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2016, 2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012, 2016, 2018, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -278,6 +278,7 @@ typedef enum
     RF_CHAN_165,
     RF_CHAN_169,
 
+#ifdef WLAN_FEATURE_DSRC
     // 802.11p
     RF_CHAN_170,
     RF_CHAN_171,
@@ -294,6 +295,10 @@ typedef enum
     RF_CHAN_182,
     RF_CHAN_183,
     RF_CHAN_184,
+#else
+    RF_CHAN_173,
+    RF_CHAN_184 = RF_CHAN_173,
+#endif
 
     //CHANNEL BONDED CHANNELS
     RF_CHAN_BOND_3,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -325,7 +325,7 @@ static enum hdd_tsf_op_result hdd_indicate_tsf_internal(
 #define OVERFLOW_INDICATOR32 (((int64_t)0x1) << 32)
 #define MAX_UINT64 ((uint64_t)0xffffffffffffffff)
 #define MASK_UINT32 0xffffffff
-#define CAP_TSF_TIMER_FIX_SEC 1
+#define CAP_TSF_TIMER_FIX_SEC 7
 #if defined(CONFIG_NON_QC_PLATFORM)
 #define WLAN_HDD_CAPTURE_TSF_RESYNC_INTERVAL 1
 #else
@@ -457,7 +457,7 @@ enum hdd_ts_status hdd_check_timestamp_status(
 
 	/* the deviation should be smaller than a threshold */
 	if (delta_ns > MAX_ALLOWED_DEVIATION_NS) {
-		hddLog(VOS_TRACE_LEVEL_ERROR,
+		hddLog(VOS_TRACE_LEVEL_INFO,
 		       FL("Invalid timestamps - delta: %llu ns"), delta_ns);
 		return HDD_TS_STATUS_INVALID;
 	} else {
@@ -962,7 +962,7 @@ static ssize_t hdd_wlan_tsf_show(struct device *dev,
 	return ret;
 }
 
-static DEVICE_ATTR(tsf, 0400, hdd_wlan_tsf_show, NULL);
+static DEVICE_ATTR(tsf, 0444, hdd_wlan_tsf_show, NULL);
 
 static void hdd_capture_tsf_timer_expired_handler(void *arg)
 {
@@ -1320,7 +1320,7 @@ int hdd_tx_timestamp(int32_t status, adf_nbuf_t netbuf, uint64_t target_time)
 		memset(serr, 0, sizeof(*serr));
 		switch (status) {
 		case htt_tx_status_ok:
-			serr->ee.ee_errno = ENOMSG;
+			serr->ee.ee_errno = 0;
 			break;
 		case htt_tx_status_discard:
 			serr->ee.ee_errno = ENOBUFS;
@@ -1839,7 +1839,7 @@ static int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 	hdd_adapter_t *adapter;
 	hdd_adapter_t *p2p_device;
 	int status;
-	uint64_t reg_qtime, qtime;
+
 	VOS_TIMER_STATE capture_req_timer_status;
 	if (pcb_cxt == NULL || ptsf == NULL) {
 		hddLog(VOS_TRACE_LEVEL_ERROR,
@@ -1909,10 +1909,6 @@ static int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 
 	adapter->cur_target_time = ((uint64_t)ptsf->tsf_high << 32 |
 			 ptsf->tsf_low);
-
-	GET_CURRENT_QTIME;
-
-	SET_CURRENT_QTIME;
 
 	hdd_update_tsf(adapter, adapter->cur_target_time);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -717,7 +717,7 @@ int hdd_priv_get_data(struct iw_point *p_priv_data,
    return 0;
 }
 
-#define WLAN_HDD_MAX_BW_VALUE	5
+#define WLAN_HDD_MAX_BW_VALUE	6
 
 /**
  * wlan_hdd_validate_mon_channel() - check channel number is valid or not
@@ -759,7 +759,7 @@ VOS_STATUS wlan_hdd_validate_mon_bw(int ch, int bw)
             /* Check if bandwidth from user is valid in 2.4GHz */
             if ((ch >= rfChannels[RF_CHAN_1].channelNum) &&
                 (ch <= rfChannels[RF_CHAN_14].channelNum)) {
-                if (bw > 1) {
+                if ((bw != 5 && bw != 6) && bw > 1) {/* 5M bw == 5; 10M bw == 6 */
                    hddLog(VOS_TRACE_LEVEL_ERROR,
                        "Invalid bw %d for 2.4GHz Chan [%d]",bw,ch);
                    return VOS_STATUS_E_INVAL;
@@ -5348,7 +5348,7 @@ int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
 #endif
     v_BOOL_t band_24 = VOS_FALSE, band_5g = VOS_FALSE;
     v_BOOL_t ch_bond24 = VOS_FALSE, ch_bond5g = VOS_FALSE;
-    tSmeConfigParams smeconfig = {0};
+    tSmeConfigParams smeconfig = {{0}};
     tANI_U32 chwidth = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
 #ifdef WLAN_FEATURE_11AC
     tANI_U32 vhtchanwidth;
@@ -5739,7 +5739,8 @@ VOS_STATUS wlan_hdd_get_temperature(hdd_adapter_t *adapter_ptr,
  *
  * Return: An error code or 0 on success.
  */
-static int wlan_hdd_mnt_filter_type_cmd(hdd_adapter_t *pAdapter, v_U8_t *data,
+static int wlan_hdd_mnt_filter_type_cmd(hdd_adapter_t *pAdapter,
+                                        v_U32_t *data,
                                         int data_len)
 {
     hdd_context_t *pHddCtx = NULL;
@@ -7160,33 +7161,52 @@ static int __iw_setint_getnone(struct net_device *dev,
         }
         case WE_SET_MON_FILTER:
         {
-            v_U8_t filter_type = 0;
+            v_U32_t filter_type = (v_U32_t)set_value;
 
             if (VOS_MONITOR_MODE != hdd_get_conparam()) {
                 hddLog(LOGE, "Unable to set Monitor Mode Filters");
                 hddLog(LOGE, "WLAN Device is not in Monitor mode!!");
                 return -EINVAL;
             }
-
-            if (set_value < MON_MGMT_PKT || set_value > MON_ALL_PKT) {
-                hddLog(LOGE, "Invalid Filter value recieved...");
-                hddLog(LOGE, "Valid Values to set monitor mode filter:");
-                hddLog(LOGE, "0: Filter management packets");
-                hddLog(LOGE, "1: Filter control packets");
-                hddLog(LOGE, "2: Filter data packets");
-                hddLog(LOGE, "3: Filter All packets");
-                return -EINVAL;
-            }
-            filter_type = (v_U8_t) (set_value & 0xFF);
-
-            /* filter packetin monitor mode. */
-            if (filter_type < MON_MGMT_PKT || filter_type > MON_ALL_PKT) {
-                hddLog(LOGE, "Invalid monitor mode filter type received");
-                return -EINVAL;
-            }
-
-            hddLog(LOG1, "Monitor Mode Filter type  = %d", filter_type);
-            wlan_hdd_mnt_filter_type_cmd(pAdapter, &filter_type,sizeof(v_U8_t));
+            /*
+             *filter type usage: 0-filter, 1-not filter;
+             * Bit 0 : OFFLOAD_FRAME_TYPE_MGMT
+             * Bit 1 : OFFLOAD_FRAME_TYPE_DATA
+             * Bit 2 : OFFLOAD_FRAME_TYPE_CTRL
+             * Bit 3 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_ASSOC_REQ
+             * Bit 4 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_ASSOC_RES
+             * Bit 5 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_REASSOC_REQ
+             * Bit 6 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_REASSOC_RSP
+             * Bit 7 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_PROBE_REQ
+             * Bit 8 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_PROBE_RSP
+             * Bit 9 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_BEACON
+             * Bit 10 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_ATIM
+             * Bit 11 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_DISASSOC
+             * Bit 12 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_AUTH
+             * Bit 13 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_DEAUTH
+             * Bit 14 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_ACTION
+             * Bit 15 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_BAR
+             * Bit 16 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_BA
+             * Bit 17 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_PSPOLL
+             * Bit 18 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_RTS
+             * Bit 19 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_CTS
+             * Bit 20 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_ACK
+             * Bit 21 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_CFEND
+             * Bit 22 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_CFENDCFACK
+             * Bit 23 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_TIMING_ADVERT
+             * Bit 24 : OFFLOAD_FRAME_TYPE_MGMT_SUBTYPE_ACTION_NOACK
+             * Bit 25 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_BRPOLL
+             * Bit 26 : OFFLOAD_FRAME_TYPE_CTRL_SUBTYPE_NDPA
+             * Bit 27 : OFFLOAD_FRAME_TYPE_DATA_SUBTYPE_DATA
+             * Bit 28 : OFFLOAD_FRAME_TYPE_DATA_SUBTYPE_CF_POLL
+             * Bit 29 : OFFLOAD_FRAME_TYPE_DATA_SUBTYPE_QOS
+             * Bit 30 : OFFLOAD_FRAME_TYPE_DATA_SUBTYPE_NODATA
+             * Bit 31 : OFFLOAD_FRAME_TYPE_DATA_SUBTYPE_QOS_NULL
+             */
+            hddLog(LOG1, "Monitor Mode Filter type  = %x", filter_type);
+            wlan_hdd_mnt_filter_type_cmd(pAdapter,
+                                         &filter_type,
+                                         sizeof(v_U32_t));
             break;
         }
 #ifdef FEATURE_WLAN_TDLS
@@ -7519,6 +7539,8 @@ static int __iw_setnone_getint(struct net_device *dev,
        hddLog(LOGE, FL("session id is not valid %d"), pAdapter->sessionId);
        return -EINVAL;
     }
+
+    vos_mem_zero(&smeConfig, sizeof(smeConfig));
 
     switch (value[0])
     {
@@ -8812,17 +8834,10 @@ void hdd_wmm_tx_snapshot(hdd_adapter_t *pAdapter)
 static int wlan_hdd_set_multicast_rate(hdd_adapter_t *pAdapter,
 				int * args)
 {
-	struct audio_multicast_aggr *pMultiAggr = &pAdapter->multicast_aggr;
-	struct audio_multicast_group *pMultiGroup;
-	struct audio_multicast_group *pMultiGroup2;
+	struct audio_multicast_set_rate *pMultiGroup;
 	int i = 0;
 	int group_id,num_rate_set;
 	vos_msg_t msg;
-
-	if (pMultiAggr->aggr_enable != 1) {
-		hddLog(LOGW, FL("multicast aggr not enabled"));
-		return -EINVAL;
-	}
 
 	num_rate_set = args[1];
 	if (num_rate_set <= 0 || num_rate_set > MAX_NUM_RATE_SET) {
@@ -8831,25 +8846,25 @@ static int wlan_hdd_set_multicast_rate(hdd_adapter_t *pAdapter,
 	}
 
 	group_id = args[0];
-	if (group_id < 0 || group_id >= MAX_GROUP_NUM) {
+	if (group_id < MIN_GROUP_ID || group_id >= MAX_GROUP_ID) {
 		hddLog(LOGW, FL("Invalid group id %d"), group_id);
 		return -EINVAL;
 	}
-	pMultiGroup2 = &pMultiAggr->multicast_group[group_id];
 
-	pMultiGroup = vos_mem_malloc(sizeof(struct audio_multicast_group));
+	pMultiGroup = vos_mem_malloc(sizeof(struct audio_multicast_set_rate));
 	if (NULL == pMultiGroup) {
 		hddLog(LOGE,
 		FL("vos_mem_alloc failed for pMultiRate"));
 		return -ENOMEM;
 	}
-	adf_os_mem_zero(pMultiGroup, sizeof(struct audio_multicast_group));
+	adf_os_mem_zero(pMultiGroup, sizeof(struct audio_multicast_set_rate));
 
+	pMultiGroup->param_vdev_id = pAdapter->sessionId;
 	pMultiGroup->group_id = group_id;
 	pMultiGroup->num_rate_set= num_rate_set;
 	for (i = 0; i < num_rate_set; i++) {
 		pMultiGroup->rate_set[i].mcs = args[2+2*i];
-		pMultiGroup->rate_set[i].bandwith = args[3+2*i];
+		pMultiGroup->rate_set[i].bandwidth = args[3+2*i];
 	}
 
 	msg.type = WDA_SET_MULTICAST_RATE;
@@ -8862,13 +8877,6 @@ static int wlan_hdd_set_multicast_rate(hdd_adapter_t *pAdapter,
 			FL("Not able to post Set Multicast group Rate message to WDA"));
 		return -EINVAL;
 	}
-	pMultiGroup2->num_rate_set = pMultiGroup->num_rate_set;
-	for (i = 0; i < pMultiGroup2->num_rate_set; i++) {
-		pMultiGroup2->rate_set[i].mcs = pMultiGroup->rate_set[i].mcs;
-		pMultiGroup2->rate_set[i].bandwith = pMultiGroup->rate_set[i].bandwith;
-	}
-	VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-		FL("set Multicast Rate group%d num_rate_set%d"), group_id, num_rate_set);
 
 	return VOS_STATUS_SUCCESS;
 }
@@ -8878,10 +8886,8 @@ wlan_hdd_set_multicast_retry_limit(hdd_adapter_t *adapter,
 			int group_id,int retry_limit)
 {
 	int ret;
-	struct audio_multicast_aggr *pMultiAggr = &adapter->multicast_aggr;
-	struct audio_multicast_group *pMultiGroup;
 
-	if (group_id < 0 || group_id >= MAX_GROUP_NUM) {
+	if (group_id < MIN_GROUP_ID || group_id >= MAX_GROUP_ID) {
 		hddLog(LOGW, FL("Invalid group id %d"), group_id);
 		return -EINVAL;
 	}
@@ -8894,10 +8900,6 @@ wlan_hdd_set_multicast_retry_limit(hdd_adapter_t *adapter,
 					       (int)GEN_PARAM_MULTICAST_RETRY_LIMIT,
 					       group_id, retry_limit, GEN_CMD);
 
-	if (!ret) {
-		pMultiGroup = &pMultiAggr->multicast_group[group_id];
-		pMultiGroup->retry_limit = retry_limit;
-	}
 	return ret;
 }
 
@@ -8906,7 +8908,6 @@ wlan_hdd_multicast_aggr_enable(hdd_adapter_t *adapter,
 						int aggr_enable, int tbd_enable)
 {
 	int ret;
-	struct audio_multicast_aggr *pMultiAggr = &adapter->multicast_aggr;
 
 	if (aggr_enable != 0 && aggr_enable != 1) {
 		hddLog(LOGW, FL("Invalid input %d"), aggr_enable);
@@ -8921,13 +8922,107 @@ wlan_hdd_multicast_aggr_enable(hdd_adapter_t *adapter,
 						   (int)GEN_PARAM_MULTICAST_AGGR_ENABLED,
 						   aggr_enable, tbd_enable, GEN_CMD);
 
-	if (!ret) {
-		pMultiAggr->aggr_enable = aggr_enable;
-		pMultiAggr->tbd_enable = tbd_enable;
-	}
 	return ret;
 }
 
+static int wlan_hdd_set_multicast_auto_rate(hdd_adapter_t *pAdapter,
+				int * args)
+{
+	struct audio_multicast_set_auto_rate *pMultiGroup;
+	int group_id;
+	vos_msg_t msg;
+
+	group_id = args[0];
+	if (group_id < MIN_GROUP_ID || group_id >= MAX_GROUP_ID) {
+		hddLog(LOGW, FL("Invalid group id %d"), group_id);
+		return -EINVAL;
+	}
+
+	pMultiGroup = vos_mem_malloc(sizeof(struct audio_multicast_set_auto_rate));
+	if (NULL == pMultiGroup) {
+		hddLog(LOGE, FL("vos_mem_alloc failed for pMultiRate"));
+		return -ENOMEM;
+	}
+	adf_os_mem_zero(pMultiGroup, sizeof(struct audio_multicast_set_auto_rate));
+
+	pMultiGroup->param_vdev_id = pAdapter->sessionId;
+	pMultiGroup->group_id = group_id;
+	pMultiGroup->bandwidth = args[1];
+	pMultiGroup->nss = args[2];
+	pMultiGroup->mcs_min = args[3];
+	pMultiGroup->mcs_max = args[4];
+	pMultiGroup->mcs_offset = args[5];
+
+	msg.type = WDA_SET_MULTICAST_AUTO_RATE;
+	msg.reserved = 0;
+	msg.bodyptr = pMultiGroup;
+	if (VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MODULE_ID_WDA,
+						&msg)) {
+		vos_mem_free(pMultiGroup);
+		VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+			FL("Not able to post Set Multicast group Rate message to WDA"));
+		return -EINVAL;
+	}
+
+	return VOS_STATUS_SUCCESS;
+}
+
+int
+wlan_hdd_set_multicast_probe(hdd_adapter_t *adapter,
+			int group_id,int interval)
+{
+	int ret;
+
+	if (interval < 0 || interval > MAX_PERIOD_LIMIT) {
+		hddLog(LOGW, FL("Invalid Interval %d"), interval);
+		return -EINVAL;
+	}
+
+	ret = process_wma_set_command_twoargs((int)adapter->sessionId,
+					       (int)GEN_PARAM_MULTICAST_SET_PROBE,
+					       group_id, interval, GEN_CMD);
+
+	return ret;
+}
+
+static int wlan_hdd_set_multicast_sta(hdd_adapter_t *pAdapter,
+				int * args, int group_num)
+{
+	struct audio_multicast_set_sta *pMultiGroup;
+	int i;
+	vos_msg_t msg;
+
+	pMultiGroup = vos_mem_malloc(sizeof(struct audio_multicast_set_sta));
+	if (NULL == pMultiGroup) {
+		hddLog(LOGE, FL("vos_mem_alloc failed for pMultiGroup"));
+		return -ENOMEM;
+	}
+	adf_os_mem_zero(pMultiGroup, sizeof(struct audio_multicast_set_sta));
+
+	pMultiGroup->param_vdev_id = pAdapter->sessionId;
+	pMultiGroup->group_num = group_num;
+	pMultiGroup->bitmap = args[0];
+
+	if (group_num > 0) {
+		for (i = 0; i < group_num; i++) {
+			pMultiGroup->group_addr[i].mac_addr31to0 = args[i*2+1];
+			pMultiGroup->group_addr[i].mac_addr47to32 = args[i*2+2];
+		}
+	}
+
+	msg.type = WDA_SET_MULTICAST_STA;
+	msg.reserved = 0;
+	msg.bodyptr = pMultiGroup;
+	if (VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MODULE_ID_WDA,
+						&msg)) {
+		vos_mem_free(pMultiGroup);
+		VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+			FL("Not able to post Set Multicast group Rate message to WDA"));
+		return -EINVAL;
+	}
+
+	return VOS_STATUS_SUCCESS;
+}
 #endif
 
 static int __iw_set_var_ints_getnone(struct net_device *dev,
@@ -9346,16 +9441,39 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
             break;
 #ifdef AUDIO_MULTICAST_AGGR_SUPPORT
         case WE_AUDIO_AGGR_SET_GROUP_RATE:
-        {
+            {
                 if (num_args != (2 + 2*apps_args[1])) {
-                        hddLog(LOGE, FL("au_set_rate: Invalid arguments"));
-                        return -EINVAL;
+                    hddLog(LOGE, FL("au_set_rate: Invalid arguments"));
+                    return -EINVAL;
                 }
                 ret = wlan_hdd_set_multicast_rate(pAdapter, apps_args);
                 if (ret != eHAL_STATUS_SUCCESS)
-                return -EINVAL;
-        }
-        break;
+                    return -EINVAL;
+            }
+            break;
+        case WE_AUDIO_AGGR_SET_AUTO_RATE:
+            {
+                if (num_args != 6) {
+                    hddLog(LOGE, FL("au_set_auto: Invalid arguments"));
+                    return -EINVAL;
+                }
+                ret = wlan_hdd_set_multicast_auto_rate(pAdapter, apps_args);
+                if (ret != eHAL_STATUS_SUCCESS)
+                    return -EINVAL;
+            }
+            break;
+        case WE_AUDIO_AGGR_SET_STA:
+            {
+                if ((num_args < 1) || (num_args > (MAX_GROUP_NUM*2 + 1))
+                    || ((num_args & 0x1) == 0)) {
+                        hddLog(LOGE, FL("au_set_sta: Invalid arguments"));
+                        return -EINVAL;
+                }
+                ret = wlan_hdd_set_multicast_sta(pAdapter, apps_args, (num_args-1)/2);
+                if (ret != eHAL_STATUS_SUCCESS)
+                        return -EINVAL;
+            }
+            break;
 #endif
         default:
             {
@@ -11759,10 +11877,10 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
             }
             vos_mem_zero(roam_profile, sizeof(*roam_profile));
 
-            if (vht_channel_width == 4) {
+            if (vht_channel_width == 5) {
                 vht_channel_width = 0;
                 roam_profile->sub20_channelwidth = SUB20_MODE_5MHZ;
-            } else if (vht_channel_width == 5) {
+            } else if (vht_channel_width == 6) {
                 vht_channel_width = 0;
                 roam_profile->sub20_channelwidth = SUB20_MODE_10MHZ;
             } else {
@@ -13103,6 +13221,11 @@ static const struct iw_priv_args we_private_args[] = {
     {   WE_SET_HPCS_PULSE_PARAMS_CONFIG,
         IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
         0, "setHpcsParams" },
+#ifdef AUDIO_MULTICAST_AGGR_SUPPORT
+    {   WE_AUDIO_AGGR_SET_STA,
+        IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+        0, "au_set_sta" },
+#endif
 };
 
 

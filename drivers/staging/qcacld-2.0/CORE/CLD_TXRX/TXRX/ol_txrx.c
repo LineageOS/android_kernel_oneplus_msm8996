@@ -844,6 +844,8 @@ ol_txrx_pdev_attach(
         OL_TX_SCHED_WRR_ADV_CAT_MCAST_DATA;
     pdev->tid_to_ac[OL_TX_NUM_TIDS + OL_TX_VDEV_DEFAULT_MGMT] =
         OL_TX_SCHED_WRR_ADV_CAT_MCAST_MGMT;
+    pdev->tid_to_ac[OL_TX_NUM_TIDS + OL_TX_VDEV_MCAST_VO] =
+        OL_TX_SCHED_WRR_ADV_CAT_MCAST_VO;
     return pdev; /* success */
 
 pn_trace_attach_fail:
@@ -943,6 +945,9 @@ ol_txrx_pdev_detach(ol_txrx_pdev_handle pdev, int force)
     adf_os_spinlock_destroy(&pdev->req_list_spinlock);
 
     OL_RX_REORDER_TIMEOUT_CLEANUP(pdev);
+
+    if (vos_is_fast_chswitch_cali_enabled())
+        cali_deinit(pdev->htt_pdev);
 
     ol_per_pkt_tx_stats_enable(0);
 
@@ -1237,6 +1242,10 @@ ol_txrx_vdev_attach(
             OL_TX_TXQ_SET_GROUP_PTR(&vdev->txqs[i], NULL);
             ol_txrx_set_txq_peer(&vdev->txqs[i], NULL);
         }
+
+#if defined(AUDIO_MULTICAST_AGGR_SUPPORT)
+	adf_os_spinlock_init(&vdev->au_mcast_conf.lock);
+#endif
     }
     #endif /* defined(CONFIG_HL_SUPPORT) */
 
