@@ -162,6 +162,8 @@
 		39 01 00 00 00 00 03 F0 5A 5A
 		39 01 00 00 00 00 02 57 40
 		39 01 00 00 00 00 03 F0 A5 A5];
+	qcom,mdss-dsi-lp11-init;
+	qcom,mdss-dsi-init-delay-us = <10000>;
 };
 
 &dsi_samsung_s6e3fa5_1080p_cmd {
@@ -212,4 +214,6 @@
 		39 01 00 00 00 00 02 B0 18
 		39 01 00 00 00 00 02 C3 00
 		39 01 00 00 00 00 03 F0 A5 A5];
+	qcom,mdss-dsi-lp11-init;
+	qcom,mdss-dsi-init-delay-us = <10000>;
 };
