@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -53,8 +53,6 @@
 #include <ol_txrx_ctrl_api.h>
 #include <ol_txrx_peer_find.h>
 #include <ol_ctrl_txrx_api.h>
-#include "vos_utils.h"
-
 /*--- target->host HTT message dispatch function ----------------------------*/
 
 #ifndef DEBUG_CREDIT
@@ -533,101 +531,6 @@ htt_t2h_lp_msg_handler(void *context, adf_nbuf_t htt_t2h_msg )
         break;
     }
 
-    case HTT_T2H_MSG_TYPE_CHAN_CALDATA:
-    {
-        u8 msg_subtype;
-        u8 chksum_valid;
-        u32 freq;
-        u8 cali_data_idx;
-        u16 center_freq1;
-        u16 center_freq2;
-        u16 payloadsize;
-        u8 frag_num;
-        u8 append_flag;
-        adf_nbuf_t buf;
-        u8 *msg_start_ptr;
-
-        if (!vos_is_fast_chswitch_cali_enabled()) {
-            adf_os_print("fcs cali not enabled");
-            break;
-        }
-
-        msg_start_ptr = (u8 *)msg_word;
-        msg_subtype = HTT_CHAN_CALDATA_MSG_SUB_TYPE_GET(*msg_word);
-        chksum_valid = HTT_CHAN_CALDATA_MSG_CHKSUM_V_GET(*msg_word);
-        frag_num = HTT_CHAN_CALDATA_MSG_FRAG_IDX_GET(*msg_word);
-        if (frag_num > CALI_FRAG_IDX_MAX || frag_num == 0) {
-            adf_os_print("invalid frag_num %d", frag_num);
-            break;
-        }
-        append_flag = HTT_CHAN_CALDATA_MSG_APPENDING_GET(*msg_word);
-        msg_word++;
-        freq = HTT_CHAN_CALDATA_MSG_MHZ_GET(*msg_word);
-        if (HTT_T2H_MSG_CHAN_CALDATA_UPLOAD == msg_subtype) {
-            payloadsize = HTT_CHAN_CALDATA_MSG_PLD_SIZE_GET(*msg_word);
-            msg_word++;
-            center_freq1 = HTT_CHAN_CALDATA_MSG_FREQ1_GET(*msg_word);
-            center_freq2 = HTT_CHAN_CALDATA_MSG_FREQ2_GET(*msg_word);
-            cali_data_idx = get_chan_cali_data_index(freq);
-            if (cali_data_idx >= MAX_WIFI_CHAN_CNT) {
-                adf_os_print("error cali_data_idx %d", cali_data_idx);
-                break;
-            }
-            if ((sizeof(struct htt_chan_caldata_msg) + payloadsize - 1) > CHAN_CALI_DATA_LEN) {
-                adf_os_print("cali_data len %d exceed!", payloadsize);
-                break;
-            }
-            adf_os_print("%s: recv cali data,"
-                         "chksum_valid %u freq %u idx %d frag %d append %d"
-                         " center_freq1 %u center_freq2 %u payloadsize %u\n",
-                         __func__, chksum_valid, freq, cali_data_idx,
-                         frag_num, append_flag, center_freq1,
-                         center_freq2, payloadsize);
-
-            /*cali frag idx start from 1 not 0*/
-            buf = pdev->chan_cali_data_array[cali_data_idx].buf[frag_num - 1];
-            if (!buf) {
-                /*try to alloc buf again, as it alloc failed in the init period*/
-                pdev->chan_cali_data_array[cali_data_idx].buf[frag_num - 1] =
-                    adf_nbuf_alloc(pdev->osdev,
-                                   HTT_MSG_BUF_SIZE(CHAN_CALI_DATA_LEN),
-                                   /* reserve room for HTC header */
-                                   HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING,
-                                   4, FALSE);
-                if (!pdev->chan_cali_data_array[cali_data_idx].buf[frag_num - 1]) {
-                    adf_os_print("no mem for restore cali data for freq %d frag %d",
-                                 freq, frag_num);
-                    break;
-                }
-                adf_os_print("additional alloc cali data for idx %d frag %d", cali_data_idx, frag_num);
-            }
-            /* set the length of the message */
-            adf_nbuf_put_tail(buf,
-                              (sizeof(struct htt_chan_caldata_msg) +
-                               payloadsize - 1));
-            /* rewind beyond alignment pad to get to the HTC header reserved area */
-            adf_nbuf_push_head(buf, HTC_HDR_ALIGNMENT_PADDING);
-
-            /* fill in the message contents */
-            pdev->chan_cali_data_array[cali_data_idx].cali_data_buf[frag_num - 1] =
-                    (u_int32_t *)adf_nbuf_data(buf);
-            adf_os_mem_copy(pdev->chan_cali_data_array[cali_data_idx].cali_data_buf[frag_num - 1],
-                            msg_start_ptr,
-                            (sizeof(struct htt_chan_caldata_msg) +
-                             payloadsize - 1));
-
-            pdev->chan_cali_data_array[cali_data_idx].payloadsize[frag_num - 1] = payloadsize;
-            pdev->chan_cali_data_array[cali_data_idx].freq = freq;
-            pdev->chan_cali_data_array[cali_data_idx].cali_data_valid[frag_num - 1] = true;
-        } else if (HTT_T2H_MSG_CHAN_CALDATA_REQ == msg_subtype) {
-            adf_os_print("firmware req freq %d cali data", freq);
-        } else {
-            adf_os_print("error HTT_T2H_MSG_TYPE_CHAN_CALDATA subtype %d", msg_subtype);
-        }
-
-        break;
-    }
-
 #ifdef IPA_UC_OFFLOAD
     case HTT_T2H_MSG_TYPE_WDI_IPA_OP_RESPONSE:
         {
@@ -945,8 +848,7 @@ if (adf_os_unlikely(pdev->rx_ring.rx_reset)) {
                  */
                 if (ol_cfg_tx_free_at_download(pdev->ctrl_pdev) &&
                     HTT_FAIL_NOTIFY_BREAK_CHECK(status)) {
-                    adf_os_print("HTT TX COMPL for failed data frm: NUM %d TID %d\n",
-                                 num_msdus, HTT_TX_COMPL_IND_TID_GET(*msg_word));
+                    adf_os_print("HTT TX COMPL for failed data frm.\n");
                     break;
                 }
 

@@ -3130,12 +3130,10 @@ sapGotoStarting
     halStatus = sme_RoamConnect(hHal, sapContext->sessionId,
             &sapContext->csrRoamProfile,
             &sapContext->csrRoamId);
-    if (eHAL_STATUS_SUCCESS != halStatus) {
+    if (eHAL_STATUS_SUCCESS != halStatus)
         VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
         "%s: Failed to issue sme_RoamConnect", __func__);
-    }
-
-    return halStatus;
+        return halStatus;
 
 }// sapGotoStarting
 
@@ -5631,7 +5629,6 @@ v_U8_t sapIndicateRadar(ptSapContext sapContext, tSirSmeDfsEventInd *dfs_event)
         !VOS_IS_DFS_CH(sapContext->candidate_ch) &&
         sapContext->candidate_ch != sapContext->channel) {
         target_channel = sapContext->candidate_ch;
-	pMac->sap.SapDfsInfo.new_chanWidth = sapContext->ch_width_orig;
         VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_DEBUG,
                   FL("Candidate channel exist, ch= %d"), target_channel);
     } else {

@@ -85,7 +85,6 @@ typedef enum {
     GEN_PARAM_MULTICAST_RETRY_LIMIT,
     GEN_PARAM_MULTICAST_AGGR_ENABLED,
     GEN_PARAM_MULTICAST_DEL_GROUP,
-    GEN_PARAM_MULTICAST_SET_PROBE,
 #endif
 } GEN_PARAM;
 
@@ -202,13 +201,4 @@ VOS_STATUS wma_set_rx_antanna(void *wma_handle, uint8_t pdev_id,
 			      uint32_t matrix);
 VOS_STATUS wma_set_gpio_cfg(void *handle, struct hal_gpio_cfg *gpio_cfg);
 VOS_STATUS wma_set_gpio_output(void *handle, struct hal_gpio_output *output);
-
-#ifdef AUDIO_MULTICAST_AGGR_SUPPORT
-int wma_cli_au_get_global_info(void *wmapvosContext, int vdev_id,
-			 char *extra);
-int wma_cli_au_get_group_info(void *wmapvosContext, int vdev_id,
-			int info_mask, char *extra, int group_index);
-int wma_add_multicast_group(void *wmapvosContext, int vdev_id,
-			struct audio_multicast_add_group * multi_group);
-#endif
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016, 2019-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016, 2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -552,7 +552,6 @@ OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(NON_QOS_DATA,10,     17,    16,     1,  8);
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(UCAST_MGMT,   1,      1,     4,     0,  1);
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(MCAST_DATA,  10,     17,     4,     1,  4);
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(MCAST_MGMT,   1,      1,     4,     0,  1);
-OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(MCAST_VO,     1,      17,   24,     0,  1);
 #else
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(VO,           1,     16,    24,     0,  1);
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(VI,           3,     16,    16,     1,  4);
@@ -562,7 +561,6 @@ OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(NON_QOS_DATA,12,      6,     4,     1,  8);
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(UCAST_MGMT,   1,      1,     4,     0,  1);
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(MCAST_DATA,  10,     16,     4,     1,  4);
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(MCAST_MGMT,   1,      1,     4,     0,  1);
-OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(MCAST_VO,     1,     17,    24,     0,  1);
 #endif
 
 #ifdef DEBUG_HL_LOGGING
@@ -776,125 +774,6 @@ ol_tx_sched_wrr_adv_credit_sanity_check(struct ol_txrx_pdev_t *pdev, u_int32_t c
     adf_os_assert(okay);
 }
 
-#if defined(AUDIO_MULTICAST_AGGR_SUPPORT)
-#define OL_TX_VO_MCAST_SET_START(tag)	(*(tag) |= 0x01)
-#define OL_TX_VO_MCAST_SET_END(tag)	(*(tag) |= 0x02)
-static void
-ol_tx_sched_wrr_adv_vo_mcast_addtag(struct ol_tx_frms_queue_t *txq,
-				    int tx_limit)
-{
-	int tx_cnt = 0;
-	struct ol_tx_desc_t *tx_desc, *prev_desc;
-	adf_nbuf_t buf;
-	u_int8_t group_id;
-	u_int8_t *tag, *prev_tag = NULL;
-	u_int32_t offset;
-
-	prev_desc = TAILQ_FIRST(&txq->head);
-	TAILQ_FOREACH(tx_desc, &txq->head, tx_desc_list_elem) {
-		group_id = tx_desc->group_id;
-		buf = tx_desc->netbuf;
-		offset = tx_desc->tag_offset;
-
-		if (offset + OL_TX_VO_MCAST_TAG_SIZE > adf_nbuf_len(buf)) {
-			VOS_TRACE(VOS_MODULE_ID_TXRX, VOS_TRACE_LEVEL_ERROR,
-				  "Invalid audio multicast tag offset!");
-			break;
-		}
-
-		tag = adf_nbuf_data(buf) + offset;
-		*tag = 0;
-
-		if (tx_cnt == 0) {
-			OL_TX_VO_MCAST_SET_START(tag);
-		} else if (tx_desc->group_id != prev_desc->group_id) {
-			OL_TX_VO_MCAST_SET_START(tag);
-			OL_TX_VO_MCAST_SET_END(prev_tag);
-		}
-
-		prev_tag = tag;
-
-		if (++tx_cnt == tx_limit)
-			break;
-
-		prev_desc = tx_desc;
-	}
-
-	if (prev_tag)
-		OL_TX_VO_MCAST_SET_END(prev_tag);
-}
-
-static int ol_tx_sched_wrr_adv_vo_mcast_aggr(struct ol_tx_frms_queue_t *txq,
-					     int category_index,
-					     u_int32_t credit,
-					     int tx_limit)
-{
-	u_int64_t expire_time, tsf;
-	struct ol_tx_desc_t *first_tx_desc, *tx_desc;
-	u_int8_t total_num, group_id, seqno;
-	struct ol_txrx_vdev_t *vdev;
-	struct ol_audio_multicast_aggr_conf *conf;
-	int tx_allow_cnt = 0, force_tx = 0;
-
-	if (category_index != OL_TX_SCHED_WRR_ADV_CAT_MCAST_VO ||
-	    !txq->frms || !credit || !tx_limit)
-		return tx_limit;
-
-	first_tx_desc = TAILQ_FIRST(&txq->head);
-	vdev = first_tx_desc->vdev;
-	conf = &vdev->au_mcast_conf;
-
-	/* expired, flush as no subsequence packets */
-	expire_time = txq->last_enq_time +
-		msecs_to_jiffies(OL_TX_VO_MCAST_GROUP_EXP_TIME);
-	if (vos_system_time_after(jiffies, expire_time)) {
-		conf->expire_error++;
-		force_tx = 1;
-	}
-
-	total_num = first_tx_desc->total_num;
-	seqno = first_tx_desc->seqno;
-	tsf = first_tx_desc->tsf;
-	group_id = first_tx_desc->group_id;
-
-	if (seqno != 1)
-		conf->seqno_error++;
-
-	TAILQ_FOREACH(tx_desc, &txq->head, tx_desc_list_elem) {
-		if (tx_desc->tsf != tsf) {
-			force_tx = 1;
-			break;
-		}
-
-		if (++tx_allow_cnt == total_num)
-			break;
-	}
-
-	if (tx_allow_cnt == total_num || force_tx)
-		tx_limit = tx_allow_cnt > credit ? 0 : tx_allow_cnt;
-	else
-		tx_limit = 0;
-
-	if (!tx_limit)
-		goto out;
-
-	ol_tx_sched_wrr_adv_vo_mcast_addtag(txq, tx_limit);
-
-	conf->packet_success += tx_limit;
-	conf->sched_count++;
-out:
-	return tx_limit;
-}
-#else
-static int ol_tx_sched_wrr_adv_vo_mcast_aggr(struct ol_tx_frms_queue_t *txq,
-					     int category_index,
-					     u_int32_t credit,
-					     int tx_limit)
-{
-	return tx_limit;
-}
-#endif
-
 /*
  * The scheduler sync spinlock has been acquired outside this function,
  * so there is no need to worry about mutex within this function.
@@ -989,9 +868,6 @@ ol_tx_sched_select_batch_wrr_adv(
             pdev->tx_sched.last_used_txq = txq;
 
             tx_limit = ol_tx_bad_peer_dequeue_check(txq, category->specs.send_limit, &tx_limit_flag);
-
-	    tx_limit = ol_tx_sched_wrr_adv_vo_mcast_aggr(txq, category_index, credit, tx_limit);
-
             frames = ol_tx_dequeue(
                 pdev, txq, &sctx->head, tx_limit, &credit, &bytes);
             ol_tx_bad_peer_update_tx_limit(pdev, txq, frames, tx_limit_flag);
@@ -1168,14 +1044,12 @@ void ol_tx_sched_wrr_param_update(struct ol_txrx_pdev_t *pdev,
 				struct ol_tx_sched_wrr_adv_t *scheduler)
 {
 	int i;
-#ifdef WLAN_DEBUG
 	char *tx_sched_wrr_name[4] = {
 		"BE",
 		"BK",
 		"VI",
 		"VO"
 	};
-#endif
 
 	if (NULL == scheduler)
 		return;
@@ -1243,7 +1117,6 @@ ol_tx_sched_init_wrr_adv(
     OL_TX_SCHED_WRR_ADV_CAT_CFG_STORE(UCAST_MGMT, scheduler);
     OL_TX_SCHED_WRR_ADV_CAT_CFG_STORE(MCAST_DATA, scheduler);
     OL_TX_SCHED_WRR_ADV_CAT_CFG_STORE(MCAST_MGMT, scheduler);
-    OL_TX_SCHED_WRR_ADV_CAT_CFG_STORE(MCAST_VO, scheduler);
 
     ol_tx_sched_wrr_param_update(pdev, scheduler);
 
@@ -1613,30 +1486,6 @@ ol_tx_sched(struct ol_txrx_pdev_t *pdev)
     u_int32_t credit;
 
     TX_SCHED_DEBUG_PRINT("Enter %s\n", __func__);
-
-    if (vos_is_fast_chswitch_cali_enabled()) {
-        int cali_tx_credit_availability = A_EINVAL;
-
-        if (adf_os_atomic_read(&pdev->htt_pdev->tx_cali_pending) != 0) {
-            VOS_TRACE(VOS_MODULE_ID_TXRX, VOS_TRACE_LEVEL_ERROR,
-                      "<HTT>ol_tx_sched while cali dl pending, credit %d\n",
-                      adf_os_atomic_read(&pdev->target_tx_credit));
-            if (adf_os_atomic_read(&pdev->target_tx_credit) >= 2) {
-                cali_tx_credit_availability =
-                    ol_tx_target_credit_dec(pdev, 2);
-                if (cali_tx_credit_availability == A_ERROR)
-                    return;
-                ol_tx_cali_pending_status_set(pdev, 0);
-                complete(&pdev->htt_pdev->tx_cali_resource);
-                VOS_TRACE(VOS_MODULE_ID_TXRX, VOS_TRACE_LEVEL_ERROR,
-                          "<HTT>ol_tx_sched up cali dl, current credit %d\n",
-                          adf_os_atomic_read(&pdev->target_tx_credit));
-            }
-            else
-                return;
-        }
-    }
-
     adf_os_spin_lock_bh(&pdev->tx_queue_spinlock);
     if (pdev->tx_sched.tx_sched_status != ol_tx_scheduler_idle) {
         adf_os_spin_unlock_bh(&pdev->tx_queue_spinlock);

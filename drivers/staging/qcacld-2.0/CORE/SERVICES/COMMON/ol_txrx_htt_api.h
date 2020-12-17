@@ -332,17 +332,6 @@ int
 ol_tx_target_credit_dec(struct ol_txrx_pdev_t *pdev, int credit);
 
 /**
- * @brief set cali data download status
- * @details
- *  Function is used to set cali data download status to pending or not.
- *
- * @param pdev - the data physical device that sent the tx frames
- * @param value - 1 means cali data download process is pending
- */
-void
-ol_tx_cali_pending_status_set(struct ol_txrx_pdev_t *pdev, int value);
-
-/**
  * @brief Process an rx indication message sent by the target.
  * @details
  *  The target sends a rx indication message to the host as a

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) "2012,2014" The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -887,7 +887,6 @@ const sHalNv nvDefaults =
                     {NV_CHANNEL_ENABLE, 30},            //RF_CHAN_161,
                     {NV_CHANNEL_ENABLE, 0},             //RF_CHAN_165,
 
-#ifdef WLAN_FEATURE_DSRC
                     // 802.11p
                     {NV_CHANNEL_DISABLE, 30},           //RF_CHAN_170,
                     {NV_CHANNEL_DISABLE, 30},           //RF_CHAN_171,
@@ -904,9 +903,6 @@ const sHalNv nvDefaults =
                     {NV_CHANNEL_ENABLE, 30},            //RF_CHAN_182,
                     {NV_CHANNEL_DISABLE, 30},           //RF_CHAN_183,
                     {NV_CHANNEL_ENABLE, 30},            //RF_CHAN_184,
-#else
-                    {NV_CHANNEL_DISABLE, 30},           //RF_CHAN_173,
-#endif
 
                     //2.4GHz Band, channel bonded channels
                     {NV_CHANNEL_ENABLE, 22},            //RF_CHAN_BOND_3,
@@ -1041,7 +1037,6 @@ const sHalNv nvDefaults =
                     {NV_CHANNEL_DISABLE, 0},            //RF_CHAN_161,
                     {NV_CHANNEL_DISABLE, 0},            //RF_CHAN_165,
 
-#ifdef WLAN_FEATURE_DSRC
                     // 802.11p
                     {NV_CHANNEL_DISABLE, 30},           //RF_CHAN_170,
                     {NV_CHANNEL_DISABLE, 30},           //RF_CHAN_171,
@@ -1058,9 +1053,6 @@ const sHalNv nvDefaults =
                     {NV_CHANNEL_ENABLE, 30},            //RF_CHAN_182,
                     {NV_CHANNEL_DISABLE, 30},           //RF_CHAN_183,
                     {NV_CHANNEL_ENABLE, 30},            //RF_CHAN_184,
-#else
-                    {NV_CHANNEL_DISABLE, 30},           //RF_CHAN_173,
-#endif
 
                     //2.4GHz Band, channel bonded channels
                     {NV_CHANNEL_ENABLE, 20},            //RF_CHAN_BOND_3,

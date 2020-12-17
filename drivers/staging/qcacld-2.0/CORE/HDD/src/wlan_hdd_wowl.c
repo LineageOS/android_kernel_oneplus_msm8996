@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, 2016, 2018, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016, 2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -298,11 +298,8 @@ v_BOOL_t hdd_del_wowl_ptrn (hdd_adapter_t *pAdapter, const char * ptrn)
   v_U8_t sessionId = pAdapter->sessionId;
 
   // Detect pattern
-  for (id=0; id<WOWL_MAX_PTRNS_ALLOWED; id++)
+  for (id=0; id<WOWL_MAX_PTRNS_ALLOWED && g_hdd_wowl_ptrns[id] != NULL; id++)
   {
-    if (!g_hdd_wowl_ptrns[id])
-      continue;
-
     if(!strcmp(ptrn, g_hdd_wowl_ptrns[id]))
     {
       patternFound = VOS_TRUE;

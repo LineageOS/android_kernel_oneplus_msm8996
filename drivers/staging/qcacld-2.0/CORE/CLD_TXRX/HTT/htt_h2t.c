@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -54,6 +54,8 @@
 #include <htt_internal.h>
 #include <vos_getBin.h>
 
+#define HTT_MSG_BUF_SIZE(msg_bytes) \
+   ((msg_bytes) + HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING)
 
 #ifndef container_of
 #define container_of(ptr, type, member) ((type *)( \
@@ -1058,123 +1060,3 @@ int htt_h2t_ipa_uc_get_stats(struct htt_pdev_t *pdev)
 }
 #endif /* IPA_UC_OFFLOAD */
 
-int htt_h2t_chan_cali_data_msg(struct htt_pdev_t *pdev,
-			       u32 freq)
-{
-	struct htt_htc_pkt *pkt[CALI_FRAG_IDX_MAX] = {NULL, NULL};
-	adf_nbuf_t msg;
-	u32 *msg_word;
-	u8 cali_idx;
-	int tx_credit_availability = A_EINVAL;
-	u8 frag_num;
-	u32 freq_in_msg;
-	adf_os_size_t msg_len;
-	int frag_idx = 0;
-	long rc;
-
-	cali_idx = get_chan_cali_data_index(freq);
-	if (cali_idx >= MAX_WIFI_CHAN_CNT) {
-		adf_os_print("error chan cali data array idx %d", cali_idx);
-		return A_EINVAL;
-	}
-
-	for (frag_idx = 0; frag_idx < CALI_FRAG_IDX_MAX; frag_idx++) {
-		if (!pdev->chan_cali_data_array[cali_idx].cali_data_valid[frag_idx]) {
-			adf_os_print("no cali data for idx %d of frag %d",
-				     cali_idx, frag_idx + 1);
-			return A_NO_RESOURCE;
-		}
-		if (!pdev->chan_cali_data_array[cali_idx].buf[frag_idx]) {
-			adf_os_print("no cali buf for idx %d of frag %d",
-				     cali_idx, frag_idx + 1);
-			return A_NO_RESOURCE;
-		}
-		msg_word =
-		  pdev->chan_cali_data_array[cali_idx].cali_data_buf[frag_idx];
-		frag_num = HTT_CHAN_CALDATA_MSG_FRAG_IDX_GET(*msg_word);
-		msg_word++;
-		freq_in_msg = HTT_CHAN_CALDATA_MSG_MHZ_GET(*msg_word);
-		if (freq_in_msg != freq || frag_num != (frag_idx + 1)) {
-			adf_os_print("mismatch between freq %d frag %d and "
-				     "msg freq %d frag %d",
-				     freq, frag_idx + 1,
-				     freq_in_msg, frag_num);
-			return A_EINVAL;
-		}
-	}
-
-	if ((pdev->cfg.is_high_latency) &&
-	    (!pdev->cfg.default_tx_comp_req)) {
-		tx_credit_availability =
-		    ol_tx_target_credit_dec(pdev->txrx_pdev, 2);
-		if (tx_credit_availability == A_ERROR) {
-			u_int64_t tx_pending_record = 0;
-
-			adf_os_print("htt dl cali pending");
-			tx_pending_record = ktime_get_ns();
-			ol_tx_cali_pending_status_set(pdev->txrx_pdev, 1);
-			rc =
-			  wait_for_completion_timeout(&pdev->tx_cali_resource,
-						      msecs_to_jiffies(15));
-			if (!rc) {
-				adf_os_print("dl cali pending too long %lld",
-					     (ktime_get_ns() -
-						 tx_pending_record));
-				ol_tx_cali_pending_status_set(pdev->txrx_pdev, 0);
-				return A_NO_RESOURCE;
-			}
-			tx_credit_availability = A_OK;
-		}
-	}
-
-	for (frag_idx = 0; frag_idx < CALI_FRAG_IDX_MAX;) {
-		pkt[frag_idx] = htt_htc_pkt_alloc(pdev);
-		if (!pkt[frag_idx])
-			break;
-		frag_idx++;
-	}
-
-	if (frag_idx < CALI_FRAG_IDX_MAX) {
-		int i;
-		for (i = 0; i < CALI_FRAG_IDX_MAX;i++) {
-			if (!pkt[i])
-				htt_htc_pkt_free(pdev, pkt[i]);
-		}
-		if (tx_credit_availability == A_OK)
-			ol_tx_target_credit_update(pdev->txrx_pdev, 2);
-		adf_os_print("%s: alloc htt_htc_pkt fail", __func__);
-		return A_NO_RESOURCE;
-	}
-
-	for (frag_idx = 0; frag_idx < CALI_FRAG_IDX_MAX; frag_idx++) {
-		msg = pdev->chan_cali_data_array[cali_idx].buf[frag_idx];
-		msg_word =
-		    pdev->chan_cali_data_array[cali_idx].cali_data_buf[frag_idx];
-
-		/* show that this is not a tx frame download (not required, but helpful) */
-		(pkt[frag_idx])->msdu_id = HTT_TX_COMPL_INV_MSDU_ID;
-		(pkt[frag_idx])->pdev_ctxt = NULL; /* not used during send-done callback */
-
-		HTT_H2T_MSG_TYPE_CLR(*msg_word);
-		HTT_CHAN_CALDATA_MSG_SUB_TYPE_CLR(*msg_word);
-
-		HTT_H2T_MSG_TYPE_SET(*msg_word, HTT_H2T_MSG_TYPE_CHAN_CALDATA);
-		HTT_CHAN_CALDATA_MSG_SUB_TYPE_SET(*msg_word,
-						  HTT_H2T_MSG_CHAN_CALDATA_DOWNLOAD);
-		msg_len = adf_nbuf_len(msg);
-		SET_HTC_PACKET_INFO_TX(&(pkt[frag_idx])->htc_pkt, NULL,
-				       adf_nbuf_data(msg),
-				       msg_len,
-				       pdev->htc_endpoint, 1);
-		SET_HTC_PACKET_NET_BUF_CONTEXT(&(pkt[frag_idx])->htc_pkt, msg);
-#ifdef ATH_11AC_TXCOMPACT
-		if (HTCSendPkt(pdev->htc_pdev, &(pkt[frag_idx])->htc_pkt) == A_OK)
-			htt_htc_misc_pkt_list_add(pdev, pkt[frag_idx]);
-#else
-		HTCSendPkt(pdev->htc_pdev, &(pkt[frag_idx])->htc_pkt);
-#endif
-		adf_os_print("send out %zu cali data for freq %d of frag %d",
-			     msg_len, freq, frag_idx + 1);
-	}
-	return A_OK;
-}

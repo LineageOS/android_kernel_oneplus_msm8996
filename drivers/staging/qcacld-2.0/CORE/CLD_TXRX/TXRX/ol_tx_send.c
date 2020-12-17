@@ -406,15 +406,6 @@ ol_tx_target_credit_dec(struct ol_txrx_pdev_t *pdev, int credit)
     return A_OK;
 }
 
-void
-ol_tx_cali_pending_status_set(struct ol_txrx_pdev_t *pdev, int value)
-{
-	adf_os_spin_lock_bh(&pdev->tx_queue_spinlock);
-	adf_os_atomic_set(&pdev->htt_pdev->tx_cali_pending, value);
-	adf_os_spin_unlock_bh(&pdev->tx_queue_spinlock);
-	return;
-}
-
 #ifdef QCA_COMPUTE_TX_DELAY
 
 static void
