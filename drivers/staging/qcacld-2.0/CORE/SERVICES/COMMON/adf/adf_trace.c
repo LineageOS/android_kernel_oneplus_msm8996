@@ -601,6 +601,7 @@ void adf_dp_trace_log_pkt(uint8_t session_id, struct sk_buff *skb,
 void adf_dp_display_proto_pkt(struct adf_dp_trace_record_s *record,
 			      uint16_t index)
 {
+#ifdef WLAN_DEBUG
 	struct adf_dp_trace_proto_buf *buf =
 		(struct adf_dp_trace_proto_buf *)record->data;
 
@@ -612,6 +613,7 @@ void adf_dp_display_proto_pkt(struct adf_dp_trace_record_s *record,
 		MAC_ADDR_ARRAY(buf->sa.bytes), adf_dp_dir_to_str(buf->dir),
 		MAC_ADDR_ARRAY(buf->da.bytes), adf_dp_type_to_str(buf->type),
 		adf_dp_subtype_to_str(buf->subtype));
+#endif
 }
 
 /**
@@ -651,6 +653,7 @@ void adf_dp_trace_proto_pkt(enum ADF_DP_TRACE_ID code, uint8_t vdev_id,
 void adf_dp_display_mgmt_pkt(struct adf_dp_trace_record_s *record,
 			      uint16_t index)
 {
+#ifdef WLAN_DEBUG
 	struct adf_dp_trace_mgmt_buf *buf =
 		(struct adf_dp_trace_mgmt_buf *)record->data;
 
@@ -659,6 +662,7 @@ void adf_dp_display_mgmt_pkt(struct adf_dp_trace_record_s *record,
 		buf->vdev_id);
 	DPTRACE_PRINT("DPT: Type %s Subtype %s", adf_dp_type_to_str(buf->type),
 		adf_dp_subtype_to_str(buf->subtype));
+#endif
 }
 
 void adf_dp_trace_mgmt_pkt(enum ADF_DP_TRACE_ID code, uint8_t vdev_id,
@@ -682,6 +686,7 @@ void adf_dp_trace_mgmt_pkt(enum ADF_DP_TRACE_ID code, uint8_t vdev_id,
 void adf_dp_display_event_record(struct adf_dp_trace_record_s *record,
 			      uint16_t index)
 {
+#ifdef WLAN_DEBUG
 	struct adf_dp_trace_event_buf *buf =
 		(struct adf_dp_trace_event_buf *)record->data;
 
@@ -690,6 +695,7 @@ void adf_dp_display_event_record(struct adf_dp_trace_record_s *record,
 		buf->vdev_id);
 	DPTRACE_PRINT("DPT: Type %s Subtype %s", adf_dp_type_to_str(buf->type),
 		adf_dp_subtype_to_str(buf->subtype));
+#endif
 }
 
 void adf_dp_trace_record_event(enum ADF_DP_TRACE_ID code, uint8_t vdev_id,
