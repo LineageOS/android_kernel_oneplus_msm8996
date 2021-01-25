@@ -907,13 +907,13 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 	struct tfa98xx *tfa98xx;
 	int ret;
 	struct device_node *np = i2c->dev.of_node;
-    int error = 0;
+	int error = 0;
 
-    pr_err("%s\n",__func__);
+	pr_err("%s\n",__func__);
 
 
-    if(np!=NULL)
-        tfa_codec_np =np;
+	if(np!=NULL)
+		tfa_codec_np =np;
 
 	if (!i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C)) {
 		dev_err(&i2c->dev, "check_functionality failed\n");
@@ -921,7 +921,7 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 	}
 
 	tfa98xx = devm_kzalloc(&i2c->dev, sizeof(struct tfa98xx),
-			       GFP_KERNEL);
+			GFP_KERNEL);
 	if (tfa98xx == NULL)
 		return -ENOMEM;
 
@@ -954,39 +954,39 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 		goto gpio_fail;
 	}
 	gpio_direction_output(tfa98xx->rst_gpio, 1);
-/*zhiguang.su@MultiMedia.AudioDrv on 2015-05-18,optimize for speed */
+	/*zhiguang.su@MultiMedia.AudioDrv on 2015-05-18,optimize for speed */
 	udelay(100);
 	gpio_direction_output(tfa98xx->rst_gpio, 0);
 	//zhiguang.su add end 1218
 
 	INIT_WORK(&tfa98xx->init_work, tfa98xx_dsp_init);
 	INIT_WORK(&tfa98xx->stop_work, tfa98xx_stop);
-    tfa98xx->stop_ref = 0;
+	tfa98xx->stop_ref = 0;
 
 	/* register codec */
 	ret = snd_soc_register_codec(&i2c->dev, &tfa98xx_soc_codec,
-				     &tfa98xx_dai, 1);
+			&tfa98xx_dai, 1);
 	if (ret < 0) {
 		pr_err("%s: Error registering tfa98xx codec", __func__);
 		goto codec_fail;
 	}
 
-/*zhiguang.su@MultiMedia.AudioDrv on 2015-05-18,optimize for speed */
+	/*zhiguang.su@MultiMedia.AudioDrv on 2015-05-18,optimize for speed */
 	pr_debug("tfa98xx probed successfully!");
 
 
-/* zhiguang.su@MultiMedia.AudioDrv on 2015-05-29, add for smart pa calibtation*/
+	/* zhiguang.su@MultiMedia.AudioDrv on 2015-05-29, add for smart pa calibtation*/
 	error = sysfs_create_file(&i2c->dev.kobj, &tfa98xx_state_attr.attr);
-    if(error < 0)
-    {
-        pr_err("%s sysfs_create_file tfa98xx_state_attr err.",__func__);
-    }
-/* zhiguang.su@MultiMedia.AudioDrv on 2015-11-09, add for debug*/
+	if(error < 0)
+	{
+		pr_err("%s sysfs_create_file tfa98xx_state_attr err.",__func__);
+	}
+	/* zhiguang.su@MultiMedia.AudioDrv on 2015-11-09, add for debug*/
 	error = sysfs_create_file(&i2c->dev.kobj, &tfa98xx_Log_state_attr.attr);
-    if(error < 0)
-    {
-        pr_err("%s sysfs_create_file tfa98xx_Log_state_attr err.",__func__);
-    }
+	if(error < 0)
+	{
+		pr_err("%s sysfs_create_file tfa98xx_Log_state_attr err.",__func__);
+	}
 
 	return ret;
 
