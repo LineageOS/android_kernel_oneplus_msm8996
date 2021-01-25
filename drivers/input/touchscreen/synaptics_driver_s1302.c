@@ -1105,7 +1105,7 @@ static ssize_t synaptics_s1302_radd_write(struct file *file, const char __user *
     }
     else
         block = temp_block;
-	return count;
+    return count;
 }
 static int synaptics_s1302_radd_open(struct inode *inode, struct file *file)
 {
